@@ -2,6 +2,7 @@ import { initializeApp } from "firebase/app"
 import { getAuth } from "firebase/auth"
 import { getFirestore } from "firebase/firestore"
 
+// Configuración de Firebase - Reemplaza con tus credenciales
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
   authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
@@ -11,10 +12,13 @@ const firebaseConfig = {
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
 }
 
+// Inicializar Firebase
 const app = initializeApp(firebaseConfig)
 
+// Inicializar Firebase Auth
 export const auth = getAuth(app)
 
+// Inicializar Firestore
 export const db = getFirestore(app)
 
 export default app
