@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Badge } from "@/components/ui/badge"
 import {
   CheckCircle,
   XCircle,
@@ -21,6 +22,7 @@ import {
   ChevronsLeft,
   ChevronsRight,
   Clock,
+  UserCheck,
 } from "lucide-react"
 
 interface PersonData {
@@ -38,6 +40,9 @@ interface AccessLog {
   timestamp: string
   status: "granted" | "denied" | "q10_success" | "q10_failed"
   details?: string
+  grantedByUserId?: string
+  grantedByUserName?: string
+  grantedByUserEmail?: string
 }
 
 export function AccessControl() {
@@ -319,7 +324,7 @@ export function AccessControl() {
                 return (
                   <div
                     key={item.id || index}
-                    className={`flex flex-col sm:flex-row items-start sm:items-center justify-between p-2 border rounded-lg gap-3 ${
+                    className={`flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 border rounded-lg gap-3 ${
                       activeTab === "granted"
                         ? "bg-green-50 border-green-200"
                         : activeTab === "denied"
@@ -357,9 +362,24 @@ export function AccessControl() {
                           <span>{person.programa}</span>
                         </div>
                         {isAccessLog && (
-                          <p className="text-xs text-muted-foreground mt-1">
-                            Último acceso: {new Date(item.timestamp).toLocaleString()}
-                          </p>
+                          <div className="mt-1 space-y-1">
+                            <p className="text-xs text-muted-foreground">
+                              Último acceso: {new Date(item.timestamp).toLocaleString()}
+                            </p>
+                            {item.grantedByUserName && (
+                              <div className="flex items-center gap-1 text-xs">
+                                <UserCheck className="w-3 h-3 text-blue-600" />
+                                <span className="text-blue-600 font-medium">
+                                  {person.nombre}, autorizado por {item.grantedByUserName}
+                                </span>
+                                {item.grantedByUserEmail && (
+                                  <Badge variant="outline" className="text-xs px-1 py-0">
+                                    {item.grantedByUserEmail}
+                                  </Badge>
+                                )}
+                              </div>
+                            )}
+                          </div>
                         )}
                       </div>
                     </div>

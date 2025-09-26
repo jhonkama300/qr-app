@@ -21,6 +21,15 @@ export interface AccessLog {
   status: "granted" | "denied" | "q10_success" | "q10_failed"
   details?: string
   source?: "direct" | "q10" | "manual" // Nuevo campo para el origen del escaneo/entrada
+  grantedByUserId?: string // ID del usuario que otorgó el acceso
+  grantedByUserName?: string // Nombre del usuario que otorgó el acceso
+  grantedByUserEmail?: string // Email del usuario que otorgó el acceso
+}
+
+interface UserInfo {
+  userId?: string
+  userName?: string
+  userEmail?: string
 }
 
 interface StudentStoreContextType {
@@ -30,13 +39,15 @@ interface StudentStoreContextType {
     granted: boolean,
     details?: string,
     source?: "direct" | "q10" | "manual",
-  ) => Promise<void> // Añadir source
+    userInfo?: UserInfo,
+  ) => Promise<void>
   markQ10Access: (
     id: string,
     status: "q10_success" | "q10_failed",
     details?: string,
     source?: "direct" | "q10" | "manual",
-  ) => Promise<void> // Añadir source
+    userInfo?: UserInfo,
+  ) => Promise<void>
 }
 
 const StudentStoreContext = createContext<StudentStoreContextType | undefined>(undefined)
@@ -79,7 +90,13 @@ export function StudentStoreProvider({ children }: { children: React.ReactNode }
   }, [])
 
   const markStudentAccess = useCallback(
-    async (identificacion: string, granted: boolean, details?: string, source?: "direct" | "q10" | "manual") => {
+    async (
+      identificacion: string,
+      granted: boolean,
+      details?: string,
+      source?: "direct" | "q10" | "manual",
+      userInfo?: UserInfo,
+    ) => {
       try {
         const log: AccessLog = {
           identificacion,
@@ -87,6 +104,9 @@ export function StudentStoreProvider({ children }: { children: React.ReactNode }
           status: granted ? "granted" : "denied",
           details: details || (granted ? "Acceso concedido" : "Acceso denegado"),
           source: source || "direct", // Guardar el origen
+          grantedByUserId: userInfo?.userId,
+          grantedByUserName: userInfo?.userName,
+          grantedByUserEmail: userInfo?.userEmail,
         }
         await addDoc(collection(db, "access_logs"), log)
         console.log("Registro de acceso guardado:", log)
@@ -103,6 +123,7 @@ export function StudentStoreProvider({ children }: { children: React.ReactNode }
       status: "q10_success" | "q10_failed",
       details?: string,
       source?: "direct" | "q10" | "manual",
+      userInfo?: UserInfo,
     ) => {
       try {
         const log: AccessLog = {
@@ -111,6 +132,9 @@ export function StudentStoreProvider({ children }: { children: React.ReactNode }
           status,
           details: details || (status === "q10_success" ? "Validación Q10 exitosa" : "Validación Q10 fallida"),
           source: source || "q10", // Guardar el origen
+          grantedByUserId: userInfo?.userId,
+          grantedByUserName: userInfo?.userName,
+          grantedByUserEmail: userInfo?.userEmail,
         }
         await addDoc(collection(db, "access_logs"), log)
         console.log("Registro de acceso Q10 guardado:", log)

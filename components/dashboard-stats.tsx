@@ -1,14 +1,11 @@
 "use client"
 
-import { AlertDescription } from "@/components/ui/alert"
-
-import { Alert } from "@/components/ui/alert"
-
 import { useState, useEffect } from "react"
 import { collection, getDocs, query, orderBy } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { CheckCircle, XCircle, Clock, Users, Loader2 } from "lucide-react"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { CheckCircle, XCircle, Clock, Users, Loader2, UserCheck, BarChart3, TrendingUp } from "lucide-react"
 
 interface PersonData {
   id: string
@@ -25,6 +22,16 @@ interface AccessLog {
   timestamp: string
   status: "granted" | "denied" | "q10_success" | "q10_failed"
   details?: string
+  grantedByUserId?: string
+  grantedByUserName?: string
+  grantedByUserEmail?: string
+}
+
+interface UserStats {
+  userId: string
+  userName: string
+  userEmail: string
+  registrosCount: number
 }
 
 export function DashboardStats() {
@@ -41,6 +48,7 @@ export function DashboardStats() {
     setLoading(true)
     setError(null)
     try {
+      // Cargar todas las personas
       const personsSnapshot = await getDocs(collection(db, "personas"))
       const personsData: PersonData[] = []
       personsSnapshot.forEach((doc) => {
@@ -51,6 +59,7 @@ export function DashboardStats() {
       })
       setAllPersons(personsData)
 
+      // Cargar logs de acceso ordenados por timestamp descendente
       const logsQuery = query(collection(db, "access_logs"), orderBy("timestamp", "desc"))
       const logsSnapshot = await getDocs(logsQuery)
       const logsData: AccessLog[] = []
@@ -69,6 +78,28 @@ export function DashboardStats() {
     }
   }
 
+  const getUserStats = (): UserStats[] => {
+    const userStatsMap = new Map<string, UserStats>()
+
+    accessLogs.forEach((log) => {
+      if (log.grantedByUserId && log.grantedByUserName) {
+        const existing = userStatsMap.get(log.grantedByUserId)
+        if (existing) {
+          existing.registrosCount++
+        } else {
+          userStatsMap.set(log.grantedByUserId, {
+            userId: log.grantedByUserId,
+            userName: log.grantedByUserName,
+            userEmail: log.grantedByUserEmail || "",
+            registrosCount: 1,
+          })
+        }
+      }
+    })
+
+    return Array.from(userStatsMap.values()).sort((a, b) => b.registrosCount - a.registrosCount)
+  }
+
   const getUniqueAccessLogs = () => {
     const uniqueLogs = new Map<string, AccessLog>()
     accessLogs.forEach((log) => {
@@ -83,6 +114,8 @@ export function DashboardStats() {
   }
 
   const uniqueAccessLogs = getUniqueAccessLogs()
+  const userStats = getUserStats()
+  const topUser = userStats[0] // Usuario con más registros
 
   const grantedAccessCount = uniqueAccessLogs.filter(
     (log) => log.status === "granted" || log.status === "q10_success",
@@ -93,68 +126,175 @@ export function DashboardStats() {
   const scannedIdentifications = new Set(uniqueAccessLogs.map((log) => log.identificacion))
   const waitingPersonsCount = allPersons.filter((person) => !scannedIdentifications.has(person.identificacion)).length
   const totalPersonsCount = allPersons.length
+  const totalRegistrosCount = accessLogs.length // Total de registros de acceso
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[200px]">
-        <div className="text-center">
-          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-2" />
-          <p className="text-muted-foreground">Cargando estadísticas...</p>
+      <div className="flex flex-1 flex-col gap-4 p-4">
+        <div className="flex items-center justify-center min-h-[400px]">
+          <div className="text-center">
+            <Loader2 className="h-8 w-8 animate-spin mx-auto mb-2" />
+            <p className="text-muted-foreground">Cargando estadísticas del dashboard...</p>
+          </div>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Total Personas</CardTitle>
-          <Users className="h-4 w-4 text-muted-foreground" />
-        </CardHeader>
-        <CardContent>
-          <div className="text-2xl font-bold">{totalPersonsCount}</div>
-          <p className="text-xs text-muted-foreground">Registros en la base de datos</p>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium text-green-600">Acceso Concedido</CardTitle>
-          <CheckCircle className="h-4 w-4 text-green-600" />
-        </CardHeader>
-        <CardContent>
-          <div className="text-2xl font-bold text-green-800">{grantedAccessCount}</div>
-          <p className="text-xs text-muted-foreground">Personas con acceso permitido</p>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium text-red-600">Acceso Denegado</CardTitle>
-          <XCircle className="h-4 w-4 text-red-600" />
-        </CardHeader>
-        <CardContent>
-          <div className="text-2xl font-bold text-red-800">{deniedAccessCount}</div>
-          <p className="text-xs text-muted-foreground">Personas con acceso denegado</p>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium text-blue-600">En Espera</CardTitle>
-          <Clock className="h-4 w-4 text-blue-600" />
-        </CardHeader>
-        <CardContent>
-          <div className="text-2xl font-bold text-blue-800">{waitingPersonsCount}</div>
-          <p className="text-xs text-muted-foreground">Personas sin escanear</p>
-        </CardContent>
-      </Card>
+    <div className="flex flex-1 flex-col gap-6 p-4">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold">Dashboard Principal</h1>
+          <p className="text-muted-foreground">Resumen general del sistema de control de acceso</p>
+        </div>
+      </div>
 
       {error && (
-        <Alert variant="destructive" className="col-span-full">
+        <Alert variant="destructive">
           <AlertDescription>{error}</AlertDescription>
         </Alert>
+      )}
+
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Estudiantes Registrados</CardTitle>
+            <Users className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{totalPersonsCount}</div>
+            <p className="text-xs text-muted-foreground">Total en la base de datos</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Registros</CardTitle>
+            <BarChart3 className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{totalRegistrosCount}</div>
+            <p className="text-xs text-muted-foreground">Registros de acceso totales</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-green-600">Accesos Concedidos</CardTitle>
+            <CheckCircle className="h-4 w-4 text-green-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-green-800">{grantedAccessCount}</div>
+            <p className="text-xs text-muted-foreground">Personas con acceso permitido</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-red-600">Accesos Denegados</CardTitle>
+            <XCircle className="h-4 w-4 text-red-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-red-800">{deniedAccessCount}</div>
+            <p className="text-xs text-muted-foreground">Personas con acceso denegado</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <TrendingUp className="w-5 h-5 text-blue-600" />
+              Usuario Más Activo
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {topUser ? (
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <UserCheck className="w-4 h-4 text-blue-600" />
+                  <span className="font-medium">{topUser.userName}</span>
+                </div>
+                <p className="text-sm text-muted-foreground">{topUser.userEmail}</p>
+                <div className="text-2xl font-bold text-blue-800">{topUser.registrosCount}</div>
+                <p className="text-xs text-muted-foreground">registros realizados</p>
+              </div>
+            ) : (
+              <p className="text-muted-foreground">No hay datos de usuarios disponibles</p>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Clock className="w-5 h-5 text-orange-600" />
+              Estado General
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              <div className="flex justify-between items-center">
+                <span className="text-sm">En espera</span>
+                <span className="font-medium text-orange-600">{waitingPersonsCount}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-sm">Procesados</span>
+                <span className="font-medium">{grantedAccessCount + deniedAccessCount}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-sm">Tasa de aprobación</span>
+                <span className="font-medium text-green-600">
+                  {grantedAccessCount + deniedAccessCount > 0
+                    ? Math.round((grantedAccessCount / (grantedAccessCount + deniedAccessCount)) * 100)
+                    : 0}
+                  %
+                </span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {userStats.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Ranking de Usuarios por Actividad</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {userStats.slice(0, 5).map((user, index) => (
+                <div key={user.userId} className="flex items-center justify-between p-3 border rounded-lg">
+                  <div className="flex items-center gap-3">
+                    <div
+                      className={`flex items-center justify-center w-8 h-8 rounded-full ${
+                        index === 0
+                          ? "bg-yellow-100 text-yellow-800"
+                          : index === 1
+                            ? "bg-gray-100 text-gray-800"
+                            : index === 2
+                              ? "bg-orange-100 text-orange-800"
+                              : "bg-blue-100 text-blue-800"
+                      }`}
+                    >
+                      {index + 1}
+                    </div>
+                    <div>
+                      <p className="font-medium">{user.userName}</p>
+                      <p className="text-sm text-muted-foreground">{user.userEmail}</p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className="font-bold">{user.registrosCount}</p>
+                    <p className="text-xs text-muted-foreground">registros</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
       )}
     </div>
   )

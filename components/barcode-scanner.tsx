@@ -7,8 +7,9 @@ import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Input } from "@/components/ui/input" // Importar Input
-import { Label } from "@/components/ui/label" // Importar Label
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 import {
   CameraOffIcon,
   CameraIcon,
@@ -24,7 +25,7 @@ import {
 } from "lucide-react"
 import { useStudentStoreContext } from "@/components/providers/student-store-provider"
 import { useQ10Validation } from "@/hooks/use-q10-validation"
-import { Alert, AlertDescription } from "@/components/ui/alert" // Importar Alert y AlertDescription
+import { useAuth } from "@/components/auth-provider"
 
 interface ScanResultDisplay {
   type: "success" | "denied" | "error" | "info" // 'info' para estados de procesamiento
@@ -38,6 +39,7 @@ interface ScanResultDisplay {
 export function BarcodeScanner() {
   const { getStudentById, markStudentAccess } = useStudentStoreContext()
   const { processQ10Url, isProcessingQ10, q10Message } = useQ10Validation()
+  const { user } = useAuth()
 
   const [isClient, setIsClient] = useState(false)
   const [hasPermission, setHasPermission] = useState<boolean | null>(null)
@@ -57,7 +59,6 @@ export function BarcodeScanner() {
     setIsClient(true)
   }, [])
 
-  // Inicializar el lector de códigos de barras una vez
   useEffect(() => {
     if (!isClient) return
 
@@ -73,7 +74,6 @@ export function BarcodeScanner() {
     ])
     codeReader.current = new BrowserMultiFormatReader(hints)
 
-    // Cleanup para el lector
     return () => {
       if (codeReader.current) {
         codeReader.current.reset()
@@ -81,7 +81,6 @@ export function BarcodeScanner() {
     }
   }, [isClient])
 
-  // Manejar la enumeración de dispositivos de cámara
   const handleDevices = useCallback((mediaDevices: MediaDeviceInfo[]) => {
     const videoDevices = mediaDevices.filter(({ kind }) => kind === "videoinput")
     setDevices(videoDevices)
@@ -99,7 +98,6 @@ export function BarcodeScanner() {
     }
   }, [])
 
-  // Solicitar permisos de cámara y enumerar dispositivos al cargar
   useEffect(() => {
     if (!isClient) return
 
@@ -120,6 +118,16 @@ export function BarcodeScanner() {
     async (scannedContent: string, source: "direct" | "q10" | "manual") => {
       let currentScanResult: ScanResultDisplay
 
+      const userInfo = user
+        ? {
+            userId: user.id, // Cambiado de user.uid a user.id
+            userName: user.email || "Usuario", // Usando email como nombre por defecto
+            userEmail: user.email || undefined,
+          }
+        : undefined
+
+      console.log("[v0] Usuario que otorga acceso:", userInfo) // Debug log
+
       if (
         scannedContent.startsWith("https://site2.q10.com/CertificadosAcademicos/") ||
         scannedContent.startsWith("https://uparsistemvalledupar.q10.com/CertificadosAcademicos/")
@@ -133,12 +141,12 @@ export function BarcodeScanner() {
         }
         setScanResultDisplay(currentScanResult)
         await processQ10Url(scannedContent)
-        setScanResultDisplay(null) // Limpiar el mensaje temporal después de la redirección de Q10
+        setScanResultDisplay(null)
         return
       } else {
         const student = await getStudentById(scannedContent)
         if (student) {
-          await markStudentAccess(scannedContent, true)
+          await markStudentAccess(scannedContent, true, undefined, source, userInfo)
           currentScanResult = {
             type: "success",
             identificacion: scannedContent,
@@ -148,7 +156,7 @@ export function BarcodeScanner() {
             timestamp: new Date().toISOString(),
           }
         } else {
-          await markStudentAccess(scannedContent, false)
+          await markStudentAccess(scannedContent, false, undefined, source, userInfo)
           currentScanResult = {
             type: "denied",
             identificacion: scannedContent,
@@ -161,23 +169,18 @@ export function BarcodeScanner() {
 
       setScanResultDisplay(currentScanResult)
 
-      // Redirigir después de un breve retraso
       setTimeout(() => {
         if (currentScanResult.type === "success") {
           router.push(`/access-granted?id=${currentScanResult.identificacion}&source=${currentScanResult.source}`)
         } else if (currentScanResult.type === "denied") {
           router.push(`/access-denied?id=${currentScanResult.identificacion}&source=${currentScanResult.source}`)
         }
-        // Para el tipo 'error', simplemente se mostrará el mensaje y no se redirigirá automáticamente.
-      }, 2500) // 2.5 segundos de retraso
+      }, 2500)
     },
-    [getStudentById, markStudentAccess, processQ10Url, router],
+    [getStudentById, markStudentAccess, processQ10Url, router, user], // Agregando user a las dependencias
   )
 
-  // Efecto principal para iniciar y detener el escaneo continuo
   useEffect(() => {
-    // Solo iniciar el escaneo si el cliente está listo, tiene permisos, hay un dispositivo seleccionado,
-    // no se está procesando Q10, no se está mostrando un resultado de escaneo temporal, y no se está procesando manualmente.
     if (
       !isClient ||
       !hasPermission ||
@@ -204,13 +207,12 @@ export function BarcodeScanner() {
       return
     }
 
-    setError(null) // Limpiar errores previos
+    setError(null)
 
     console.log("Iniciando escaneo continuo con dispositivo:", selectedDeviceId)
     codeReader.current
       .decodeFromVideoDevice(selectedDeviceId, video, (result, err) => {
         if (result) {
-          // Solo procesar si no se está mostrando un resultado temporal y no se está procesando Q10 o manualmente
           if (!scanResultDisplay && !isProcessingQ10 && !isManualProcessing) {
             processScanResult(result.getText(), "direct")
           }
@@ -261,7 +263,6 @@ export function BarcodeScanner() {
   const switchCamera = () => {
     if (!isClient || devices.length <= 1) return
 
-    // Detener el escaneo actual antes de cambiar de cámara
     if (codeReader.current) {
       codeReader.current.reset()
     }
@@ -269,7 +270,6 @@ export function BarcodeScanner() {
     const currentIndex = devices.findIndex((device) => device.deviceId === selectedDeviceId)
     const nextIndex = (currentIndex + 1) % devices.length
     setSelectedDeviceId(devices[nextIndex].deviceId)
-    // El useEffect principal se encargará de reiniciar el escaneo con la nueva cámara
   }
 
   const handleManualSubmit = async () => {
@@ -279,14 +279,14 @@ export function BarcodeScanner() {
     }
 
     setIsManualProcessing(true)
-    setManualInputError(null) // Limpiar errores previos de entrada manual
+    setManualInputError(null)
     setScanResultDisplay({
       type: "info",
       identificacion: manualIdInput,
       message: "Validando identificación manual...",
       timestamp: new Date().toISOString(),
     })
-    setError(null) // Limpiar errores de cámara si los hubiera
+    setError(null)
 
     try {
       await processScanResult(manualIdInput.trim(), "manual")
@@ -300,7 +300,7 @@ export function BarcodeScanner() {
       })
     } finally {
       setIsManualProcessing(false)
-      setManualIdInput("") // Limpiar el input después de procesar
+      setManualIdInput("")
     }
   }
 
@@ -353,9 +353,10 @@ export function BarcodeScanner() {
         </CardHeader>
         <CardContent className="space-y-4">
           {error && (
-            <div className="p-3 bg-red-50 border border-red-200 rounded-md">
-              <p className="text-sm text-red-600">{error}</p>
-            </div>
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription className="text-sm text-destructive">{error}</AlertDescription>
+            </Alert>
           )}
 
           <div className="relative w-full pt-[100%] overflow-hidden rounded-lg bg-card shadow-lg border border-border">
@@ -390,7 +391,6 @@ export function BarcodeScanner() {
         </CardContent>
       </Card>
 
-      {/* Área de visualización de resultados temporales */}
       {scanResultDisplay && (
         <div
           className={`mt-4 p-4 rounded-lg border ${
@@ -400,7 +400,7 @@ export function BarcodeScanner() {
                 ? "bg-red-50 border-red-200 text-red-800"
                 : scanResultDisplay.type === "error"
                   ? "bg-yellow-50 border-yellow-200 text-yellow-800"
-                  : "bg-blue-50 border-blue-200 text-blue-800" // Para 'info' type
+                  : "bg-blue-50 border-blue-200 text-blue-800"
           }`}
         >
           <div className="flex items-center gap-2 mb-2">
@@ -439,7 +439,6 @@ export function BarcodeScanner() {
         </div>
       )}
 
-      {/* Sección de entrada manual */}
       <Card className="mt-6">
         <CardHeader className="text-center">
           <CardTitle className="flex items-center justify-center gap-2">
@@ -452,7 +451,7 @@ export function BarcodeScanner() {
           {manualInputError && (
             <Alert variant="destructive">
               <AlertCircle className="h-4 w-4" />
-              <AlertDescription>{manualInputError}</AlertDescription>
+              <AlertDescription className="text-sm text-destructive">{manualInputError}</AlertDescription>
             </Alert>
           )}
           <div className="space-y-2">
