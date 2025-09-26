@@ -8,6 +8,7 @@ export interface User {
   id: string
   email: string
   role: "administrador" | "operativo" | "bufete"
+  mesaAsignada?: number
   createdAt: string
   hasDefaultPassword?: boolean
 }
@@ -43,6 +44,7 @@ export const validateLogin = async (email: string, password: string): Promise<Us
       id: userDoc.id,
       email: userData.email,
       role: userData.role,
+      mesaAsignada: userData.mesaAsignada,
       createdAt: userData.createdAt,
       hasDefaultPassword,
     }
@@ -57,6 +59,7 @@ export const createUser = async (
   email: string,
   password: string,
   role: "administrador" | "operativo" | "bufete",
+  mesaAsignada?: number,
 ): Promise<boolean> => {
   try {
     const hashedPassword = hashPassword(password)
@@ -69,13 +72,18 @@ export const createUser = async (
       throw new Error("El usuario ya existe")
     }
 
-    // Crear nuevo usuario
-    await addDoc(collection(db, "users"), {
+    const userData: any = {
       email,
       password: hashedPassword,
       role,
       createdAt: new Date().toISOString(),
-    })
+    }
+
+    if (role === "bufete" && mesaAsignada) {
+      userData.mesaAsignada = mesaAsignada
+    }
+
+    await addDoc(collection(db, "users"), userData)
 
     return true
   } catch (error) {

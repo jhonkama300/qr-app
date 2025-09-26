@@ -1,10 +1,5 @@
-import { DashboardLayout } from "@/components/dashboard-layout"
-import { DashboardStats } from "@/components/dashboard-stats"
+import { SPADashboard } from "@/components/spa-dashboard"
 
 export default function Dashboard() {
-  return (
-    <DashboardLayout>
-      <DashboardStats />
-    </DashboardLayout>
-  )
+  return <SPADashboard initialView="inicio" />
 }

@@ -182,11 +182,11 @@ export function AccessControl() {
 
   if (loading) {
     return (
-      <div className="flex flex-1 flex-col gap-4 p-4">
+      <div className="flex flex-1 flex-col gap-4 p-2 sm:p-4">
         <div className="flex items-center justify-center min-h-[400px]">
           <div className="text-center">
             <Loader2 className="h-8 w-8 animate-spin mx-auto mb-2" />
-            <p className="text-muted-foreground">Cargando control de acceso...</p>
+            <p className="text-muted-foreground text-sm">Cargando control de acceso...</p>
           </div>
         </div>
       </div>
@@ -194,13 +194,13 @@ export function AccessControl() {
   }
 
   return (
-    <div className="flex flex-1 flex-col gap-6 p-4">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+    <div className="flex flex-1 flex-col gap-4 sm:gap-6 p-2 sm:p-4">
+      <div className="flex flex-col space-y-2 sm:flex-row sm:items-center sm:justify-between sm:space-y-0 gap-2 sm:gap-4">
         <div>
-          <h1 className="text-2xl font-bold">Control de Acceso</h1>
-          <p className="text-muted-foreground">Monitoreo de accesos al sistema</p>
+          <h1 className="text-xl sm:text-2xl font-bold">Control de Acceso</h1>
+          <p className="text-muted-foreground text-sm">Monitoreo de accesos al sistema</p>
         </div>
-        <Button onClick={loadData} variant="outline">
+        <Button onClick={loadData} variant="outline" size="sm" className="w-full sm:w-auto bg-transparent">
           <RefreshCw className="w-4 h-4 mr-2" />
           Actualizar
         </Button>
@@ -208,12 +208,11 @@ export function AccessControl() {
 
       {error && (
         <Alert variant="destructive">
-          <AlertDescription>{error}</AlertDescription>
+          <AlertDescription className="text-sm">{error}</AlertDescription>
         </Alert>
       )}
 
-      {/* Tarjetas de estadísticas */}
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
         <Card
           className={`cursor-pointer transition-colors ${activeTab === "granted" ? "ring-2 ring-green-500" : ""}`}
           onClick={() => setActiveTab("granted")}
@@ -223,7 +222,7 @@ export function AccessControl() {
             <CheckCircle className="h-4 w-4 text-green-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-800">{grantedAccess.length}</div>
+            <div className="text-xl sm:text-2xl font-bold text-green-800">{grantedAccess.length}</div>
             <p className="text-xs text-muted-foreground">Personas con acceso permitido</p>
           </CardContent>
         </Card>
@@ -237,13 +236,13 @@ export function AccessControl() {
             <XCircle className="h-4 w-4 text-red-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-red-800">{deniedAccess.length}</div>
+            <div className="text-xl sm:text-2xl font-bold text-red-800">{deniedAccess.length}</div>
             <p className="text-xs text-muted-foreground">Personas con acceso denegado</p>
           </CardContent>
         </Card>
 
         <Card
-          className={`cursor-pointer transition-colors ${activeTab === "waiting" ? "ring-2 ring-blue-500" : ""}`}
+          className={`cursor-pointer transition-colors ${activeTab === "waiting" ? "ring-2 ring-blue-500" : ""} sm:col-span-2 lg:col-span-1`}
           onClick={() => setActiveTab("waiting")}
         >
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -251,38 +250,40 @@ export function AccessControl() {
             <Clock className="h-4 w-4 text-blue-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-blue-800">{waitingPersons.length}</div>
+            <div className="text-xl sm:text-2xl font-bold text-blue-800">{waitingPersons.length}</div>
             <p className="text-xs text-muted-foreground">Personas sin escanear</p>
           </CardContent>
         </Card>
       </div>
 
-      {/* Controles de búsqueda y paginación */}
       <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            {activeTab === "granted" && <CheckCircle className="w-5 h-5 text-green-600" />}
-            {activeTab === "denied" && <XCircle className="w-5 h-5 text-red-600" />}
-            {activeTab === "waiting" && <Clock className="w-5 h-5 text-blue-600" />}
-            {activeTab === "granted" && "Personas con Acceso Concedido"}
-            {activeTab === "denied" && "Personas con Acceso Denegado"}
-            {activeTab === "waiting" && "Personas en Espera"}({filteredData.length})
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+            {activeTab === "granted" && <CheckCircle className="w-4 h-4 sm:w-5 sm:h-5 text-green-600" />}
+            {activeTab === "denied" && <XCircle className="w-4 h-4 sm:w-5 sm:h-5 text-red-600" />}
+            {activeTab === "waiting" && <Clock className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600" />}
+            <span className="truncate">
+              {activeTab === "granted" && "Acceso Concedido"}
+              {activeTab === "denied" && "Acceso Denegado"}
+              {activeTab === "waiting" && "En Espera"}
+            </span>
+            <span className="text-sm font-normal">({filteredData.length})</span>
           </CardTitle>
-          <CardDescription>
+          <CardDescription className="text-xs sm:text-sm">
             {activeTab === "granted" && "Lista de personas que han obtenido acceso al sistema"}
             {activeTab === "denied" && "Lista de personas a las que se les ha denegado el acceso"}
             {activeTab === "waiting" && "Lista de personas registradas que aún no han sido escaneadas"}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="flex flex-col sm:flex-row gap-4">
+          <div className="flex flex-col space-y-3 sm:flex-row sm:space-y-0 sm:gap-4">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
               <Input
-                placeholder="Buscar por nombre, identificación, puesto o programa..."
+                placeholder="Buscar por nombre, ID, puesto..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
+                className="pl-10 text-sm"
               />
             </div>
             <div className="flex items-center gap-2">
@@ -307,12 +308,11 @@ export function AccessControl() {
             </div>
           </div>
 
-          {/* Lista de datos */}
-          <div className="space-y-3">
+          <div className="space-y-2 sm:space-y-3">
             {currentData.length === 0 ? (
               <div className="text-center py-8">
-                <Users className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
-                <p className="text-muted-foreground">
+                <Users className="w-8 h-8 sm:w-12 sm:h-12 mx-auto text-muted-foreground mb-4" />
+                <p className="text-muted-foreground text-sm">
                   {searchTerm ? "No se encontraron resultados" : "No hay datos disponibles"}
                 </p>
               </div>
@@ -324,7 +324,7 @@ export function AccessControl() {
                 return (
                   <div
                     key={item.id || index}
-                    className={`flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 border rounded-lg gap-3 ${
+                    className={`flex flex-col p-3 sm:p-4 border rounded-lg gap-2 sm:gap-3 ${
                       activeTab === "granted"
                         ? "bg-green-50 border-green-200"
                         : activeTab === "denied"
@@ -332,9 +332,9 @@ export function AccessControl() {
                           : "bg-blue-50 border-blue-200"
                     }`}
                   >
-                    <div className="flex items-center gap-3 flex-1">
+                    <div className="flex items-start gap-3">
                       <div
-                        className={`flex items-center justify-center w-10 h-10 rounded-full ${
+                        className={`flex items-center justify-center w-8 h-8 sm:w-10 sm:h-10 rounded-full flex-shrink-0 ${
                           activeTab === "granted"
                             ? "bg-green-100"
                             : activeTab === "denied"
@@ -343,7 +343,7 @@ export function AccessControl() {
                         }`}
                       >
                         <User
-                          className={`w-5 h-5 ${
+                          className={`w-4 h-4 sm:w-5 sm:h-5 ${
                             activeTab === "granted"
                               ? "text-green-600"
                               : activeTab === "denied"
@@ -352,28 +352,31 @@ export function AccessControl() {
                           }`}
                         />
                       </div>
-                      <div className="flex-1">
-                        <p className="font-medium">{person.nombre}</p>
-                        <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-4 text-sm text-muted-foreground">
-                          <span>ID: {person.identificacion}</span>
-                          <span className="hidden sm:inline">•</span>
-                          <span>{person.puesto}</span>
-                          <span className="hidden sm:inline">•</span>
-                          <span>{person.programa}</span>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-sm sm:text-base truncate">{person.nombre}</p>
+                        <div className="flex flex-col gap-1 text-xs sm:text-sm text-muted-foreground">
+                          <div className="flex flex-wrap items-center gap-1 sm:gap-2">
+                            <span className="font-mono bg-gray-100 px-1 rounded text-xs">
+                              ID: {person.identificacion}
+                            </span>
+                            <span className="hidden sm:inline">•</span>
+                            <span className="truncate">{person.puesto}</span>
+                          </div>
+                          <div className="truncate">{person.programa}</div>
                         </div>
                         {isAccessLog && (
-                          <div className="mt-1 space-y-1">
+                          <div className="mt-2 space-y-1">
                             <p className="text-xs text-muted-foreground">
                               Último acceso: {new Date(item.timestamp).toLocaleString()}
                             </p>
                             {item.grantedByUserName && (
                               <div className="flex items-center gap-1 text-xs">
-                                <UserCheck className="w-3 h-3 text-blue-600" />
-                                <span className="text-blue-600 font-medium">
-                                  {person.nombre}, autorizado por {item.grantedByUserName}
+                                <UserCheck className="w-3 h-3 text-blue-600 flex-shrink-0" />
+                                <span className="text-blue-600 font-medium truncate">
+                                  Autorizado por {item.grantedByUserName}
                                 </span>
                                 {item.grantedByUserEmail && (
-                                  <Badge variant="outline" className="text-xs px-1 py-0">
+                                  <Badge variant="outline" className="text-xs px-1 py-0 ml-1 hidden sm:inline-flex">
                                     {item.grantedByUserEmail}
                                   </Badge>
                                 )}
@@ -389,15 +392,14 @@ export function AccessControl() {
             )}
           </div>
 
-          {/* Paginación */}
           {totalPages > 1 && (
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t">
-              <div className="text-sm text-muted-foreground">
+            <div className="flex flex-col space-y-3 sm:flex-row sm:items-center sm:justify-between sm:space-y-0 gap-4 pt-4 border-t">
+              <div className="text-xs sm:text-sm text-muted-foreground text-center sm:text-left">
                 Mostrando {startIndex + 1} a {Math.min(endIndex, filteredData.length)} de {filteredData.length}{" "}
                 registros
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex items-center justify-center gap-1 sm:gap-2">
                 <Button
                   variant="outline"
                   size="sm"
@@ -405,7 +407,7 @@ export function AccessControl() {
                   disabled={currentPage === 1}
                   className="h-8 w-8 p-0 bg-transparent"
                 >
-                  <ChevronsLeft className="h-4 w-4" />
+                  <ChevronsLeft className="h-3 w-3 sm:h-4 sm:w-4" />
                 </Button>
 
                 <Button
@@ -415,20 +417,20 @@ export function AccessControl() {
                   disabled={currentPage === 1}
                   className="h-8 w-8 p-0 bg-transparent"
                 >
-                  <ChevronLeft className="h-4 w-4" />
+                  <ChevronLeft className="h-3 w-3 sm:h-4 sm:w-4" />
                 </Button>
 
                 <div className="flex items-center gap-1">
-                  {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                  {Array.from({ length: Math.min(3, totalPages) }, (_, i) => {
                     let pageNumber
-                    if (totalPages <= 5) {
+                    if (totalPages <= 3) {
                       pageNumber = i + 1
-                    } else if (currentPage <= 3) {
+                    } else if (currentPage <= 2) {
                       pageNumber = i + 1
-                    } else if (currentPage >= totalPages - 2) {
-                      pageNumber = totalPages - 4 + i
+                    } else if (currentPage >= totalPages - 1) {
+                      pageNumber = totalPages - 2 + i
                     } else {
-                      pageNumber = currentPage - 2 + i
+                      pageNumber = currentPage - 1 + i
                     }
 
                     return (
@@ -437,7 +439,7 @@ export function AccessControl() {
                         variant={currentPage === pageNumber ? "default" : "outline"}
                         size="sm"
                         onClick={() => setCurrentPage(pageNumber)}
-                        className="h-8 w-8 p-0"
+                        className="h-8 w-8 p-0 text-xs"
                       >
                         {pageNumber}
                       </Button>
@@ -452,7 +454,7 @@ export function AccessControl() {
                   disabled={currentPage === totalPages}
                   className="h-8 w-8 p-0 bg-transparent"
                 >
-                  <ChevronRight className="h-4 w-4" />
+                  <ChevronRight className="h-3 w-3 sm:h-4 sm:w-4" />
                 </Button>
 
                 <Button
@@ -462,7 +464,7 @@ export function AccessControl() {
                   disabled={currentPage === totalPages}
                   className="h-8 w-8 p-0 bg-transparent"
                 >
-                  <ChevronsRight className="h-4 w-4" />
+                  <ChevronsRight className="h-3 w-3 sm:h-4 sm:w-4" />
                 </Button>
               </div>
             </div>

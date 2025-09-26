@@ -11,7 +11,6 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import {
-  CameraOffIcon,
   CameraIcon,
   RefreshCcwIcon,
   Loader2Icon,
@@ -28,16 +27,16 @@ import { useQ10Validation } from "@/hooks/use-q10-validation"
 import { useAuth } from "@/components/auth-provider"
 
 interface ScanResultDisplay {
-  type: "success" | "denied" | "error" | "info" // 'info' para estados de procesamiento
+  type: "success" | "denied" | "error" | "info"
   identificacion: string
   person?: any
   message: string
-  source?: "direct" | "q10" | "manual" // Añadir 'manual'
+  source?: "direct" | "q10" | "manual"
   timestamp: string
 }
 
 export function BarcodeScanner() {
-  const { getStudentById, markStudentAccess } = useStudentStoreContext()
+  const { getStudentById, markStudentAccess, checkIfAlreadyScanned } = useStudentStoreContext()
   const { processQ10Url, isProcessingQ10, q10Message } = useQ10Validation()
   const { user } = useAuth()
 
@@ -46,10 +45,10 @@ export function BarcodeScanner() {
   const [error, setError] = useState<string | null>(null)
   const [devices, setDevices] = useState<MediaDeviceInfo[]>([])
   const [selectedDeviceId, setSelectedDeviceId] = useState<string>("")
-  const [scanResultDisplay, setScanResultDisplay] = useState<ScanResultDisplay | null>(null) // Para mostrar feedback en la misma página
-  const [manualIdInput, setManualIdInput] = useState<string>("") // Estado para la entrada manual
-  const [isManualProcessing, setIsManualProcessing] = useState(false) // Estado para el procesamiento manual
-  const [manualInputError, setManualInputError] = useState<string | null>(null) // Nuevo estado para errores de entrada manual
+  const [scanResultDisplay, setScanResultDisplay] = useState<ScanResultDisplay | null>(null)
+  const [manualIdInput, setManualIdInput] = useState<string>("")
+  const [isManualProcessing, setIsManualProcessing] = useState(false)
+  const [manualInputError, setManualInputError] = useState<string | null>(null)
 
   const router = useRouter()
   const webcamRef = useRef<Webcam>(null)
@@ -120,13 +119,11 @@ export function BarcodeScanner() {
 
       const userInfo = user
         ? {
-            userId: user.id, // Cambiado de user.uid a user.id
-            userName: user.email || "Usuario", // Usando email como nombre por defecto
+            userId: user.id,
+            userName: user.email || "Usuario",
             userEmail: user.email || undefined,
           }
         : undefined
-
-      console.log("[v0] Usuario que otorga acceso:", userInfo) // Debug log
 
       if (
         scannedContent.startsWith("https://site2.q10.com/CertificadosAcademicos/") ||
@@ -144,6 +141,24 @@ export function BarcodeScanner() {
         setScanResultDisplay(null)
         return
       } else {
+        const alreadyScanned = await checkIfAlreadyScanned(scannedContent)
+
+        if (alreadyScanned) {
+          currentScanResult = {
+            type: "error",
+            identificacion: scannedContent,
+            message: `Este usuario ya fue escaneado anteriormente. No se puede volver a escanear.`,
+            source: source,
+            timestamp: new Date().toISOString(),
+          }
+          setScanResultDisplay(currentScanResult)
+
+          setTimeout(() => {
+            setScanResultDisplay(null)
+          }, 4000)
+          return
+        }
+
         const student = await getStudentById(scannedContent)
         if (student) {
           await markStudentAccess(scannedContent, true, undefined, source, userInfo)
@@ -177,72 +192,8 @@ export function BarcodeScanner() {
         }
       }, 2500)
     },
-    [getStudentById, markStudentAccess, processQ10Url, router, user], // Agregando user a las dependencias
+    [getStudentById, markStudentAccess, processQ10Url, router, user, checkIfAlreadyScanned],
   )
-
-  useEffect(() => {
-    if (
-      !isClient ||
-      !hasPermission ||
-      !selectedDeviceId ||
-      isProcessingQ10 ||
-      scanResultDisplay ||
-      isManualProcessing
-    ) {
-      if (codeReader.current) {
-        console.log("Reseteando lector (condiciones no cumplidas)...")
-        codeReader.current.reset()
-      }
-      return
-    }
-
-    const video = webcamRef.current?.video
-    if (!video) {
-      console.warn("Elemento de video no listo para escanear.")
-      return
-    }
-
-    if (!codeReader.current) {
-      setError("El lector de códigos no está inicializado.")
-      return
-    }
-
-    setError(null)
-
-    console.log("Iniciando escaneo continuo con dispositivo:", selectedDeviceId)
-    codeReader.current
-      .decodeFromVideoDevice(selectedDeviceId, video, (result, err) => {
-        if (result) {
-          if (!scanResultDisplay && !isProcessingQ10 && !isManualProcessing) {
-            processScanResult(result.getText(), "direct")
-          }
-        }
-        if (err && err.name !== "NotFoundException" && err.name !== "AbortException") {
-          console.error("Error al escanear:", err)
-          setError("Error en el escáner: " + err.message)
-        }
-      })
-      .catch((err) => {
-        console.error("Error al iniciar el escaneo continuo:", err)
-        setError("Error al iniciar el escáner: " + err.message)
-        codeReader.current?.reset()
-      })
-
-    return () => {
-      if (codeReader.current) {
-        console.log("Reseteando lector en cleanup...")
-        codeReader.current.reset()
-      }
-    }
-  }, [
-    isClient,
-    hasPermission,
-    selectedDeviceId,
-    isProcessingQ10,
-    scanResultDisplay,
-    isManualProcessing,
-    processScanResult,
-  ])
 
   const requestCameraPermission = () => {
     if (!isClient) return
@@ -304,49 +255,11 @@ export function BarcodeScanner() {
     }
   }
 
-  if (!isClient) {
-    return (
-      <div className="flex flex-col items-center justify-center p-8 text-center bg-card rounded-lg border border-border shadow-sm">
-        <Loader2Icon className="text-primary mb-4 size-16 animate-spin" />
-        <p className="text-muted-foreground text-lg">Cargando escáner...</p>
-      </div>
-    )
-  }
-
-  if (hasPermission === false) {
-    return (
-      <div className="flex flex-col items-center justify-center p-8 text-center bg-card rounded-lg border border-border shadow-sm">
-        <CameraOffIcon className="text-destructive mb-6 size-20" />
-        <h3 className="text-2xl font-bold mb-3 text-foreground">Acceso a la cámara denegado</h3>
-        <p className="text-muted-foreground mb-8 text-base">
-          {error || "Se requiere acceso a la cámara para escanear códigos de barras."}
-        </p>
-        <Button
-          onClick={requestCameraPermission}
-          className="bg-primary text-primary-foreground h-12 px-6 text-base rounded-md"
-        >
-          <CameraIcon className="mr-2 size-5" />
-          Permitir acceso a la cámara
-        </Button>
-      </div>
-    )
-  }
-
-  if (isProcessingQ10) {
-    return (
-      <div className="flex flex-col items-center justify-center p-8 text-center bg-card rounded-lg border border-border shadow-sm">
-        <Loader2Icon className="text-primary mb-4 size-16 animate-spin" />
-        <p className="text-muted-foreground text-lg">Procesando certificado Q10...</p>
-        {q10Message && <p className="text-sm text-muted-foreground mt-2">{q10Message.text}</p>}
-      </div>
-    )
-  }
-
   return (
-    <div className="w-full max-w-md @container">
+    <div className="w-full max-w-md mx-auto @container">
       <Card>
         <CardHeader className="text-center">
-          <CardTitle className="flex items-center justify-center gap-2">
+          <CardTitle className="flex items-center justify-center gap-2 text-lg sm:text-xl">
             <CameraIcon className="w-5 h-5" />
             Escáner QR/Código
           </CardTitle>
@@ -377,10 +290,10 @@ export function BarcodeScanner() {
             {devices.length > 1 && (
               <button
                 onClick={switchCamera}
-                className="absolute top-4 right-4 bg-secondary/70 text-foreground p-3 rounded-full hover:bg-secondary transition-colors shadow-md"
+                className="absolute top-2 right-2 sm:top-4 sm:right-4 bg-secondary/70 text-foreground p-2 sm:p-3 rounded-full hover:bg-secondary transition-colors shadow-md"
                 aria-label="Cambiar cámara"
               >
-                <RefreshCcwIcon className="size-6" />
+                <RefreshCcwIcon className="size-4 sm:size-6" />
               </button>
             )}
           </div>
@@ -393,7 +306,7 @@ export function BarcodeScanner() {
 
       {scanResultDisplay && (
         <div
-          className={`mt-4 p-4 rounded-lg border ${
+          className={`mt-4 p-3 sm:p-4 rounded-lg border ${
             scanResultDisplay.type === "success"
               ? "bg-green-50 border-green-200 text-green-800"
               : scanResultDisplay.type === "denied"
@@ -404,31 +317,35 @@ export function BarcodeScanner() {
           }`}
         >
           <div className="flex items-center gap-2 mb-2">
-            {scanResultDisplay.type === "success" && <CheckCircle className="w-5 h-5" />}
-            {scanResultDisplay.type === "denied" && <XCircle className="w-5 h-5" />}
-            {scanResultDisplay.type === "error" && <AlertTriangle className="w-5 h-5" />}
-            {scanResultDisplay.type === "info" && <Loader2Icon className="w-5 h-5 animate-spin" />}
-            <p className="font-semibold text-lg">{scanResultDisplay.message}</p>
+            {scanResultDisplay.type === "success" && <CheckCircle className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" />}
+            {scanResultDisplay.type === "denied" && <XCircle className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" />}
+            {scanResultDisplay.type === "error" && <AlertTriangle className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" />}
+            {scanResultDisplay.type === "info" && (
+              <Loader2Icon className="w-4 h-4 sm:w-5 sm:h-5 animate-spin flex-shrink-0" />
+            )}
+            <p className="font-semibold text-sm sm:text-lg">{scanResultDisplay.message}</p>
           </div>
           {scanResultDisplay.identificacion && scanResultDisplay.identificacion !== "N/A" && (
-            <p className="text-sm">
+            <p className="text-sm mb-2">
               <span className="font-medium">Identificación:</span>{" "}
-              <Badge variant="outline">{scanResultDisplay.identificacion}</Badge>
+              <Badge variant="outline" className="text-xs">
+                {scanResultDisplay.identificacion}
+              </Badge>
             </p>
           )}
           {scanResultDisplay.person && (
             <div className="mt-2 text-sm space-y-1">
               <div className="flex items-center gap-2">
-                <User className="w-4 h-4 text-muted-foreground" />
-                <span className="font-medium">{scanResultDisplay.person.nombre}</span>
+                <User className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                <span className="font-medium truncate">{scanResultDisplay.person.nombre}</span>
               </div>
-              <p>
+              <p className="text-xs sm:text-sm">
                 <span className="font-medium">Puesto:</span> {scanResultDisplay.person.puesto}
               </p>
-              <p>
+              <p className="text-xs sm:text-sm">
                 <span className="font-medium">Programa:</span> {scanResultDisplay.person.programa}
               </p>
-              <p>
+              <p className="text-xs sm:text-sm">
                 <span className="font-medium">Cupos Extras:</span> {scanResultDisplay.person.cuposExtras}
               </p>
             </div>
@@ -439,13 +356,15 @@ export function BarcodeScanner() {
         </div>
       )}
 
-      <Card className="mt-6">
-        <CardHeader className="text-center">
-          <CardTitle className="flex items-center justify-center gap-2">
-            <Keyboard className="w-5 h-5" />
+      <Card className="mt-4 sm:mt-6">
+        <CardHeader className="text-center pb-3">
+          <CardTitle className="flex items-center justify-center gap-2 text-base sm:text-lg">
+            <Keyboard className="w-4 h-4 sm:w-5 sm:h-5" />
             Entrada Manual
           </CardTitle>
-          <CardDescription>Ingresa la identificación si el escaneo no es posible</CardDescription>
+          <CardDescription className="text-xs sm:text-sm">
+            Ingresa la identificación si el escaneo no es posible
+          </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           {manualInputError && (
@@ -455,7 +374,9 @@ export function BarcodeScanner() {
             </Alert>
           )}
           <div className="space-y-2">
-            <Label htmlFor="manual-id">Número de Identificación</Label>
+            <Label htmlFor="manual-id" className="text-sm">
+              Número de Identificación
+            </Label>
             <Input
               id="manual-id"
               type="text"
@@ -463,13 +384,13 @@ export function BarcodeScanner() {
               value={manualIdInput}
               onChange={(e) => setManualIdInput(e.target.value)}
               disabled={isManualProcessing || isProcessingQ10}
-              className="h-11 text-base"
+              className="h-10 sm:h-11 text-sm sm:text-base"
             />
           </div>
           <Button
             onClick={handleManualSubmit}
             disabled={isManualProcessing || isProcessingQ10 || !manualIdInput.trim()}
-            className="w-full h-11 text-base"
+            className="w-full h-10 sm:h-11 text-sm sm:text-base"
           >
             {isManualProcessing ? (
               <>

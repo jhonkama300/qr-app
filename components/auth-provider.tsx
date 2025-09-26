@@ -8,6 +8,7 @@ import type { User } from "@/lib/auth-service"
 interface AuthContextType {
   user: User | null
   userRole: "administrador" | "operativo" | "bufete" | null
+  mesaAsignada: number | null // Agregado campo para mesa asignada
   isAdmin: boolean
   isBufete: boolean
   loading: boolean
@@ -18,6 +19,7 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType>({
   user: null,
   userRole: null,
+  mesaAsignada: null, // Agregado valor por defecto
   isAdmin: false,
   isBufete: false,
   loading: true,
@@ -62,11 +64,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   const userRole = user?.role || null
+  const mesaAsignada = user?.mesaAsignada || null // Extraer mesa asignada del usuario
   const isAdmin = userRole === "administrador"
   const isBufete = userRole === "bufete"
 
   return (
-    <AuthContext.Provider value={{ user, userRole, isAdmin, isBufete, loading, login, logout }}>
+    <AuthContext.Provider value={{ user, userRole, mesaAsignada, isAdmin, isBufete, loading, login, logout }}>
       {children}
     </AuthContext.Provider>
   )

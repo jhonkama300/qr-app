@@ -2,7 +2,7 @@
 
 import type React from "react"
 import { createContext, useContext, useCallback } from "react"
-import { collection, query, where, getDocs, addDoc } from "firebase/firestore"
+import { collection, query, where, getDocs, addDoc, updateDoc, doc } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 
 interface Student {
@@ -12,6 +12,7 @@ interface Student {
   nombre: string
   programa: string
   cuposExtras: number
+  cuposConsumidos?: number // Agregado campo para cupos consumidos
 }
 
 export interface AccessLog {
@@ -24,12 +25,14 @@ export interface AccessLog {
   grantedByUserId?: string // ID del usuario que otorgó el acceso
   grantedByUserName?: string // Nombre del usuario que otorgó el acceso
   grantedByUserEmail?: string // Email del usuario que otorgó el acceso
+  mesaUsada?: number // Agregado campo para la mesa donde se escaneó
 }
 
 interface UserInfo {
   userId?: string
   userName?: string
   userEmail?: string
+  mesaAsignada?: number // Agregado campo para mesa del usuario
 }
 
 interface StudentStoreContextType {
@@ -48,6 +51,9 @@ interface StudentStoreContextType {
     source?: "direct" | "q10" | "manual",
     userInfo?: UserInfo,
   ) => Promise<void>
+  checkIfAlreadyScanned: (identificacion: string) => Promise<boolean>
+  validateMesaAccess: (identificacion: string, mesaRequerida: number) => Promise<{ valid: boolean; message: string }> // Nueva función para validar mesa
+  checkMesaStatus: (mesaNumero: number) => Promise<boolean> // Nueva función para verificar si una mesa está activa
 }
 
 const StudentStoreContext = createContext<StudentStoreContextType | undefined>(undefined)
@@ -61,6 +67,42 @@ export const useStudentStoreContext = () => {
 }
 
 export function StudentStoreProvider({ children }: { children: React.ReactNode }) {
+  const checkMesaStatus = useCallback(async (mesaNumero: number): Promise<boolean> => {
+    try {
+      const mesasQuery = query(collection(db, "mesas_config"), where("numero", "==", mesaNumero))
+      const mesasSnapshot = await getDocs(mesasQuery)
+
+      if (mesasSnapshot.empty) {
+        return false // Mesa no encontrada, considerarla inactiva
+      }
+
+      const mesaData = mesasSnapshot.docs[0].data()
+      return mesaData.activa === true
+    } catch (error) {
+      console.error("Error al verificar estado de mesa:", error)
+      return false
+    }
+  }, [])
+
+  const checkIfAlreadyScanned = useCallback(async (identificacion: string): Promise<boolean> => {
+    try {
+      console.log("[v0] Verificando si el usuario ya fue escaneado:", identificacion)
+      const q = query(
+        collection(db, "access_logs"),
+        where("identificacion", "==", identificacion),
+        where("status", "==", "granted"),
+      )
+      const querySnapshot = await getDocs(q)
+
+      const alreadyScanned = !querySnapshot.empty
+      console.log("[v0] Usuario ya escaneado:", alreadyScanned)
+      return alreadyScanned
+    } catch (error) {
+      console.error("Error al verificar si el usuario ya fue escaneado:", error)
+      return false
+    }
+  }, [])
+
   const getStudentById = useCallback(async (identificacion: string): Promise<Student | null> => {
     try {
       console.log("Buscando estudiante por identificación:", identificacion)
@@ -82,12 +124,57 @@ export function StudentStoreProvider({ children }: { children: React.ReactNode }
         nombre: studentData.nombre,
         programa: studentData.programa,
         cuposExtras: studentData.cuposExtras,
+        cuposConsumidos: studentData.cuposConsumidos || 0, // Incluir cupos consumidos
       } as Student
     } catch (error) {
       console.error("Error al obtener estudiante por ID:", error)
       return null
     }
   }, [])
+
+  const validateMesaAccess = useCallback(
+    async (identificacion: string, mesaRequerida: number): Promise<{ valid: boolean; message: string }> => {
+      try {
+        const mesaActiva = await checkMesaStatus(mesaRequerida)
+        if (!mesaActiva) {
+          return {
+            valid: false,
+            message: `La Mesa ${mesaRequerida} está inactiva. No se puede procesar la entrega.`,
+          }
+        }
+
+        // Obtener estudiante
+        const student = await getStudentById(identificacion)
+        if (!student) {
+          return { valid: false, message: "Estudiante no encontrado en la base de datos" }
+        }
+
+        // Verificar si ya fue escaneado
+        const alreadyScanned = await checkIfAlreadyScanned(identificacion)
+        if (alreadyScanned) {
+          return { valid: false, message: "Este estudiante ya fue escaneado anteriormente" }
+        }
+
+        // Calcular cupos disponibles (2 predeterminados + extras)
+        const cuposTotales = 2 + student.cuposExtras
+        const cuposConsumidos = student.cuposConsumidos || 0
+        const cuposDisponibles = cuposTotales - cuposConsumidos
+
+        if (cuposDisponibles <= 0) {
+          return { valid: false, message: "No tiene cupos disponibles" }
+        }
+
+        return {
+          valid: true,
+          message: `Acceso válido. Cupos disponibles: ${cuposDisponibles}/${cuposTotales}`,
+        }
+      } catch (error) {
+        console.error("Error al validar acceso por mesa:", error)
+        return { valid: false, message: "Error al validar el acceso" }
+      }
+    },
+    [getStudentById, checkIfAlreadyScanned, checkMesaStatus],
+  )
 
   const markStudentAccess = useCallback(
     async (
@@ -98,23 +185,42 @@ export function StudentStoreProvider({ children }: { children: React.ReactNode }
       userInfo?: UserInfo,
     ) => {
       try {
+        if (granted) {
+          const student = await getStudentById(identificacion)
+          if (student) {
+            const cuposConsumidos = (student.cuposConsumidos || 0) + 1
+            await updateDoc(doc(db, "personas", student.id), {
+              cuposConsumidos: cuposConsumidos,
+            })
+            console.log(`[v0] Cupo consumido para ${identificacion}. Total consumidos: ${cuposConsumidos}`)
+          }
+        }
+
         const log: AccessLog = {
           identificacion,
           timestamp: new Date().toISOString(),
           status: granted ? "granted" : "denied",
           details: details || (granted ? "Acceso concedido" : "Acceso denegado"),
-          source: source || "direct", // Guardar el origen
-          grantedByUserId: userInfo?.userId,
-          grantedByUserName: userInfo?.userName,
-          grantedByUserEmail: userInfo?.userEmail,
+          source: source || "direct",
+          grantedByUserId: userInfo?.userId || "unknown",
+          grantedByUserName: userInfo?.userName || "Usuario desconocido",
+          grantedByUserEmail: userInfo?.userEmail || "sin-email@sistema.com",
         }
+
+        // Solo agregar mesaUsada si existe y no es undefined
+        if (userInfo?.mesaAsignada !== undefined && userInfo?.mesaAsignada !== null) {
+          log.mesaUsada = userInfo.mesaAsignada
+        }
+
+        console.log("[v0] Guardando log de acceso:", log)
         await addDoc(collection(db, "access_logs"), log)
-        console.log("Registro de acceso guardado:", log)
+        console.log("Registro de acceso guardado exitosamente")
       } catch (error) {
         console.error("Error al registrar acceso:", error)
+        throw error // Re-lanzar el error para que se maneje en el componente
       }
     },
-    [],
+    [getStudentById],
   )
 
   const markQ10Access = useCallback(
@@ -131,22 +237,39 @@ export function StudentStoreProvider({ children }: { children: React.ReactNode }
           timestamp: new Date().toISOString(),
           status,
           details: details || (status === "q10_success" ? "Validación Q10 exitosa" : "Validación Q10 fallida"),
-          source: source || "q10", // Guardar el origen
-          grantedByUserId: userInfo?.userId,
-          grantedByUserName: userInfo?.userName,
-          grantedByUserEmail: userInfo?.userEmail,
+          source: source || "q10",
+          grantedByUserId: userInfo?.userId || "unknown",
+          grantedByUserName: userInfo?.userName || "Usuario desconocido",
+          grantedByUserEmail: userInfo?.userEmail || "sin-email@sistema.com",
         }
+
+        // Solo agregar mesaUsada si existe y no es undefined
+        if (userInfo?.mesaAsignada !== undefined && userInfo?.mesaAsignada !== null) {
+          log.mesaUsada = userInfo.mesaAsignada
+        }
+
+        console.log("[v0] Guardando log de acceso Q10:", log)
         await addDoc(collection(db, "access_logs"), log)
-        console.log("Registro de acceso Q10 guardado:", log)
+        console.log("Registro de acceso Q10 guardado exitosamente")
       } catch (error) {
         console.error("Error al registrar acceso Q10:", error)
+        throw error // Re-lanzar el error para que se maneje en el componente
       }
     },
     [],
   )
 
   return (
-    <StudentStoreContext.Provider value={{ getStudentById, markStudentAccess, markQ10Access }}>
+    <StudentStoreContext.Provider
+      value={{
+        getStudentById,
+        markStudentAccess,
+        markQ10Access,
+        checkIfAlreadyScanned,
+        validateMesaAccess,
+        checkMesaStatus, // Agregar nueva función al contexto
+      }}
+    >
       {children}
     </StudentStoreContext.Provider>
   )

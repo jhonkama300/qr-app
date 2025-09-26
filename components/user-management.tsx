@@ -4,7 +4,7 @@ import type React from "react"
 
 import { useState, useEffect } from "react"
 import { createUser, resetUserPassword } from "@/lib/auth-service"
-import { collection, getDocs, deleteDoc, doc, updateDoc } from "firebase/firestore"
+import { collection, getDocs, deleteDoc, doc, updateDoc, query } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -27,6 +27,7 @@ interface UserData {
   id: string
   email: string
   role: "administrador" | "operativo" | "bufete"
+  mesaAsignada?: number // Agregado campo para mesa asignada
   createdAt: string
 }
 
@@ -39,17 +40,44 @@ export function UserManagement() {
   const [success, setSuccess] = useState("")
   const [isDialogOpen, setIsDialogOpen] = useState(false)
 
+  const [mesasActivas, setMesasActivas] = useState<number[]>([])
+
   // Formulario de nuevo usuario
   const [newUser, setNewUser] = useState({
     email: "",
     password: "",
     role: "operativo" as "administrador" | "operativo" | "bufete",
+    mesaAsignada: 1, // Agregado campo para mesa por defecto
   })
 
   // Cargar usuarios al montar el componente
   useEffect(() => {
     loadUsers()
   }, [])
+
+  // Cargar mesas activas al montar el componente
+  useEffect(() => {
+    loadMesasActivas()
+  }, [])
+
+  const loadMesasActivas = async () => {
+    try {
+      const mesasQuery = query(collection(db, "mesas_config"))
+      const mesasSnapshot = await getDocs(mesasQuery)
+      const activas: number[] = []
+
+      mesasSnapshot.forEach((doc) => {
+        const data = doc.data()
+        if (data.activa) {
+          activas.push(data.numero)
+        }
+      })
+
+      setMesasActivas(activas.sort((a, b) => a - b))
+    } catch (error) {
+      console.error("Error al cargar mesas activas:", error)
+    }
+  }
 
   const loadUsers = async () => {
     try {
@@ -61,6 +89,7 @@ export function UserManagement() {
           id: doc.id,
           email: data.email,
           role: data.role,
+          mesaAsignada: data.mesaAsignada, // Cargar mesa asignada
           createdAt: data.createdAt,
         })
       })
@@ -80,9 +109,22 @@ export function UserManagement() {
     setSuccess("")
 
     try {
-      await createUser(newUser.email, newUser.password, newUser.role)
+      if (newUser.role === "bufete" && !mesasActivas.includes(newUser.mesaAsignada)) {
+        setError(
+          `No se puede asignar la Mesa ${newUser.mesaAsignada} porque está inactiva. Por favor, selecciona una mesa activa.`,
+        )
+        setCreating(false)
+        return
+      }
+
+      await createUser(
+        newUser.email,
+        newUser.password,
+        newUser.role,
+        newUser.role === "bufete" ? newUser.mesaAsignada : undefined,
+      )
       setSuccess(`Usuario ${newUser.email} creado exitosamente`)
-      setNewUser({ email: "", password: "", role: "operativo" })
+      setNewUser({ email: "", password: "", role: "operativo", mesaAsignada: 1 })
       setIsDialogOpen(false)
       loadUsers()
     } catch (error: any) {
@@ -110,14 +152,37 @@ export function UserManagement() {
 
   const handleRoleChange = async (userId: string, newRole: "administrador" | "operativo" | "bufete") => {
     try {
-      await updateDoc(doc(db, "users", userId), {
-        role: newRole,
-      })
+      const updateData: any = { role: newRole }
+      if (newRole === "bufete") {
+        updateData.mesaAsignada = 1
+      } else {
+        updateData.mesaAsignada = null
+      }
+
+      await updateDoc(doc(db, "users", userId), updateData)
       setSuccess("Rol actualizado exitosamente")
       loadUsers()
     } catch (error) {
       console.error("Error al actualizar rol:", error)
       setError("Error al actualizar el rol")
+    }
+  }
+
+  const handleMesaChange = async (userId: string, newMesa: number) => {
+    try {
+      if (!mesasActivas.includes(newMesa)) {
+        setError(`No se puede asignar la Mesa ${newMesa} porque está inactiva. Por favor, selecciona una mesa activa.`)
+        return
+      }
+
+      await updateDoc(doc(db, "users", userId), {
+        mesaAsignada: newMesa,
+      })
+      setSuccess("Mesa asignada actualizada exitosamente")
+      loadUsers()
+    } catch (error) {
+      console.error("Error al actualizar mesa:", error)
+      setError("Error al actualizar la mesa asignada")
     }
   }
 
@@ -239,6 +304,39 @@ export function UserManagement() {
                     </SelectContent>
                   </Select>
                 </div>
+
+                {newUser.role === "bufete" && (
+                  <div className="space-y-2">
+                    <Label htmlFor="mesa">Mesa Asignada</Label>
+                    <Select
+                      value={newUser.mesaAsignada.toString()}
+                      onValueChange={(value) => setNewUser({ ...newUser, mesaAsignada: Number.parseInt(value) })}
+                      disabled={creating}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecciona la mesa" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {mesasActivas.length > 0 ? (
+                          mesasActivas.map((mesa) => (
+                            <SelectItem key={mesa} value={mesa.toString()}>
+                              Mesa {mesa} (Activa)
+                            </SelectItem>
+                          ))
+                        ) : (
+                          <SelectItem value="0" disabled>
+                            No hay mesas activas disponibles
+                          </SelectItem>
+                        )}
+                      </SelectContent>
+                    </Select>
+                    {mesasActivas.length === 0 && (
+                      <p className="text-sm text-red-600">
+                        No hay mesas activas. Contacta al administrador para activar mesas.
+                      </p>
+                    )}
+                  </div>
+                )}
               </div>
 
               <DialogFooter>
@@ -306,6 +404,11 @@ export function UserManagement() {
                       <p className="font-medium">{user.email}</p>
                       <p className="text-sm text-muted-foreground">
                         Creado: {new Date(user.createdAt).toLocaleDateString()}
+                        {user.role === "bufete" && user.mesaAsignada && (
+                          <span className="ml-2 px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs">
+                            Mesa {user.mesaAsignada}
+                          </span>
+                        )}
                       </p>
                     </div>
                   </div>
@@ -341,6 +444,30 @@ export function UserManagement() {
                         </SelectItem>
                       </SelectContent>
                     </Select>
+
+                    {user.role === "bufete" && (
+                      <Select
+                        value={user.mesaAsignada?.toString() || "1"}
+                        onValueChange={(value) => handleMesaChange(user.id, Number.parseInt(value))}
+                      >
+                        <SelectTrigger className="w-full sm:w-[100px]">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {mesasActivas.length > 0 ? (
+                            mesasActivas.map((mesa) => (
+                              <SelectItem key={mesa} value={mesa.toString()}>
+                                Mesa {mesa}
+                              </SelectItem>
+                            ))
+                          ) : (
+                            <SelectItem value="0" disabled>
+                              Sin mesas activas
+                            </SelectItem>
+                          )}
+                        </SelectContent>
+                      </Select>
+                    )}
 
                     <Button
                       variant="outline"
