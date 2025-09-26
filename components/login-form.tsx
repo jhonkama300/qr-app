@@ -32,7 +32,12 @@ export default function LoginForm() {
       if (user) {
         login(user)
         console.log("Usuario autenticado:", user)
-        router.push("/dashboard")
+
+        if (user.hasDefaultPassword) {
+          router.push("/change-password")
+        } else {
+          router.push("/dashboard")
+        }
       } else {
         setError("Correo electrónico o contraseña incorrectos")
       }

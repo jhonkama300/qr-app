@@ -3,7 +3,7 @@
 import type React from "react"
 
 import { useState, useEffect } from "react"
-import { createUser } from "@/lib/auth-service"
+import { createUser, resetUserPassword } from "@/lib/auth-service"
 import { collection, getDocs, deleteDoc, doc, updateDoc } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { Button } from "@/components/ui/button"
@@ -21,12 +21,12 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
-import { Loader2, Plus, Trash2, Shield, User, Mail } from "lucide-react"
+import { Loader2, Plus, Trash2, Shield, User, Mail, Scale, KeyRound } from "lucide-react"
 
 interface UserData {
   id: string
   email: string
-  role: "administrador" | "operativo"
+  role: "administrador" | "operativo" | "bufete"
   createdAt: string
 }
 
@@ -34,6 +34,7 @@ export function UserManagement() {
   const [users, setUsers] = useState<UserData[]>([])
   const [loading, setLoading] = useState(true)
   const [creating, setCreating] = useState(false)
+  const [resettingPassword, setResettingPassword] = useState<string | null>(null)
   const [error, setError] = useState("")
   const [success, setSuccess] = useState("")
   const [isDialogOpen, setIsDialogOpen] = useState(false)
@@ -42,7 +43,7 @@ export function UserManagement() {
   const [newUser, setNewUser] = useState({
     email: "",
     password: "",
-    role: "operativo" as "administrador" | "operativo",
+    role: "operativo" as "administrador" | "operativo" | "bufete",
   })
 
   // Cargar usuarios al montar el componente
@@ -107,7 +108,7 @@ export function UserManagement() {
     }
   }
 
-  const handleRoleChange = async (userId: string, newRole: "administrador" | "operativo") => {
+  const handleRoleChange = async (userId: string, newRole: "administrador" | "operativo" | "bufete") => {
     try {
       await updateDoc(doc(db, "users", userId), {
         role: newRole,
@@ -117,6 +118,25 @@ export function UserManagement() {
     } catch (error) {
       console.error("Error al actualizar rol:", error)
       setError("Error al actualizar el rol")
+    }
+  }
+
+  const handleResetPassword = async (userId: string, email: string) => {
+    if (
+      !confirm(`¿Estás seguro de restaurar la contraseña de ${email}? Se establecerá la contraseña predeterminada.`)
+    ) {
+      return
+    }
+
+    setResettingPassword(userId)
+    try {
+      await resetUserPassword(userId)
+      setSuccess(`Contraseña de ${email} restaurada exitosamente. Nueva contraseña: Uparsistem123`)
+    } catch (error) {
+      console.error("Error al restaurar contraseña:", error)
+      setError("Error al restaurar la contraseña")
+    } finally {
+      setResettingPassword(null)
     }
   }
 
@@ -189,7 +209,9 @@ export function UserManagement() {
                   <Label htmlFor="role">Tipo de Usuario</Label>
                   <Select
                     value={newUser.role}
-                    onValueChange={(value: "administrador" | "operativo") => setNewUser({ ...newUser, role: value })}
+                    onValueChange={(value: "administrador" | "operativo" | "bufete") =>
+                      setNewUser({ ...newUser, role: value })
+                    }
                     disabled={creating}
                   >
                     <SelectTrigger>
@@ -206,6 +228,12 @@ export function UserManagement() {
                         <div className="flex items-center gap-2">
                           <Shield className="w-4 h-4" />
                           Administrador
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="bufete">
+                        <div className="flex items-center gap-2">
+                          <Scale className="w-4 h-4" />
+                          Bufete
                         </div>
                       </SelectItem>
                     </SelectContent>
@@ -268,6 +296,8 @@ export function UserManagement() {
                     <div className="flex items-center justify-center w-10 h-10 rounded-full bg-sidebar-primary/10">
                       {user.role === "administrador" ? (
                         <Shield className="w-5 h-5 text-red-600" />
+                      ) : user.role === "bufete" ? (
+                        <Scale className="w-5 h-5 text-green-600" />
                       ) : (
                         <User className="w-5 h-5 text-blue-600" />
                       )}
@@ -283,7 +313,9 @@ export function UserManagement() {
                   <div className="flex items-center gap-2 w-full sm:w-auto">
                     <Select
                       value={user.role}
-                      onValueChange={(value: "administrador" | "operativo") => handleRoleChange(user.id, value)}
+                      onValueChange={(value: "administrador" | "operativo" | "bufete") =>
+                        handleRoleChange(user.id, value)
+                      }
                     >
                       <SelectTrigger className="w-full sm:w-[140px]">
                         <SelectValue />
@@ -301,8 +333,28 @@ export function UserManagement() {
                             Administrador
                           </div>
                         </SelectItem>
+                        <SelectItem value="bufete">
+                          <div className="flex items-center gap-2">
+                            <Scale className="w-4 h-4" />
+                            Bufete
+                          </div>
+                        </SelectItem>
                       </SelectContent>
                     </Select>
+
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleResetPassword(user.id, user.email)}
+                      disabled={resettingPassword === user.id}
+                      title="Restaurar contraseña"
+                    >
+                      {resettingPassword === user.id ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <KeyRound className="w-4 h-4" />
+                      )}
+                    </Button>
 
                     <Button variant="destructive" size="sm" onClick={() => handleDeleteUser(user.id, user.email)}>
                       <Trash2 className="w-4 h-4" />

@@ -1,6 +1,6 @@
 "use client"
 
-import { Home, Scan, Shield, Database, Users, LogOut, User, ChevronUp } from "lucide-react"
+import { Home, Scan, Shield, Database, Users, LogOut, User, ChevronUp, Scale } from "lucide-react"
 
 import {
   Sidebar,
@@ -26,35 +26,47 @@ const items = [
     url: "/dashboard",
     icon: Home,
     adminOnly: false,
+    bufeteOnly: false,
   },
   {
     title: "Escanear",
     url: "/dashboard/escanear",
     icon: Scan,
     adminOnly: false,
+    bufeteOnly: false,
   },
   {
     title: "Control de Acceso",
     url: "/dashboard/control-acceso",
     icon: Shield,
     adminOnly: false,
+    bufeteOnly: false,
   },
   {
     title: "Usuarios",
     url: "/dashboard/usuarios",
     icon: Users,
     adminOnly: true,
+    bufeteOnly: false,
   },
   {
     title: "Base de Datos",
     url: "/dashboard/base-datos",
     icon: Database,
     adminOnly: true,
+    bufeteOnly: false,
+  },
+  {
+    title: "Gestión Bufetes",
+    url: "/dashboard/bufetes",
+    icon: Scale,
+    adminOnly: false,
+    bufeteOnly: true,
   },
 ]
 
 export function AppSidebar() {
-  const { user, userRole, isAdmin, logout } = useAuth()
+  const { user, userRole, isAdmin, isBufete, logout } = useAuth()
   const router = useRouter()
 
   const handleLogout = () => {
@@ -64,7 +76,11 @@ export function AppSidebar() {
 
   const userName = user?.email?.split("@")[0] || "Usuario"
 
-  const visibleItems = items.filter((item) => !item.adminOnly || isAdmin)
+  const visibleItems = items.filter((item) => {
+    if (item.adminOnly && !isAdmin) return false
+    if (item.bufeteOnly && !isBufete) return false
+    return true
+  })
 
   return (
     <Sidebar variant="inset">
@@ -80,7 +96,9 @@ export function AppSidebar() {
               </div>
               <div className="grid flex-1 text-left text-sm leading-tight">
                 <span className="truncate font-semibold">Mi Aplicación</span>
-                <span className="truncate text-xs">{isAdmin ? "Administrador" : "Dashboard"}</span>
+                <span className="truncate text-xs">
+                  {isAdmin ? "Administrador" : isBufete ? "Bufete" : "Dashboard"}
+                </span>
               </div>
             </SidebarMenuButton>
           </SidebarMenuItem>
@@ -104,10 +122,18 @@ export function AppSidebar() {
                         {item.adminOnly && isAdmin && (
                           <div className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full"></div>
                         )}
+                        {item.bufeteOnly && isBufete && (
+                          <div className="absolute -top-1 -right-1 w-2 h-2 bg-green-500 rounded-full"></div>
+                        )}
                       </div>
                       <span className="font-medium text-base">{item.title}</span>
                       {item.adminOnly && isAdmin && (
                         <span className="ml-auto text-xs bg-red-100 text-red-700 px-2 py-1 rounded-full">Admin</span>
+                      )}
+                      {item.bufeteOnly && isBufete && (
+                        <span className="ml-auto text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full">
+                          Bufete
+                        </span>
                       )}
                     </a>
                   </SidebarMenuButton>
@@ -133,6 +159,7 @@ export function AppSidebar() {
                     <span className="truncate font-semibold">
                       {userName}
                       {isAdmin && " (Admin)"}
+                      {isBufete && " (Bufete)"}
                     </span>
                     <span className="truncate text-xs">
                       {user?.email} • {userRole}
@@ -155,6 +182,7 @@ export function AppSidebar() {
                     <span className="truncate font-semibold">
                       {userName}
                       {isAdmin && " (Admin)"}
+                      {isBufete && " (Bufete)"}
                     </span>
                     <span className="truncate text-xs">
                       {user?.email} • {userRole}

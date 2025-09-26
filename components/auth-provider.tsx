@@ -7,8 +7,9 @@ import type { User } from "@/lib/auth-service"
 
 interface AuthContextType {
   user: User | null
-  userRole: "administrador" | "operativo" | null
+  userRole: "administrador" | "operativo" | "bufete" | null
   isAdmin: boolean
+  isBufete: boolean
   loading: boolean
   login: (user: User) => void
   logout: () => void
@@ -18,6 +19,7 @@ const AuthContext = createContext<AuthContextType>({
   user: null,
   userRole: null,
   isAdmin: false,
+  isBufete: false,
   loading: true,
   login: () => {},
   logout: () => {},
@@ -61,8 +63,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const userRole = user?.role || null
   const isAdmin = userRole === "administrador"
+  const isBufete = userRole === "bufete"
 
   return (
-    <AuthContext.Provider value={{ user, userRole, isAdmin, loading, login, logout }}>{children}</AuthContext.Provider>
+    <AuthContext.Provider value={{ user, userRole, isAdmin, isBufete, loading, login, logout }}>
+      {children}
+    </AuthContext.Provider>
   )
 }
