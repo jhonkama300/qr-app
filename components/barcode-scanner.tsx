@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import {
+  CameraOffIcon,
   CameraIcon,
   RefreshCcwIcon,
   Loader2Icon,
@@ -49,13 +50,10 @@ export function BarcodeScanner() {
   const [manualIdInput, setManualIdInput] = useState<string>("")
   const [isManualProcessing, setIsManualProcessing] = useState(false)
   const [manualInputError, setManualInputError] = useState<string | null>(null)
-  const [isScanning, setIsScanning] = useState(false)
-  const [scanningActive, setScanningActive] = useState(false)
 
   const router = useRouter()
   const webcamRef = useRef<Webcam>(null)
   const codeReader = useRef<BrowserMultiFormatReader | null>(null)
-  const scanIntervalRef = useRef<NodeJS.Timeout | null>(null)
 
   useEffect(() => {
     setIsClient(true)
@@ -80,68 +78,8 @@ export function BarcodeScanner() {
       if (codeReader.current) {
         codeReader.current.reset()
       }
-      if (scanIntervalRef.current) {
-        clearInterval(scanIntervalRef.current)
-      }
     }
   }, [isClient])
-
-  const startContinuousScanning = useCallback(() => {
-    if (!webcamRef.current || !codeReader.current || scanningActive) return
-
-    console.log("[v0] Iniciando escaneo continuo...")
-    setScanningActive(true)
-
-    scanIntervalRef.current = setInterval(async () => {
-      try {
-        const video = webcamRef.current?.video
-        if (!video || video.readyState !== video.HAVE_ENOUGH_DATA) return
-
-        // Crear canvas temporal para capturar frame
-        const canvas = document.createElement("canvas")
-        const context = canvas.getContext("2d")
-        if (!context) return
-
-        canvas.width = video.videoWidth
-        canvas.height = video.videoHeight
-        context.drawImage(video, 0, 0, canvas.width, canvas.height)
-
-        // Intentar decodificar el frame
-        const imageData = context.getImageData(0, 0, canvas.width, canvas.height)
-        const result = await codeReader.current?.decodeFromImageData(imageData)
-
-        if (result && result.getText()) {
-          console.log("[v0] QR detectado:", result.getText())
-          // Detener escaneo y procesar resultado
-          stopContinuousScanning()
-          await processScanResult(result.getText(), "direct")
-        }
-      } catch (error) {
-        // Error silencioso - es normal que no siempre haya un código QR
-        // console.log("[v0] No se detectó código QR en este frame")
-      }
-    }, 500) // Escanear cada 500ms
-  }, [scanningActive])
-
-  const stopContinuousScanning = useCallback(() => {
-    if (scanIntervalRef.current) {
-      clearInterval(scanIntervalRef.current)
-      scanIntervalRef.current = null
-    }
-    setScanningActive(false)
-    console.log("[v0] Escaneo continuo detenido")
-  }, [])
-
-  useEffect(() => {
-    if (selectedDeviceId && hasPermission && !scanningActive && !scanResultDisplay) {
-      // Esperar un poco para que la cámara se inicialice
-      const timer = setTimeout(() => {
-        startContinuousScanning()
-      }, 1000)
-
-      return () => clearTimeout(timer)
-    }
-  }, [selectedDeviceId, hasPermission, scanningActive, scanResultDisplay, startContinuousScanning])
 
   const handleDevices = useCallback((mediaDevices: MediaDeviceInfo[]) => {
     const videoDevices = mediaDevices.filter(({ kind }) => kind === "videoinput")
@@ -180,6 +118,7 @@ export function BarcodeScanner() {
     async (scannedContent: string, source: "direct" | "q10" | "manual") => {
       let currentScanResult: ScanResultDisplay
 
+      // Información del usuario que autoriza el acceso
       const userInfo = user
         ? {
             userId: user.id,
@@ -201,7 +140,7 @@ export function BarcodeScanner() {
         }
         setScanResultDisplay(currentScanResult)
         await processQ10Url(scannedContent)
-        setScanResultDisplay(null)
+        setScanResultDisplay(null) // Limpiar el mensaje temporal después de la redirección de Q10
         return
       } else {
         const alreadyScanned = await checkIfAlreadyScanned(scannedContent)
@@ -216,9 +155,9 @@ export function BarcodeScanner() {
           }
           setScanResultDisplay(currentScanResult)
 
+          // Limpiar después de mostrar el error y reiniciar escaneo
           setTimeout(() => {
             setScanResultDisplay(null)
-            startContinuousScanning()
           }, 4000)
           return
         }
@@ -254,10 +193,79 @@ export function BarcodeScanner() {
         } else if (currentScanResult.type === "denied") {
           router.push(`/access-denied?id=${currentScanResult.identificacion}&source=${currentScanResult.source}`)
         }
-      }, 2500)
+        // Para el tipo 'error', simplemente se mostrará el mensaje y no se redirigirá automáticamente.
+      }, 2500) // 2.5 segundos de retraso
     },
-    [getStudentById, markStudentAccess, processQ10Url, router, user, checkIfAlreadyScanned, startContinuousScanning],
+    [getStudentById, markStudentAccess, processQ10Url, router, user, checkIfAlreadyScanned],
   )
+
+  useEffect(() => {
+    // Solo iniciar el escaneo si el cliente está listo, tiene permisos, hay un dispositivo seleccionado,
+    // no se está procesando Q10, no se está mostrando un resultado de escaneo temporal, y no se está procesando manualmente.
+    if (
+      !isClient ||
+      !hasPermission ||
+      !selectedDeviceId ||
+      isProcessingQ10 ||
+      scanResultDisplay ||
+      isManualProcessing
+    ) {
+      if (codeReader.current) {
+        console.log("[v0] Reseteando lector (condiciones no cumplidas)...")
+        codeReader.current.reset()
+      }
+      return
+    }
+
+    const video = webcamRef.current?.video
+    if (!video) {
+      console.warn("[v0] Elemento de video no listo para escanear.")
+      return
+    }
+
+    if (!codeReader.current) {
+      setError("El lector de códigos no está inicializado.")
+      return
+    }
+
+    setError(null) // Limpiar errores previos
+
+    console.log("[v0] Iniciando escaneo continuo con dispositivo:", selectedDeviceId)
+    codeReader.current
+      .decodeFromVideoDevice(selectedDeviceId, video, (result, err) => {
+        if (result) {
+          // Solo procesar si no se está mostrando un resultado temporal y no se está procesando Q10 o manualmente
+          if (!scanResultDisplay && !isProcessingQ10 && !isManualProcessing) {
+            console.log("[v0] QR detectado:", result.getText())
+            processScanResult(result.getText(), "direct")
+          }
+        }
+        if (err && err.name !== "NotFoundException" && err.name !== "AbortException") {
+          console.error("[v0] Error al escanear:", err)
+          setError("Error en el escáner: " + err.message)
+        }
+      })
+      .catch((err) => {
+        console.error("[v0] Error al iniciar el escaneo continuo:", err)
+        setError("Error al iniciar el escáner: " + err.message)
+        codeReader.current?.reset()
+      })
+
+    return () => {
+      if (codeReader.current) {
+        console.log("[v0] Reseteando lector en cleanup...")
+        codeReader.current.reset()
+      }
+    }
+  }, [
+    isClient,
+    hasPermission,
+    selectedDeviceId,
+    isProcessingQ10,
+    scanResultDisplay,
+    isManualProcessing,
+    processScanResult,
+  ])
 
   const requestCameraPermission = () => {
     if (!isClient) return
@@ -278,8 +286,6 @@ export function BarcodeScanner() {
   const switchCamera = () => {
     if (!isClient || devices.length <= 1) return
 
-    stopContinuousScanning()
-
     if (codeReader.current) {
       codeReader.current.reset()
     }
@@ -287,6 +293,7 @@ export function BarcodeScanner() {
     const currentIndex = devices.findIndex((device) => device.deviceId === selectedDeviceId)
     const nextIndex = (currentIndex + 1) % devices.length
     setSelectedDeviceId(devices[nextIndex].deviceId)
+    // El useEffect principal se encargará de reiniciar el escaneo con la nueva cámara
   }
 
   const handleManualSubmit = async () => {
@@ -295,17 +302,15 @@ export function BarcodeScanner() {
       return
     }
 
-    stopContinuousScanning()
-
     setIsManualProcessing(true)
-    setManualInputError(null)
+    setManualInputError(null) // Limpiar errores previos de entrada manual
     setScanResultDisplay({
       type: "info",
       identificacion: manualIdInput,
       message: "Validando identificación manual...",
       timestamp: new Date().toISOString(),
     })
-    setError(null)
+    setError(null) // Limpiar errores de cámara si los hubiera
 
     try {
       await processScanResult(manualIdInput.trim(), "manual")
@@ -319,25 +324,62 @@ export function BarcodeScanner() {
       })
     } finally {
       setIsManualProcessing(false)
-      setManualIdInput("")
+      setManualIdInput("") // Limpiar el input después de procesar
     }
   }
 
+  if (!isClient) {
+    return (
+      <div className="flex flex-col items-center justify-center p-8 text-center bg-card rounded-lg border border-border shadow-sm">
+        <Loader2Icon className="text-primary mb-4 size-16 animate-spin" />
+        <p className="text-muted-foreground text-lg">Cargando escáner...</p>
+      </div>
+    )
+  }
+
+  if (hasPermission === false) {
+    return (
+      <div className="flex flex-col items-center justify-center p-8 text-center bg-card rounded-lg border border-border shadow-sm">
+        <CameraOffIcon className="text-destructive mb-6 size-20" />
+        <h3 className="text-2xl font-bold mb-3 text-foreground">Acceso a la cámara denegado</h3>
+        <p className="text-muted-foreground mb-8 text-base">
+          {error || "Se requiere acceso a la cámara para escanear códigos de barras."}
+        </p>
+        <Button
+          onClick={requestCameraPermission}
+          className="bg-primary text-primary-foreground h-12 px-6 text-base rounded-md"
+        >
+          <CameraIcon className="mr-2 size-5" />
+          Permitir acceso a la cámara
+        </Button>
+      </div>
+    )
+  }
+
+  if (isProcessingQ10) {
+    return (
+      <div className="flex flex-col items-center justify-center p-8 text-center bg-card rounded-lg border border-border shadow-sm">
+        <Loader2Icon className="text-primary mb-4 size-16 animate-spin" />
+        <p className="text-muted-foreground text-lg">Procesando certificado Q10...</p>
+        {q10Message && <p className="text-sm text-muted-foreground mt-2">{q10Message.text}</p>}
+      </div>
+    )
+  }
+
   return (
-    <div className="w-full max-w-md mx-auto @container">
+    <div className="w-full max-w-md @container">
       <Card>
-        <CardHeader className="text-center pb-3 px-3 sm:px-6">
-          <CardTitle className="flex items-center justify-center gap-2 text-base sm:text-xl">
-            <CameraIcon className="w-4 h-4 sm:w-5 sm:h-5" />
+        <CardHeader className="text-center">
+          <CardTitle className="flex items-center justify-center gap-2">
+            <CameraIcon className="w-5 h-5" />
             Escáner QR/Código
           </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-3 px-3 sm:px-6">
+        <CardContent className="space-y-4">
           {error && (
-            <Alert variant="destructive">
-              <AlertCircle className="h-4 w-4" />
-              <AlertDescription className="text-xs sm:text-sm text-destructive">{error}</AlertDescription>
-            </Alert>
+            <div className="p-3 bg-red-50 border border-red-200 rounded-md">
+              <p className="text-sm text-red-600">{error}</p>
+            </div>
           )}
 
           <div className="relative w-full pt-[100%] overflow-hidden rounded-lg bg-card shadow-lg border border-border">
@@ -348,88 +390,68 @@ export function BarcodeScanner() {
                 videoConstraints={{
                   deviceId: selectedDeviceId,
                   facingMode: "environment",
-                  width: { ideal: 1280 },
-                  height: { ideal: 720 },
                 }}
                 className="absolute inset-0 w-full h-full object-cover"
               />
             )}
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[85%] sm:w-[90%] h-[45%] sm:h-[50%] border-2 sm:border-4 border-primary rounded-lg shadow-[0_0_0_9999px_rgba(0,0,0,0.5)]">
-              {scanningActive && (
-                <div className="absolute top-1/2 left-[5%] right-[5%] h-[1px] sm:h-[2px] bg-primary animate-scan"></div>
-              )}
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[90%] h-[50%] border-4 border-primary rounded-lg shadow-[0_0_0_9999px_rgba(0,0,0,0.5)]">
+              <div className="absolute top-1/2 left-[5%] right-[5%] h-[2px] bg-primary animate-scan"></div>
             </div>
             {devices.length > 1 && (
               <button
                 onClick={switchCamera}
-                className="absolute top-2 right-2 sm:top-4 sm:right-4 bg-secondary/80 text-foreground p-2 sm:p-3 rounded-full hover:bg-secondary transition-colors shadow-md min-h-[44px] min-w-[44px] flex items-center justify-center"
+                className="absolute top-4 right-4 bg-secondary/70 text-foreground p-3 rounded-full hover:bg-secondary transition-colors shadow-md"
                 aria-label="Cambiar cámara"
               >
-                <RefreshCcwIcon className="size-4 sm:size-6" />
+                <RefreshCcwIcon className="size-6" />
               </button>
             )}
           </div>
 
-          <div className="text-center py-2">
-            <p className="text-xs sm:text-sm text-muted-foreground">
-              {scanningActive ? "Escaneando automáticamente... Apunta al código" : "Preparando escáner..."}
-            </p>
-            {scanningActive && (
-              <div className="flex items-center justify-center gap-2 mt-1">
-                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                <span className="text-xs text-green-600 font-medium">Activo</span>
-              </div>
-            )}
+          <div className="text-center">
+            <p className="text-sm text-muted-foreground">Escaneando... Apunta al código</p>
           </div>
         </CardContent>
       </Card>
 
       {scanResultDisplay && (
         <div
-          className={`mt-3 sm:mt-4 p-3 sm:p-4 rounded-lg border ${
+          className={`mt-4 p-4 rounded-lg border ${
             scanResultDisplay.type === "success"
               ? "bg-green-50 border-green-200 text-green-800"
               : scanResultDisplay.type === "denied"
                 ? "bg-red-50 border-red-200 text-red-800"
                 : scanResultDisplay.type === "error"
                   ? "bg-yellow-50 border-yellow-200 text-yellow-800"
-                  : "bg-blue-50 border-blue-200 text-blue-800"
+                  : "bg-blue-50 border-blue-200 text-blue-800" // Para 'info' type
           }`}
         >
-          <div className="flex items-start gap-2 mb-2">
-            {scanResultDisplay.type === "success" && (
-              <CheckCircle className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0 mt-0.5" />
-            )}
-            {scanResultDisplay.type === "denied" && <XCircle className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0 mt-0.5" />}
-            {scanResultDisplay.type === "error" && (
-              <AlertTriangle className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0 mt-0.5" />
-            )}
-            {scanResultDisplay.type === "info" && (
-              <Loader2Icon className="w-4 h-4 sm:w-5 sm:h-5 animate-spin flex-shrink-0 mt-0.5" />
-            )}
-            <p className="font-semibold text-xs sm:text-base leading-tight">{scanResultDisplay.message}</p>
+          <div className="flex items-center gap-2 mb-2">
+            {scanResultDisplay.type === "success" && <CheckCircle className="w-5 h-5" />}
+            {scanResultDisplay.type === "denied" && <XCircle className="w-5 h-5" />}
+            {scanResultDisplay.type === "error" && <AlertTriangle className="w-5 h-5" />}
+            {scanResultDisplay.type === "info" && <Loader2Icon className="w-5 h-5 animate-spin" />}
+            <p className="font-semibold text-lg">{scanResultDisplay.message}</p>
           </div>
           {scanResultDisplay.identificacion && scanResultDisplay.identificacion !== "N/A" && (
-            <p className="text-xs sm:text-sm mb-2">
+            <p className="text-sm">
               <span className="font-medium">Identificación:</span>{" "}
-              <Badge variant="outline" className="text-xs">
-                {scanResultDisplay.identificacion}
-              </Badge>
+              <Badge variant="outline">{scanResultDisplay.identificacion}</Badge>
             </p>
           )}
           {scanResultDisplay.person && (
-            <div className="mt-2 text-xs sm:text-sm space-y-1">
+            <div className="mt-2 text-sm space-y-1">
               <div className="flex items-center gap-2">
-                <User className="w-3 h-3 sm:w-4 sm:h-4 text-muted-foreground flex-shrink-0" />
-                <span className="font-medium truncate">{scanResultDisplay.person.nombre}</span>
+                <User className="w-4 h-4 text-muted-foreground" />
+                <span className="font-medium">{scanResultDisplay.person.nombre}</span>
               </div>
-              <p className="text-xs">
+              <p>
                 <span className="font-medium">Puesto:</span> {scanResultDisplay.person.puesto}
               </p>
-              <p className="text-xs">
+              <p>
                 <span className="font-medium">Programa:</span> {scanResultDisplay.person.programa}
               </p>
-              <p className="text-xs">
+              <p>
                 <span className="font-medium">Cupos Extras:</span> {scanResultDisplay.person.cuposExtras}
               </p>
             </div>
@@ -440,43 +462,37 @@ export function BarcodeScanner() {
         </div>
       )}
 
-      <Card className="mt-3 sm:mt-6">
-        <CardHeader className="text-center pb-3 px-3 sm:px-6">
-          <CardTitle className="flex items-center justify-center gap-2 text-sm sm:text-lg">
-            <Keyboard className="w-4 h-4 sm:w-5 sm:h-5" />
+      <Card className="mt-6">
+        <CardHeader className="text-center">
+          <CardTitle className="flex items-center justify-center gap-2">
+            <Keyboard className="w-5 h-5" />
             Entrada Manual
           </CardTitle>
-          <CardDescription className="text-xs sm:text-sm">
-            Ingresa la identificación si el escaneo no es posible
-          </CardDescription>
+          <CardDescription>Ingresa la identificación si el escaneo no es posible</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-3 px-3 sm:px-6">
+        <CardContent className="space-y-4">
           {manualInputError && (
             <Alert variant="destructive">
               <AlertCircle className="h-4 w-4" />
-              <AlertDescription className="text-xs sm:text-sm text-destructive">{manualInputError}</AlertDescription>
+              <AlertDescription>{manualInputError}</AlertDescription>
             </Alert>
           )}
           <div className="space-y-2">
-            <Label htmlFor="manual-id" className="text-xs sm:text-sm">
-              Número de Identificación
-            </Label>
+            <Label htmlFor="manual-id">Número de Identificación</Label>
             <Input
               id="manual-id"
               type="text"
-              inputMode="numeric"
-              pattern="[0-9]*"
               placeholder="Ej: 123456789"
               value={manualIdInput}
               onChange={(e) => setManualIdInput(e.target.value)}
               disabled={isManualProcessing || isProcessingQ10}
-              className="h-11 sm:h-12 text-base mobile-optimized"
+              className="h-11 text-base"
             />
           </div>
           <Button
             onClick={handleManualSubmit}
             disabled={isManualProcessing || isProcessingQ10 || !manualIdInput.trim()}
-            className="w-full h-11 sm:h-12 min-h-[44px] clickable"
+            className="w-full h-11 text-base"
           >
             {isManualProcessing ? (
               <>
@@ -492,22 +508,6 @@ export function BarcodeScanner() {
           </Button>
         </CardContent>
       </Card>
-
-      {hasPermission === false && (
-        <Card className="mt-3 sm:mt-4">
-          <CardContent className="text-center py-4 px-3 sm:px-6">
-            <AlertTriangle className="w-8 h-8 sm:w-12 sm:h-12 mx-auto mb-3 text-yellow-500" />
-            <h3 className="text-sm sm:text-base font-semibold mb-2">Permisos de Cámara Requeridos</h3>
-            <p className="text-xs sm:text-sm text-muted-foreground mb-4">
-              Para usar el escáner, necesitamos acceso a tu cámara.
-            </p>
-            <Button onClick={requestCameraPermission} className="w-full h-11 sm:h-12 min-h-[44px] clickable">
-              <CameraIcon className="mr-2 h-4 w-4" />
-              Permitir Acceso a Cámara
-            </Button>
-          </CardContent>
-        </Card>
-      )}
     </div>
   )
 }
