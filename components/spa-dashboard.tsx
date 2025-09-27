@@ -30,8 +30,8 @@ export type ViewType =
   | "inicio"
   | "escanear"
   | "control-acceso"
-  | "mesas-bufete"
-  | "control-mesas"
+  | "bufetes-gestion"
+  | "control-bufetes"
   | "usuarios"
   | "base-datos"
 
@@ -71,7 +71,7 @@ export function SPADashboard({ initialView = "inicio" }: SPADashboardProps) {
         return "Inicio"
       case "escanear":
         if (userRole === "bufete") {
-          return `Entrega de Comida - Mesa ${mesaAsignada}`
+          return `Entrega de Comida - Bufete ${mesaAsignada}`
         } else if (userRole === "operativo") {
           return "Control de Acceso al Evento"
         } else {
@@ -79,10 +79,10 @@ export function SPADashboard({ initialView = "inicio" }: SPADashboardProps) {
         }
       case "control-acceso":
         return "Control de Acceso"
-      case "mesas-bufete":
-        return `Gestión de Mesas${mesaAsignada ? ` - Mesa ${mesaAsignada}` : ""}`
-      case "control-mesas":
-        return "Control de Mesas (Admin)"
+      case "bufetes-gestion":
+        return `Gestión de Bufetes${mesaAsignada ? ` - Bufete ${mesaAsignada}` : ""}`
+      case "control-bufetes":
+        return "Control de Bufetes (Admin)"
       case "usuarios":
         return "Usuarios"
       case "base-datos":
@@ -95,6 +95,16 @@ export function SPADashboard({ initialView = "inicio" }: SPADashboardProps) {
   const renderCurrentView = () => {
     switch (currentView) {
       case "inicio":
+        if (!isAdmin) {
+          return (
+            <div className="flex flex-1 flex-col items-center justify-center p-4">
+              <div className="text-center">
+                <h2 className="text-xl font-semibold mb-2">Acceso Restringido</h2>
+                <p className="text-muted-foreground">No tienes permisos para ver esta sección.</p>
+              </div>
+            </div>
+          )
+        }
         return <DashboardStats />
       case "escanear":
         if (userRole === "bufete") {
@@ -116,8 +126,20 @@ export function SPADashboard({ initialView = "inicio" }: SPADashboardProps) {
           )
         }
       case "control-acceso":
+        if (!isAdmin && userRole !== "operativo") {
+          return (
+            <div className="flex flex-1 flex-col items-center justify-center p-4">
+              <div className="text-center">
+                <h2 className="text-xl font-semibold mb-2">Acceso Restringido</h2>
+                <p className="text-muted-foreground">
+                  Solo administradores y operativos pueden acceder a esta sección.
+                </p>
+              </div>
+            </div>
+          )
+        }
         return <AccessControl />
-      case "mesas-bufete":
+      case "bufetes-gestion":
         if (!isBufete) {
           setCurrentView("inicio")
           return <DashboardStats />
@@ -126,12 +148,12 @@ export function SPADashboard({ initialView = "inicio" }: SPADashboardProps) {
           <div className="flex flex-1 flex-col gap-4 p-4">
             <div className="grid auto-rows-min gap-4 md:grid-cols-3">
               <div className="aspect-video rounded-xl bg-muted/50 p-4">
-                <h3 className="font-semibold mb-2">Mesa Asignada</h3>
-                <div className="text-2xl font-bold text-primary">Mesa {mesaAsignada || "No asignada"}</div>
+                <h3 className="font-semibold mb-2">Bufete Asignado</h3>
+                <div className="text-2xl font-bold text-primary">Bufete {mesaAsignada || "No asignado"}</div>
               </div>
               <div className="aspect-video rounded-xl bg-muted/50 p-4">
                 <h3 className="font-semibold mb-2">Estado</h3>
-                <div className="text-lg font-medium text-green-600">Activa</div>
+                <div className="text-lg font-medium text-green-600">Activo</div>
               </div>
               <div className="aspect-video rounded-xl bg-muted/50 p-4">
                 <h3 className="font-semibold mb-2">Estudiantes Atendidos</h3>
@@ -139,7 +161,7 @@ export function SPADashboard({ initialView = "inicio" }: SPADashboardProps) {
               </div>
             </div>
             <div className="min-h-[100vh] flex-1 rounded-xl bg-muted/50 p-4">
-              <h3 className="font-semibold mb-4">Instrucciones para Mesa {mesaAsignada}</h3>
+              <h3 className="font-semibold mb-4">Instrucciones para Bufete {mesaAsignada}</h3>
               <div className="space-y-2 text-sm text-muted-foreground">
                 <p>• Solo puedes entregar comida a estudiantes autenticados</p>
                 <p>• Cada estudiante tiene 2 cupos predeterminados + cupos extras</p>
@@ -150,7 +172,7 @@ export function SPADashboard({ initialView = "inicio" }: SPADashboardProps) {
             </div>
           </div>
         )
-      case "control-mesas":
+      case "control-bufetes":
         if (!isAdmin) {
           setCurrentView("inicio")
           return <DashboardStats />

@@ -31,7 +31,7 @@ const items = [
     title: "Inicio",
     view: "inicio" as ViewType,
     icon: Home,
-    adminOnly: false,
+    adminOnly: true, // Solo administradores pueden ver el dashboard de inicio
     bufeteOnly: false,
     operativoOnly: false,
   },
@@ -52,21 +52,22 @@ const items = [
     title: "Control de Acceso",
     view: "control-acceso" as ViewType,
     icon: Shield,
-    adminOnly: true,
+    adminOnly: false, // Permitir acceso a administradores y operativos
     bufeteOnly: false,
     operativoOnly: false,
+    adminOrOperativo: true, // Nueva propiedad para indicar que necesita ser admin o operativo
   },
   {
-    title: "Gestión de Mesas",
-    view: "mesas-bufete" as ViewType,
+    title: "Gestión de Bufetes", // Cambiar "Gestión de Mesas" por "Gestión de Bufetes"
+    view: "bufetes-gestion" as ViewType, // Cambiar view name
     icon: Utensils,
     adminOnly: false,
     bufeteOnly: true,
     operativoOnly: false,
   },
   {
-    title: "Control de Mesas",
-    view: "control-mesas" as ViewType,
+    title: "Control de Bufetes", // Cambiar "Control de Mesas" por "Control de Bufetes"
+    view: "control-bufetes" as ViewType, // Cambiar view name
     icon: Settings,
     adminOnly: true,
     bufeteOnly: false,
@@ -116,6 +117,7 @@ export function AppSidebar({ currentView = "inicio", onViewChange }: AppSidebarP
     if (item.adminOnly && !isAdmin) return false
     if (item.bufeteOnly && !isBufete) return false
     if (item.operativoOnly && !isOperativo) return false
+    if (item.adminOrOperativo && !isAdmin && !isOperativo) return false
     return true
   })
 
@@ -169,6 +171,9 @@ export function AppSidebar({ currentView = "inicio", onViewChange }: AppSidebarP
                         {item.operativoOnly && isOperativo && (
                           <div className="absolute -top-1 -right-1 w-2 h-2 bg-blue-500 rounded-full"></div>
                         )}
+                        {item.adminOrOperativo && (isAdmin || isOperativo) && (
+                          <div className="absolute -top-1 -right-1 w-2 h-2 bg-purple-500 rounded-full"></div>
+                        )}
                       </div>
                       <div className="flex flex-col flex-1">
                         <span className="font-medium text-base">{item.title}</span>
@@ -187,6 +192,11 @@ export function AppSidebar({ currentView = "inicio", onViewChange }: AppSidebarP
                       {item.operativoOnly && isOperativo && (
                         <span className="ml-auto text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full">
                           Operativo
+                        </span>
+                      )}
+                      {item.adminOrOperativo && (isAdmin || isOperativo) && !item.adminOnly && (
+                        <span className="ml-auto text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded-full">
+                          {isAdmin ? "Admin" : "Operativo"}
                         </span>
                       )}
                     </div>
