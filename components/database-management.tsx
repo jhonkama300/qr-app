@@ -34,6 +34,7 @@ import {
   ChevronRight,
   ChevronsLeft,
   ChevronsRight,
+  RotateCcw,
 } from "lucide-react"
 import * as XLSX from "xlsx"
 
@@ -246,6 +247,46 @@ export function DatabaseManagement() {
     }
   }
 
+  const handleResetMetrics = async () => {
+    if (
+      !confirm(
+        "¿Estás seguro de reiniciar todas las métricas? Esto eliminará todos los registros de acceso (access_logs). Esta acción no se puede deshacer.",
+      )
+    ) {
+      return
+    }
+
+    setImporting(true)
+    setError("")
+    setSuccess("")
+
+    try {
+      // Obtener todos los documentos de access_logs
+      const accessLogsSnapshot = await getDocs(collection(db, "access_logs"))
+
+      if (accessLogsSnapshot.empty) {
+        setSuccess("No hay métricas para reiniciar")
+        return
+      }
+
+      // Crear batch para eliminar todos los access_logs
+      const batch = writeBatch(db)
+      accessLogsSnapshot.forEach((doc) => {
+        batch.delete(doc.ref)
+      })
+
+      // Ejecutar el batch
+      await batch.commit()
+
+      setSuccess(`✅ Métricas reiniciadas exitosamente: ${accessLogsSnapshot.size} registros de acceso eliminados`)
+    } catch (error) {
+      console.error("Error al reiniciar métricas:", error)
+      setError("Error al reiniciar las métricas. Intenta nuevamente")
+    } finally {
+      setImporting(false)
+    }
+  }
+
   const clearSearch = () => {
     setSearchTerm("")
   }
@@ -398,6 +439,16 @@ export function DatabaseManagement() {
             <Button variant="destructive" onClick={handleClearDatabase} className="w-full sm:w-auto justify-center">
               <Trash2 className="w-4 h-4 mr-2" />
               Limpiar BD
+            </Button>
+
+            <Button
+              variant="outline"
+              onClick={handleResetMetrics}
+              disabled={importing}
+              className="w-full sm:w-auto justify-center border-orange-200 text-orange-700 hover:bg-orange-50 bg-transparent"
+            >
+              {importing ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <RotateCcw className="w-4 h-4 mr-2" />}
+              Reiniciar Métricas
             </Button>
           </div>
         </div>

@@ -9,16 +9,15 @@ import {
   CheckCircle,
   XCircle,
   Clock,
-  Users,
   Loader2,
   UserCheck,
   BarChart3,
   TrendingUp,
   Utensils,
-  DollarSign,
   Activity,
   ChefHat,
   Target,
+  GraduationCap,
 } from "lucide-react"
 
 interface PersonData {
@@ -246,6 +245,23 @@ export function DashboardStats() {
     return Array.from(uniqueLogs.values())
   }
 
+  const getEntregasPorMesa = () => {
+    const entregasPorMesa = new Map<number, number>()
+    const entregasComida = accessLogs.filter(
+      (log) => (log.status === "granted" || log.status === "q10_success") && log.mesaUsada !== undefined,
+    )
+
+    entregasComida.forEach((log) => {
+      if (log.mesaUsada) {
+        entregasPorMesa.set(log.mesaUsada, (entregasPorMesa.get(log.mesaUsada) || 0) + 1)
+      }
+    })
+
+    return Array.from(entregasPorMesa.entries())
+      .map(([mesa, entregas]) => ({ mesa, entregas }))
+      .sort((a, b) => b.entregas - a.entregas)
+  }
+
   const uniqueAccessLogs = getUniqueAccessLogs()
   const userStats = getUserStats()
   const topUser = userStats[0] // Usuario con más registros
@@ -260,11 +276,13 @@ export function DashboardStats() {
   const waitingPersonsCount = allPersons.filter((person) => !scannedIdentifications.has(person.identificacion)).length
   const totalPersonsCount = allPersons.length
   const totalRegistrosCount = accessLogs.length // Total de registros de acceso
+  const graduandosRegistrados = totalPersonsCount - scannedIdentifications.size
+  const entregasPorMesa = getEntregasPorMesa()
 
   if (loading) {
     return (
       <div className="flex flex-1 flex-col gap-4 p-4">
-        <div className="flex items-center justify-center min-h-[400px]">
+        <div className="flex items-center justify-center min-h-[400px] text-foreground">
           <div className="text-center">
             <Loader2 className="h-8 w-8 animate-spin mx-auto mb-2" />
             <p className="text-muted-foreground">Cargando estadísticas del dashboard...</p>
@@ -295,140 +313,172 @@ export function DashboardStats() {
         </Alert>
       )}
 
-      <div className="grid gap-3 md:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-6">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-xs md:text-sm font-medium">Estudiantes Registrados</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
+      <div className="grid gap-2 md:gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 text-center">
+        <Card className="p-2">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1">
+            <CardTitle className="text-xs font-medium text-blue-600">Graduandos Registrados</CardTitle>
+            <GraduationCap className="h-3 w-3 text-blue-600" />
           </CardHeader>
-          <CardContent>
-            <div className="text-xl md:text-2xl font-bold">{totalPersonsCount}</div>
-            <p className="text-xs text-muted-foreground">Total en la base de datos</p>
+          <CardContent className="p-2 pt-0">
+            <div className="text-lg font-bold text-blue-800">{graduandosRegistrados}</div>
+            <p className="text-xs text-muted-foreground">Pendientes por procesar</p>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-xs md:text-sm font-medium">Total Registros</CardTitle>
-            <BarChart3 className="h-4 w-4 text-muted-foreground" />
+        <Card className="p-2">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1">
+            <CardTitle className="text-xs font-medium text-green-600">Accesos Concedidos</CardTitle>
+            <CheckCircle className="h-3 w-3 text-green-600" />
           </CardHeader>
-          <CardContent>
-            <div className="text-xl md:text-2xl font-bold">{totalRegistrosCount}</div>
-            <p className="text-xs text-muted-foreground">Registros de acceso totales</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-xs md:text-sm font-medium text-green-600">Accesos Concedidos</CardTitle>
-            <CheckCircle className="h-4 w-4 text-green-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-xl md:text-2xl font-bold text-green-800">{grantedAccessCount}</div>
+          <CardContent className="p-2 pt-0">
+            <div className="text-lg font-bold text-green-800">{grantedAccessCount}</div>
             <p className="text-xs text-muted-foreground">Personas con acceso permitido</p>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-xs md:text-sm font-medium text-red-600">Accesos Denegados</CardTitle>
-            <XCircle className="h-4 w-4 text-red-600" />
+        <Card className="p-2">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1">
+            <CardTitle className="text-xs font-medium text-red-600">Accesos Denegados</CardTitle>
+            <XCircle className="h-3 w-3 text-red-600" />
           </CardHeader>
-          <CardContent>
-            <div className="text-xl md:text-2xl font-bold text-red-800">{deniedAccessCount}</div>
+          <CardContent className="p-2 pt-0">
+            <div className="text-lg font-bold text-red-800">{deniedAccessCount}</div>
             <p className="text-xs text-muted-foreground">Personas con acceso denegado</p>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-xs md:text-sm font-medium text-blue-600">Mesas Activas</CardTitle>
-            <Utensils className="h-4 w-4 text-blue-600" />
+        <Card className="p-2">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1">
+            <CardTitle className="text-xs font-medium text-orange-600">En Espera</CardTitle>
+            <Clock className="h-3 w-3 text-orange-600" />
           </CardHeader>
-          <CardContent>
-            <div className="text-xl md:text-2xl font-bold text-blue-800">
+          <CardContent className="p-2 pt-0">
+            <div className="text-lg font-bold text-orange-800">{waitingPersonsCount}</div>
+            <p className="text-xs text-muted-foreground">Personas sin procesar</p>
+          </CardContent>
+        </Card>
+
+        <Card className="p-2">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1">
+            <CardTitle className="text-xs font-medium text-blue-600">Mesas Activas</CardTitle>
+            <Utensils className="h-3 w-3 text-blue-600" />
+          </CardHeader>
+          <CardContent className="p-2 pt-0">
+            <div className="text-lg font-bold text-blue-800">
               {buffetStats.mesasActivas}/{buffetStats.totalMesas}
             </div>
             <p className="text-xs text-muted-foreground">Mesas de bufete operativas</p>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-xs md:text-sm font-medium text-purple-600">Comidas Entregadas</CardTitle>
-            <ChefHat className="h-4 w-4 text-purple-600" />
+        <Card className="p-2">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1">
+            <CardTitle className="text-xs font-medium text-purple-600">Comidas Entregadas</CardTitle>
+            <ChefHat className="h-3 w-3 text-purple-600" />
           </CardHeader>
-          <CardContent>
-            <div className="text-xl md:text-2xl font-bold text-purple-800">{buffetStats.comidasEntregadas}</div>
+          <CardContent className="p-2 pt-0">
+            <div className="text-lg font-bold text-purple-800">{buffetStats.comidasEntregadas}</div>
             <p className="text-xs text-muted-foreground">Total de entregas realizadas</p>
           </CardContent>
         </Card>
       </div>
 
-      <div className="grid gap-3 md:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-xs md:text-sm font-medium text-green-600">Ingresos por Comidas</CardTitle>
-            <DollarSign className="h-4 w-4 text-green-600" />
+      <div className="grid gap-2 md:gap-3 grid-cols-1 sm:grid-cols-2">
+        <Card className="p-2">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1">
+            <CardTitle className="text-xs font-medium text-orange-600">Mesa Más Activa</CardTitle>
+            <Target className="h-3 w-3 text-orange-600" />
           </CardHeader>
-          <CardContent>
-            <div className="text-xl md:text-2xl font-bold text-green-800">
-              ${buffetStats.ingresosPorComida.toLocaleString()}
-            </div>
-            <p className="text-xs text-muted-foreground">COP - Estimado a $8,000/comida</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-xs md:text-sm font-medium text-orange-600">Mesa Más Activa</CardTitle>
-            <Target className="h-4 w-4 text-orange-600" />
-          </CardHeader>
-          <CardContent>
+          <CardContent className="p-2 pt-0">
             {buffetStats.mesaMasActiva ? (
               <>
-                <div className="text-xl md:text-2xl font-bold text-orange-800">
-                  Mesa {buffetStats.mesaMasActiva.numero}
-                </div>
+                <div className="text-lg font-bold text-orange-800">Mesa {buffetStats.mesaMasActiva.numero}</div>
                 <p className="text-xs text-muted-foreground">
                   {buffetStats.mesaMasActiva.entregas} entregas realizadas
                 </p>
               </>
             ) : (
               <>
-                <div className="text-xl md:text-2xl font-bold text-gray-500">N/A</div>
+                <div className="text-lg font-bold text-gray-500">N/A</div>
                 <p className="text-xs text-muted-foreground">Sin entregas registradas</p>
               </>
             )}
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-xs md:text-sm font-medium text-indigo-600">Promedio por Mesa</CardTitle>
-            <BarChart3 className="h-4 w-4 text-indigo-600" />
+        <Card className="p-2">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1">
+            <CardTitle className="text-xs font-medium text-indigo-600">Promedio por Mesa</CardTitle>
+            <BarChart3 className="h-3 w-3 text-indigo-600" />
           </CardHeader>
-          <CardContent>
-            <div className="text-xl md:text-2xl font-bold text-indigo-800">{buffetStats.promedioEntregasPorMesa}</div>
+          <CardContent className="p-2 pt-0">
+            <div className="text-lg font-bold text-indigo-800">{buffetStats.promedioEntregasPorMesa}</div>
             <p className="text-xs text-muted-foreground">Entregas promedio por mesa activa</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-xs md:text-sm font-medium text-teal-600">Eficiencia Bufete</CardTitle>
-            <TrendingUp className="h-4 w-4 text-teal-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-xl md:text-2xl font-bold text-teal-800">
-              {buffetStats.totalMesas > 0 ? Math.round((buffetStats.mesasActivas / buffetStats.totalMesas) * 100) : 0}%
-            </div>
-            <p className="text-xs text-muted-foreground">Porcentaje de mesas activas</p>
           </CardContent>
         </Card>
       </div>
 
       <div className="grid gap-3 md:gap-4 grid-cols-1 lg:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base md:text-lg">
+              <BarChart3 className="w-4 h-4 md:w-5 md:h-5 text-blue-600" />
+              Estado General
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {/* Barra de Concedidos */}
+              <div className="space-y-2">
+                <div className="flex justify-between items-center">
+                  <span className="text-xs md:text-sm text-green-600">Concedidos</span>
+                  <span className="font-medium text-green-600">{grantedAccessCount}</span>
+                </div>
+                <div className="w-full bg-gray-200 rounded-full h-2">
+                  <div
+                    className="bg-green-600 h-2 rounded-full"
+                    style={{
+                      width: `${totalPersonsCount > 0 ? (grantedAccessCount / totalPersonsCount) * 100 : 0}%`,
+                    }}
+                  ></div>
+                </div>
+              </div>
+
+              {/* Barra de Denegados */}
+              <div className="space-y-2">
+                <div className="flex justify-between items-center">
+                  <span className="text-xs md:text-sm text-red-600">Denegados</span>
+                  <span className="font-medium text-red-600">{deniedAccessCount}</span>
+                </div>
+                <div className="w-full bg-gray-200 rounded-full h-2">
+                  <div
+                    className="bg-red-600 h-2 rounded-full"
+                    style={{
+                      width: `${totalPersonsCount > 0 ? (deniedAccessCount / totalPersonsCount) * 100 : 0}%`,
+                    }}
+                  ></div>
+                </div>
+              </div>
+
+              {/* Barra de En Espera */}
+              <div className="space-y-2">
+                <div className="flex justify-between items-center">
+                  <span className="text-xs md:text-sm text-orange-600">En Espera</span>
+                  <span className="font-medium text-orange-600">{waitingPersonsCount}</span>
+                </div>
+                <div className="w-full bg-gray-200 rounded-full h-2">
+                  <div
+                    className="bg-orange-600 h-2 rounded-full"
+                    style={{
+                      width: `${totalPersonsCount > 0 ? (waitingPersonsCount / totalPersonsCount) * 100 : 0}%`,
+                    }}
+                  ></div>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base md:text-lg">
@@ -452,42 +502,36 @@ export function DashboardStats() {
             )}
           </CardContent>
         </Card>
+      </div>
 
+      {entregasPorMesa.length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base md:text-lg">
-              <Clock className="w-4 h-4 md:w-5 md:h-5 text-orange-600" />
-              Estado General
-            </CardTitle>
+            <CardTitle className="text-base md:text-lg">Cantidad de Comidas Entregadas por Mesa</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-3">
-              <div className="flex justify-between items-center">
-                <span className="text-xs md:text-sm">En espera</span>
-                <span className="font-medium text-orange-600">{waitingPersonsCount}</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-xs md:text-sm">Procesados</span>
-                <span className="font-medium">{grantedAccessCount + deniedAccessCount}</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-xs md:text-sm">Tasa de aprobación</span>
-                <span className="font-medium text-green-600">
-                  {grantedAccessCount + deniedAccessCount > 0
-                    ? Math.round((grantedAccessCount / (grantedAccessCount + deniedAccessCount)) * 100)
-                    : 0}
-                  %
-                </span>
-              </div>
+            <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+              {entregasPorMesa.map(({ mesa, entregas }) => (
+                <div key={mesa} className="flex items-center justify-between p-3 border rounded-lg">
+                  <div className="flex items-center gap-2">
+                    <ChefHat className="w-4 h-4 text-purple-600" />
+                    <span className="font-medium text-sm md:text-base">Mesa {mesa}</span>
+                  </div>
+                  <div className="text-right">
+                    <p className="font-bold text-sm md:text-base text-purple-800">{entregas}</p>
+                    <p className="text-xs text-muted-foreground">entregas</p>
+                  </div>
+                </div>
+              ))}
             </div>
           </CardContent>
         </Card>
-      </div>
+      )}
 
       {userStats.length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-base md:text-lg">Ranking de Usuarios por Actividad</CardTitle>
+            <CardTitle className="text-base md:text-lg">Usuarios que Más Registran</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
