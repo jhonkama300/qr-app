@@ -49,10 +49,13 @@ export function BarcodeScanner() {
   const [manualIdInput, setManualIdInput] = useState<string>("")
   const [isManualProcessing, setIsManualProcessing] = useState(false)
   const [manualInputError, setManualInputError] = useState<string | null>(null)
+  const [isScanning, setIsScanning] = useState(false)
+  const [scanningActive, setScanningActive] = useState(false)
 
   const router = useRouter()
   const webcamRef = useRef<Webcam>(null)
   const codeReader = useRef<BrowserMultiFormatReader | null>(null)
+  const scanIntervalRef = useRef<NodeJS.Timeout | null>(null)
 
   useEffect(() => {
     setIsClient(true)
@@ -77,8 +80,68 @@ export function BarcodeScanner() {
       if (codeReader.current) {
         codeReader.current.reset()
       }
+      if (scanIntervalRef.current) {
+        clearInterval(scanIntervalRef.current)
+      }
     }
   }, [isClient])
+
+  const startContinuousScanning = useCallback(() => {
+    if (!webcamRef.current || !codeReader.current || scanningActive) return
+
+    console.log("[v0] Iniciando escaneo continuo...")
+    setScanningActive(true)
+
+    scanIntervalRef.current = setInterval(async () => {
+      try {
+        const video = webcamRef.current?.video
+        if (!video || video.readyState !== video.HAVE_ENOUGH_DATA) return
+
+        // Crear canvas temporal para capturar frame
+        const canvas = document.createElement("canvas")
+        const context = canvas.getContext("2d")
+        if (!context) return
+
+        canvas.width = video.videoWidth
+        canvas.height = video.videoHeight
+        context.drawImage(video, 0, 0, canvas.width, canvas.height)
+
+        // Intentar decodificar el frame
+        const imageData = context.getImageData(0, 0, canvas.width, canvas.height)
+        const result = await codeReader.current?.decodeFromImageData(imageData)
+
+        if (result && result.getText()) {
+          console.log("[v0] QR detectado:", result.getText())
+          // Detener escaneo y procesar resultado
+          stopContinuousScanning()
+          await processScanResult(result.getText(), "direct")
+        }
+      } catch (error) {
+        // Error silencioso - es normal que no siempre haya un código QR
+        // console.log("[v0] No se detectó código QR en este frame")
+      }
+    }, 500) // Escanear cada 500ms
+  }, [scanningActive])
+
+  const stopContinuousScanning = useCallback(() => {
+    if (scanIntervalRef.current) {
+      clearInterval(scanIntervalRef.current)
+      scanIntervalRef.current = null
+    }
+    setScanningActive(false)
+    console.log("[v0] Escaneo continuo detenido")
+  }, [])
+
+  useEffect(() => {
+    if (selectedDeviceId && hasPermission && !scanningActive && !scanResultDisplay) {
+      // Esperar un poco para que la cámara se inicialice
+      const timer = setTimeout(() => {
+        startContinuousScanning()
+      }, 1000)
+
+      return () => clearTimeout(timer)
+    }
+  }, [selectedDeviceId, hasPermission, scanningActive, scanResultDisplay, startContinuousScanning])
 
   const handleDevices = useCallback((mediaDevices: MediaDeviceInfo[]) => {
     const videoDevices = mediaDevices.filter(({ kind }) => kind === "videoinput")
@@ -155,6 +218,7 @@ export function BarcodeScanner() {
 
           setTimeout(() => {
             setScanResultDisplay(null)
+            startContinuousScanning()
           }, 4000)
           return
         }
@@ -192,7 +256,7 @@ export function BarcodeScanner() {
         }
       }, 2500)
     },
-    [getStudentById, markStudentAccess, processQ10Url, router, user, checkIfAlreadyScanned],
+    [getStudentById, markStudentAccess, processQ10Url, router, user, checkIfAlreadyScanned, startContinuousScanning],
   )
 
   const requestCameraPermission = () => {
@@ -214,6 +278,8 @@ export function BarcodeScanner() {
   const switchCamera = () => {
     if (!isClient || devices.length <= 1) return
 
+    stopContinuousScanning()
+
     if (codeReader.current) {
       codeReader.current.reset()
     }
@@ -228,6 +294,8 @@ export function BarcodeScanner() {
       setManualInputError("Por favor, ingresa una identificación.")
       return
     }
+
+    stopContinuousScanning()
 
     setIsManualProcessing(true)
     setManualInputError(null)
@@ -287,7 +355,9 @@ export function BarcodeScanner() {
               />
             )}
             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[85%] sm:w-[90%] h-[45%] sm:h-[50%] border-2 sm:border-4 border-primary rounded-lg shadow-[0_0_0_9999px_rgba(0,0,0,0.5)]">
-              <div className="absolute top-1/2 left-[5%] right-[5%] h-[1px] sm:h-[2px] bg-primary animate-scan"></div>
+              {scanningActive && (
+                <div className="absolute top-1/2 left-[5%] right-[5%] h-[1px] sm:h-[2px] bg-primary animate-scan"></div>
+              )}
             </div>
             {devices.length > 1 && (
               <button
@@ -301,7 +371,15 @@ export function BarcodeScanner() {
           </div>
 
           <div className="text-center py-2">
-            <p className="text-xs sm:text-sm text-muted-foreground">Escaneando... Apunta al código</p>
+            <p className="text-xs sm:text-sm text-muted-foreground">
+              {scanningActive ? "Escaneando automáticamente... Apunta al código" : "Preparando escáner..."}
+            </p>
+            {scanningActive && (
+              <div className="flex items-center justify-center gap-2 mt-1">
+                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                <span className="text-xs text-green-600 font-medium">Activo</span>
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>
@@ -398,7 +476,7 @@ export function BarcodeScanner() {
           <Button
             onClick={handleManualSubmit}
             disabled={isManualProcessing || isProcessingQ10 || !manualIdInput.trim()}
-            className="w-full h-11 sm:h-12 text-sm sm:text-base min-h-[44px] clickable"
+            className="w-full h-11 sm:h-12 min-h-[44px] clickable"
           >
             {isManualProcessing ? (
               <>

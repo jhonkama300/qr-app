@@ -1,11 +1,25 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { collection, getDocs, query, orderBy } from "firebase/firestore"
+import { collection, getDocs, query, orderBy, onSnapshot } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { CheckCircle, XCircle, Clock, Users, Loader2, UserCheck, BarChart3, TrendingUp } from "lucide-react"
+import {
+  CheckCircle,
+  XCircle,
+  Clock,
+  Users,
+  Loader2,
+  UserCheck,
+  BarChart3,
+  TrendingUp,
+  Utensils,
+  DollarSign,
+  Activity,
+  ChefHat,
+  Target,
+} from "lucide-react"
 
 interface PersonData {
   id: string
@@ -25,6 +39,7 @@ interface AccessLog {
   grantedByUserId?: string
   grantedByUserName?: string
   grantedByUserEmail?: string
+  mesaUsada?: number // Agregado campo para mesa utilizada
 }
 
 interface UserStats {
@@ -34,17 +49,44 @@ interface UserStats {
   registrosCount: number
 }
 
+interface MesaConfig {
+  id: string
+  numero: number
+  nombre: string
+  activa: boolean
+}
+
+interface BuffetStats {
+  mesasActivas: number
+  totalMesas: number
+  comidasEntregadas: number
+  ingresosPorComida: number
+  mesaMasActiva: { numero: number; entregas: number } | null
+  promedioEntregasPorMesa: number
+}
+
 export function DashboardStats() {
   const [allPersons, setAllPersons] = useState<PersonData[]>([])
   const [accessLogs, setAccessLogs] = useState<AccessLog[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [mesasConfig, setMesasConfig] = useState<MesaConfig[]>([])
+  const [buffetStats, setBuffetStats] = useState<BuffetStats>({
+    mesasActivas: 0,
+    totalMesas: 0,
+    comidasEntregadas: 0,
+    ingresosPorComida: 0,
+    mesaMasActiva: null,
+    promedioEntregasPorMesa: 0,
+  })
+  const [realTimeUpdates, setRealTimeUpdates] = useState(0) // Para forzar re-renders
 
   useEffect(() => {
-    loadData()
+    loadInitialData()
+    setupRealTimeListeners()
   }, [])
 
-  const loadData = async () => {
+  const loadInitialData = async () => {
     setLoading(true)
     setError(null)
     try {
@@ -59,23 +101,114 @@ export function DashboardStats() {
       })
       setAllPersons(personsData)
 
-      // Cargar logs de acceso ordenados por timestamp descendente
-      const logsQuery = query(collection(db, "access_logs"), orderBy("timestamp", "desc"))
-      const logsSnapshot = await getDocs(logsQuery)
+      // Cargar configuración de mesas
+      const mesasSnapshot = await getDocs(collection(db, "mesas_config"))
+      const mesasData: MesaConfig[] = []
+      mesasSnapshot.forEach((doc) => {
+        mesasData.push({
+          id: doc.id,
+          ...doc.data(),
+        } as MesaConfig)
+      })
+      setMesasConfig(mesasData)
+    } catch (err) {
+      console.error("Error al cargar datos iniciales:", err)
+      setError("Error al cargar los datos de las estadísticas.")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const setupRealTimeListeners = () => {
+    // Listener para access_logs en tiempo real
+    const logsQuery = query(collection(db, "access_logs"), orderBy("timestamp", "desc"))
+    const unsubscribeLogs = onSnapshot(logsQuery, (snapshot) => {
       const logsData: AccessLog[] = []
-      logsSnapshot.forEach((doc) => {
+      snapshot.forEach((doc) => {
         logsData.push({
           id: doc.id,
           ...doc.data(),
         } as AccessLog)
       })
       setAccessLogs(logsData)
-    } catch (err) {
-      console.error("Error al cargar datos:", err)
-      setError("Error al cargar los datos de las estadísticas.")
-    } finally {
-      setLoading(false)
+      setRealTimeUpdates((prev) => prev + 1)
+      console.log("[v0] Logs actualizados en tiempo real:", logsData.length)
+    })
+
+    // Listener para mesas_config en tiempo real
+    const mesasQuery = query(collection(db, "mesas_config"))
+    const unsubscribeMesas = onSnapshot(mesasQuery, (snapshot) => {
+      const mesasData: MesaConfig[] = []
+      snapshot.forEach((doc) => {
+        mesasData.push({
+          id: doc.id,
+          ...doc.data(),
+        } as MesaConfig)
+      })
+      setMesasConfig(mesasData)
+      console.log("[v0] Configuración de mesas actualizada:", mesasData.length)
+    })
+
+    // Cleanup function
+    return () => {
+      unsubscribeLogs()
+      unsubscribeMesas()
     }
+  }
+
+  useEffect(() => {
+    if (mesasConfig.length > 0 && accessLogs.length > 0) {
+      calculateBuffetStats()
+    }
+  }, [mesasConfig, accessLogs, realTimeUpdates])
+
+  const calculateBuffetStats = () => {
+    const mesasActivas = mesasConfig.filter((mesa) => mesa.activa).length
+    const totalMesas = mesasConfig.length
+
+    // Filtrar logs de entregas de comida (con mesaUsada)
+    const entregasComida = accessLogs.filter(
+      (log) => (log.status === "granted" || log.status === "q10_success") && log.mesaUsada !== undefined,
+    )
+
+    const comidasEntregadas = entregasComida.length
+    const precioPorComida = 8000 // Precio estimado por comida en pesos colombianos
+    const ingresosPorComida = comidasEntregadas * precioPorComida
+
+    // Calcular mesa más activa
+    const entregasPorMesa = new Map<number, number>()
+    entregasComida.forEach((log) => {
+      if (log.mesaUsada) {
+        entregasPorMesa.set(log.mesaUsada, (entregasPorMesa.get(log.mesaUsada) || 0) + 1)
+      }
+    })
+
+    let mesaMasActiva: { numero: number; entregas: number } | null = null
+    let maxEntregas = 0
+    entregasPorMesa.forEach((entregas, mesa) => {
+      if (entregas > maxEntregas) {
+        maxEntregas = entregas
+        mesaMasActiva = { numero: mesa, entregas }
+      }
+    })
+
+    const promedioEntregasPorMesa = mesasActivas > 0 ? Math.round(comidasEntregadas / mesasActivas) : 0
+
+    setBuffetStats({
+      mesasActivas,
+      totalMesas,
+      comidasEntregadas,
+      ingresosPorComida,
+      mesaMasActiva,
+      promedioEntregasPorMesa,
+    })
+
+    console.log("[v0] Estadísticas de bufete calculadas:", {
+      mesasActivas,
+      comidasEntregadas,
+      ingresosPorComida,
+      mesaMasActiva,
+    })
   }
 
   const getUserStats = (): UserStats[] => {
@@ -146,7 +279,13 @@ export function DashboardStats() {
       <div className="flex flex-col items-start justify-between gap-2 md:gap-4">
         <div>
           <h1 className="text-xl md:text-2xl font-bold">Dashboard Principal</h1>
-          <p className="text-sm md:text-base text-muted-foreground">Resumen general del sistema de control de acceso</p>
+          <p className="text-sm md:text-base text-muted-foreground">
+            Resumen general del sistema de control de acceso
+            <span className="ml-2 inline-flex items-center gap-1 text-green-600">
+              <Activity className="w-3 h-3" />
+              <span className="text-xs">Tiempo Real</span>
+            </span>
+          </p>
         </div>
       </div>
 
@@ -156,7 +295,7 @@ export function DashboardStats() {
         </Alert>
       )}
 
-      <div className="grid gap-3 md:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-3 md:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-6">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-xs md:text-sm font-medium">Estudiantes Registrados</CardTitle>
@@ -198,6 +337,93 @@ export function DashboardStats() {
           <CardContent>
             <div className="text-xl md:text-2xl font-bold text-red-800">{deniedAccessCount}</div>
             <p className="text-xs text-muted-foreground">Personas con acceso denegado</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-xs md:text-sm font-medium text-blue-600">Mesas Activas</CardTitle>
+            <Utensils className="h-4 w-4 text-blue-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-xl md:text-2xl font-bold text-blue-800">
+              {buffetStats.mesasActivas}/{buffetStats.totalMesas}
+            </div>
+            <p className="text-xs text-muted-foreground">Mesas de bufete operativas</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-xs md:text-sm font-medium text-purple-600">Comidas Entregadas</CardTitle>
+            <ChefHat className="h-4 w-4 text-purple-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-xl md:text-2xl font-bold text-purple-800">{buffetStats.comidasEntregadas}</div>
+            <p className="text-xs text-muted-foreground">Total de entregas realizadas</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid gap-3 md:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-xs md:text-sm font-medium text-green-600">Ingresos por Comidas</CardTitle>
+            <DollarSign className="h-4 w-4 text-green-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-xl md:text-2xl font-bold text-green-800">
+              ${buffetStats.ingresosPorComida.toLocaleString()}
+            </div>
+            <p className="text-xs text-muted-foreground">COP - Estimado a $8,000/comida</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-xs md:text-sm font-medium text-orange-600">Mesa Más Activa</CardTitle>
+            <Target className="h-4 w-4 text-orange-600" />
+          </CardHeader>
+          <CardContent>
+            {buffetStats.mesaMasActiva ? (
+              <>
+                <div className="text-xl md:text-2xl font-bold text-orange-800">
+                  Mesa {buffetStats.mesaMasActiva.numero}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {buffetStats.mesaMasActiva.entregas} entregas realizadas
+                </p>
+              </>
+            ) : (
+              <>
+                <div className="text-xl md:text-2xl font-bold text-gray-500">N/A</div>
+                <p className="text-xs text-muted-foreground">Sin entregas registradas</p>
+              </>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-xs md:text-sm font-medium text-indigo-600">Promedio por Mesa</CardTitle>
+            <BarChart3 className="h-4 w-4 text-indigo-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-xl md:text-2xl font-bold text-indigo-800">{buffetStats.promedioEntregasPorMesa}</div>
+            <p className="text-xs text-muted-foreground">Entregas promedio por mesa activa</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-xs md:text-sm font-medium text-teal-600">Eficiencia Bufete</CardTitle>
+            <TrendingUp className="h-4 w-4 text-teal-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-xl md:text-2xl font-bold text-teal-800">
+              {buffetStats.totalMesas > 0 ? Math.round((buffetStats.mesasActivas / buffetStats.totalMesas) * 100) : 0}%
+            </div>
+            <p className="text-xs text-muted-foreground">Porcentaje de mesas activas</p>
           </CardContent>
         </Card>
       </div>
