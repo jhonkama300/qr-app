@@ -258,17 +258,17 @@ export function BarcodeScanner() {
   return (
     <div className="w-full max-w-md mx-auto @container">
       <Card>
-        <CardHeader className="text-center">
-          <CardTitle className="flex items-center justify-center gap-2 text-lg sm:text-xl">
-            <CameraIcon className="w-5 h-5" />
+        <CardHeader className="text-center pb-3 px-3 sm:px-6">
+          <CardTitle className="flex items-center justify-center gap-2 text-base sm:text-xl">
+            <CameraIcon className="w-4 h-4 sm:w-5 sm:h-5" />
             Escáner QR/Código
           </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-3 px-3 sm:px-6">
           {error && (
             <Alert variant="destructive">
               <AlertCircle className="h-4 w-4" />
-              <AlertDescription className="text-sm text-destructive">{error}</AlertDescription>
+              <AlertDescription className="text-xs sm:text-sm text-destructive">{error}</AlertDescription>
             </Alert>
           )}
 
@@ -280,17 +280,19 @@ export function BarcodeScanner() {
                 videoConstraints={{
                   deviceId: selectedDeviceId,
                   facingMode: "environment",
+                  width: { ideal: 1280 },
+                  height: { ideal: 720 },
                 }}
                 className="absolute inset-0 w-full h-full object-cover"
               />
             )}
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[90%] h-[50%] border-4 border-primary rounded-lg shadow-[0_0_0_9999px_rgba(0,0,0,0.5)]">
-              <div className="absolute top-1/2 left-[5%] right-[5%] h-[2px] bg-primary animate-scan"></div>
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[85%] sm:w-[90%] h-[45%] sm:h-[50%] border-2 sm:border-4 border-primary rounded-lg shadow-[0_0_0_9999px_rgba(0,0,0,0.5)]">
+              <div className="absolute top-1/2 left-[5%] right-[5%] h-[1px] sm:h-[2px] bg-primary animate-scan"></div>
             </div>
             {devices.length > 1 && (
               <button
                 onClick={switchCamera}
-                className="absolute top-2 right-2 sm:top-4 sm:right-4 bg-secondary/70 text-foreground p-2 sm:p-3 rounded-full hover:bg-secondary transition-colors shadow-md"
+                className="absolute top-2 right-2 sm:top-4 sm:right-4 bg-secondary/80 text-foreground p-2 sm:p-3 rounded-full hover:bg-secondary transition-colors shadow-md min-h-[44px] min-w-[44px] flex items-center justify-center"
                 aria-label="Cambiar cámara"
               >
                 <RefreshCcwIcon className="size-4 sm:size-6" />
@@ -298,15 +300,15 @@ export function BarcodeScanner() {
             )}
           </div>
 
-          <div className="text-center">
-            <p className="text-sm text-muted-foreground">Escaneando... Apunta al código</p>
+          <div className="text-center py-2">
+            <p className="text-xs sm:text-sm text-muted-foreground">Escaneando... Apunta al código</p>
           </div>
         </CardContent>
       </Card>
 
       {scanResultDisplay && (
         <div
-          className={`mt-4 p-3 sm:p-4 rounded-lg border ${
+          className={`mt-3 sm:mt-4 p-3 sm:p-4 rounded-lg border ${
             scanResultDisplay.type === "success"
               ? "bg-green-50 border-green-200 text-green-800"
               : scanResultDisplay.type === "denied"
@@ -316,17 +318,21 @@ export function BarcodeScanner() {
                   : "bg-blue-50 border-blue-200 text-blue-800"
           }`}
         >
-          <div className="flex items-center gap-2 mb-2">
-            {scanResultDisplay.type === "success" && <CheckCircle className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" />}
-            {scanResultDisplay.type === "denied" && <XCircle className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" />}
-            {scanResultDisplay.type === "error" && <AlertTriangle className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" />}
-            {scanResultDisplay.type === "info" && (
-              <Loader2Icon className="w-4 h-4 sm:w-5 sm:h-5 animate-spin flex-shrink-0" />
+          <div className="flex items-start gap-2 mb-2">
+            {scanResultDisplay.type === "success" && (
+              <CheckCircle className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0 mt-0.5" />
             )}
-            <p className="font-semibold text-sm sm:text-lg">{scanResultDisplay.message}</p>
+            {scanResultDisplay.type === "denied" && <XCircle className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0 mt-0.5" />}
+            {scanResultDisplay.type === "error" && (
+              <AlertTriangle className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0 mt-0.5" />
+            )}
+            {scanResultDisplay.type === "info" && (
+              <Loader2Icon className="w-4 h-4 sm:w-5 sm:h-5 animate-spin flex-shrink-0 mt-0.5" />
+            )}
+            <p className="font-semibold text-xs sm:text-base leading-tight">{scanResultDisplay.message}</p>
           </div>
           {scanResultDisplay.identificacion && scanResultDisplay.identificacion !== "N/A" && (
-            <p className="text-sm mb-2">
+            <p className="text-xs sm:text-sm mb-2">
               <span className="font-medium">Identificación:</span>{" "}
               <Badge variant="outline" className="text-xs">
                 {scanResultDisplay.identificacion}
@@ -334,18 +340,18 @@ export function BarcodeScanner() {
             </p>
           )}
           {scanResultDisplay.person && (
-            <div className="mt-2 text-sm space-y-1">
+            <div className="mt-2 text-xs sm:text-sm space-y-1">
               <div className="flex items-center gap-2">
-                <User className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                <User className="w-3 h-3 sm:w-4 sm:h-4 text-muted-foreground flex-shrink-0" />
                 <span className="font-medium truncate">{scanResultDisplay.person.nombre}</span>
               </div>
-              <p className="text-xs sm:text-sm">
+              <p className="text-xs">
                 <span className="font-medium">Puesto:</span> {scanResultDisplay.person.puesto}
               </p>
-              <p className="text-xs sm:text-sm">
+              <p className="text-xs">
                 <span className="font-medium">Programa:</span> {scanResultDisplay.person.programa}
               </p>
-              <p className="text-xs sm:text-sm">
+              <p className="text-xs">
                 <span className="font-medium">Cupos Extras:</span> {scanResultDisplay.person.cuposExtras}
               </p>
             </div>
@@ -356,9 +362,9 @@ export function BarcodeScanner() {
         </div>
       )}
 
-      <Card className="mt-4 sm:mt-6">
-        <CardHeader className="text-center pb-3">
-          <CardTitle className="flex items-center justify-center gap-2 text-base sm:text-lg">
+      <Card className="mt-3 sm:mt-6">
+        <CardHeader className="text-center pb-3 px-3 sm:px-6">
+          <CardTitle className="flex items-center justify-center gap-2 text-sm sm:text-lg">
             <Keyboard className="w-4 h-4 sm:w-5 sm:h-5" />
             Entrada Manual
           </CardTitle>
@@ -366,31 +372,33 @@ export function BarcodeScanner() {
             Ingresa la identificación si el escaneo no es posible
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-3 px-3 sm:px-6">
           {manualInputError && (
             <Alert variant="destructive">
               <AlertCircle className="h-4 w-4" />
-              <AlertDescription className="text-sm text-destructive">{manualInputError}</AlertDescription>
+              <AlertDescription className="text-xs sm:text-sm text-destructive">{manualInputError}</AlertDescription>
             </Alert>
           )}
           <div className="space-y-2">
-            <Label htmlFor="manual-id" className="text-sm">
+            <Label htmlFor="manual-id" className="text-xs sm:text-sm">
               Número de Identificación
             </Label>
             <Input
               id="manual-id"
               type="text"
+              inputMode="numeric"
+              pattern="[0-9]*"
               placeholder="Ej: 123456789"
               value={manualIdInput}
               onChange={(e) => setManualIdInput(e.target.value)}
               disabled={isManualProcessing || isProcessingQ10}
-              className="h-10 sm:h-11 text-sm sm:text-base"
+              className="h-11 sm:h-12 text-base mobile-optimized"
             />
           </div>
           <Button
             onClick={handleManualSubmit}
             disabled={isManualProcessing || isProcessingQ10 || !manualIdInput.trim()}
-            className="w-full h-10 sm:h-11 text-sm sm:text-base"
+            className="w-full h-11 sm:h-12 text-sm sm:text-base min-h-[44px] clickable"
           >
             {isManualProcessing ? (
               <>
@@ -406,6 +414,22 @@ export function BarcodeScanner() {
           </Button>
         </CardContent>
       </Card>
+
+      {hasPermission === false && (
+        <Card className="mt-3 sm:mt-4">
+          <CardContent className="text-center py-4 px-3 sm:px-6">
+            <AlertTriangle className="w-8 h-8 sm:w-12 sm:h-12 mx-auto mb-3 text-yellow-500" />
+            <h3 className="text-sm sm:text-base font-semibold mb-2">Permisos de Cámara Requeridos</h3>
+            <p className="text-xs sm:text-sm text-muted-foreground mb-4">
+              Para usar el escáner, necesitamos acceso a tu cámara.
+            </p>
+            <Button onClick={requestCameraPermission} className="w-full h-11 sm:h-12 min-h-[44px] clickable">
+              <CameraIcon className="mr-2 h-4 w-4" />
+              Permitir Acceso a Cámara
+            </Button>
+          </CardContent>
+        </Card>
+      )}
     </div>
   )
 }

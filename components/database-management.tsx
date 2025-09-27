@@ -59,6 +59,8 @@ export function DatabaseManagement() {
   const [file, setFile] = useState<File | null>(null)
   const [searchTerm, setSearchTerm] = useState("")
 
+  const [selectedPrograma, setSelectedPrograma] = useState<string>("")
+
   // Estados para paginación
   const [currentPage, setCurrentPage] = useState(1)
   const [itemsPerPage, setItemsPerPage] = useState(10)
@@ -67,29 +69,44 @@ export function DatabaseManagement() {
     loadPersons()
   }, [])
 
-  // Filtrar personas cuando cambie el término de búsqueda
   useEffect(() => {
-    if (searchTerm.trim() === "") {
-      setFilteredPersons(persons)
-    } else {
-      const filtered = persons.filter(
+    let filtered = persons
+
+    // Filtro por término de búsqueda
+    if (searchTerm.trim() !== "") {
+      filtered = filtered.filter(
         (person) =>
-          person.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          person.identificacion.includes(searchTerm) ||
-          person.puesto.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          person.programa.toLowerCase().includes(searchTerm.toLowerCase()),
+          (person.nombre || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+          (person.identificacion || "").includes(searchTerm) ||
+          (person.puesto || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+          (person.programa || "").toLowerCase().includes(searchTerm.toLowerCase()),
       )
-      setFilteredPersons(filtered)
     }
+
+    // Filtro por programa
+    if (selectedPrograma && selectedPrograma !== "todos") {
+      filtered = filtered.filter((person) => person.programa === selectedPrograma)
+    }
+
+    setFilteredPersons(filtered)
     // Resetear a la primera página cuando se filtra
     setCurrentPage(1)
-  }, [searchTerm, persons])
+  }, [searchTerm, selectedPrograma, persons])
 
   // Calcular datos de paginación
   const totalPages = Math.ceil(filteredPersons.length / itemsPerPage)
   const startIndex = (currentPage - 1) * itemsPerPage
   const endIndex = startIndex + itemsPerPage
   const currentPersons = filteredPersons.slice(startIndex, endIndex)
+
+  const uniquePrograms = Array.from(new Set(persons.map((p) => p.programa).filter(Boolean))).sort()
+
+  const clearAllFilters = () => {
+    setSearchTerm("")
+    setSelectedPrograma("")
+  }
+
+  const hasActiveFilters = searchTerm || selectedPrograma
 
   const loadPersons = async () => {
     try {
@@ -101,7 +118,11 @@ export function DatabaseManagement() {
           ...doc.data(),
         } as PersonData)
       })
-      const sortedPersons = personsData.sort((a, b) => a.puesto.localeCompare(b.puesto))
+      const sortedPersons = personsData.sort((a, b) => {
+        const puestoA = a.puesto || ""
+        const puestoB = b.puesto || ""
+        return puestoA.localeCompare(puestoB)
+      })
       setPersons(sortedPersons)
       setFilteredPersons(sortedPersons)
     } catch (error) {
@@ -181,7 +202,13 @@ export function DatabaseManagement() {
       // Ejecutar el batch
       await batch.commit()
 
-      setSuccess(`Se importaron ${previewData.length} registros exitosamente`)
+      const totalCuposExtrasImportados = previewData.reduce((sum, p) => sum + p.cuposExtras, 0)
+      const programasUnicos = new Set(previewData.map((p) => p.programa)).size
+
+      setSuccess(
+        `✅ Importación exitosa: ${previewData.length} registros • ${programasUnicos} programas únicos • ${totalCuposExtrasImportados} cupos extras totales`,
+      )
+
       setPreviewData([])
       setFile(null)
       setIsDialogOpen(false)
@@ -243,143 +270,216 @@ export function DatabaseManagement() {
   }
 
   return (
-    <div className="flex flex-1 flex-col gap-4 p-4">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold">Base de Datos</h1>
-          <p className="text-muted-foreground">Gestiona la base de datos de personas del sistema</p>
-        </div>
-        <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-            <DialogTrigger asChild>
-              <Button className="w-full sm:w-auto">
-                <Upload className="w-4 h-4 mr-2" />
-                Importar Excel
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-2xl">
-              <DialogHeader>
-                <DialogTitle>Importar Base de Datos desde Excel</DialogTitle>
-                <DialogDescription>
-                  Selecciona un archivo Excel (.xlsx) con las columnas: Puesto, Identificación, Nombre, Programa, Cupos
-                  Extras
-                </DialogDescription>
-              </DialogHeader>
+    <main className="flex flex-1 flex-col gap-4 p-3 sm:p-4 lg:p-6">
+      <header className="space-y-3">
+        <div className="flex flex-col gap-3">
+          <div>
+            <h1 className="text-xl sm:text-2xl font-bold text-balance">Base de Datos</h1>
+            <p className="text-sm text-muted-foreground text-pretty">
+              Gestiona la base de datos de personas del sistema
+            </p>
+          </div>
 
-              <div className="space-y-4 py-4">
-                <div className="space-y-2">
-                  <Label htmlFor="excel-file">Archivo Excel</Label>
-                  <Input
-                    id="excel-file"
-                    type="file"
-                    accept=".xlsx,.xls"
-                    onChange={handleFileChange}
-                    disabled={importing}
-                  />
+          <div className="flex flex-col sm:flex-row gap-2">
+            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+              <DialogTrigger asChild>
+                <Button className="w-full sm:w-auto justify-center">
+                  <Upload className="w-4 h-4 mr-2" />
+                  Importar Excel
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="mx-4 sm:mx-0 sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle className="text-lg">Importar Base de Datos desde Excel</DialogTitle>
+                  <DialogDescription className="text-sm">
+                    Selecciona un archivo Excel (.xlsx) con las columnas: Puesto, Identificación, Nombre, Programa,
+                    Cupos Extras
+                  </DialogDescription>
+                </DialogHeader>
+
+                <div className="space-y-4 py-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="excel-file" className="text-sm font-medium">
+                      Archivo Excel
+                    </Label>
+                    <Input
+                      id="excel-file"
+                      type="file"
+                      accept=".xlsx,.xls"
+                      onChange={handleFileChange}
+                      disabled={importing}
+                      className="h-11"
+                    />
+                  </div>
+
+                  {previewData.length > 0 && (
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium">Vista Previa ({previewData.length} registros)</Label>
+                      <div className="max-h-48 sm:max-h-60 overflow-auto border rounded-lg">
+                        <div className="block sm:hidden">
+                          {previewData.slice(0, 5).map((person, index) => (
+                            <div key={index} className="p-3 border-b last:border-b-0 space-y-1">
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded font-medium">
+                                  {person.puesto}
+                                </span>
+                                {person.cuposExtras > 0 && (
+                                  <span className="text-xs bg-orange-100 text-orange-700 px-2 py-1 rounded font-medium">
+                                    +{person.cuposExtras}
+                                  </span>
+                                )}
+                              </div>
+                              <p className="font-medium text-sm">{person.nombre}</p>
+                              <p className="text-xs text-muted-foreground">{person.identificacion}</p>
+                              <p className="text-xs text-muted-foreground">{person.programa}</p>
+                            </div>
+                          ))}
+                          {previewData.length > 5 && (
+                            <div className="p-2 text-center text-muted-foreground text-xs">
+                              ... y {previewData.length - 5} registros más
+                            </div>
+                          )}
+                        </div>
+
+                        <table className="hidden sm:table w-full text-sm">
+                          <thead className="bg-muted">
+                            <tr>
+                              <th className="p-2 text-left text-xs font-medium">Puesto</th>
+                              <th className="p-2 text-left text-xs font-medium">Identificación</th>
+                              <th className="p-2 text-left text-xs font-medium">Nombre</th>
+                              <th className="p-2 text-left text-xs font-medium">Programa</th>
+                              <th className="p-2 text-left text-xs font-medium">Cupos</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {previewData.slice(0, 10).map((person, index) => (
+                              <tr key={index} className="border-t">
+                                <td className="p-2 text-xs">{person.puesto}</td>
+                                <td className="p-2 text-xs">{person.identificacion}</td>
+                                <td className="p-2 text-xs">{person.nombre}</td>
+                                <td className="p-2 text-xs">{person.programa}</td>
+                                <td className="p-2 text-xs">{person.cuposExtras}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                        {previewData.length > 10 && (
+                          <div className="p-2 text-center text-muted-foreground text-xs">
+                            ... y {previewData.length - 10} registros más
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
 
-                {previewData.length > 0 && (
-                  <div className="space-y-2">
-                    <Label>Vista Previa ({previewData.length} registros)</Label>
-                    <div className="max-h-60 overflow-y-auto border rounded-lg">
-                      <table className="w-full text-sm">
-                        <thead className="bg-muted">
-                          <tr>
-                            <th className="p-2 text-left">Puesto</th>
-                            <th className="p-2 text-left">Identificación</th>
-                            <th className="p-2 text-left">Nombre</th>
-                            <th className="p-2 text-left">Programa</th>
-                            <th className="p-2 text-left">Cupos</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {previewData.slice(0, 10).map((person, index) => (
-                            <tr key={index} className="border-t">
-                              <td className="p-2">{person.puesto}</td>
-                              <td className="p-2">{person.identificacion}</td>
-                              <td className="p-2">{person.nombre}</td>
-                              <td className="p-2">{person.programa}</td>
-                              <td className="p-2">{person.cuposExtras}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                      {previewData.length > 10 && (
-                        <div className="p-2 text-center text-muted-foreground text-xs">
-                          ... y {previewData.length - 10} registros más
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </div>
+                <DialogFooter>
+                  <Button
+                    onClick={handleImportData}
+                    disabled={importing || previewData.length === 0}
+                    className="w-full h-11"
+                  >
+                    {importing ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Importando...
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle className="w-4 h-4 mr-2" />
+                        Importar {previewData.length} Registros
+                      </>
+                    )}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
 
-              <DialogFooter>
-                <Button onClick={handleImportData} disabled={importing || previewData.length === 0} className="w-full">
-                  {importing ? (
-                    <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Importando...
-                    </>
-                  ) : (
-                    <>
-                      <CheckCircle className="w-4 h-4 mr-2" />
-                      Importar {previewData.length} Registros
-                    </>
-                  )}
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-
-          <Button variant="destructive" onClick={handleClearDatabase} className="w-full sm:w-auto">
-            <Trash2 className="w-4 h-4 mr-2" />
-            Limpiar BD
-          </Button>
+            <Button variant="destructive" onClick={handleClearDatabase} className="w-full sm:w-auto justify-center">
+              <Trash2 className="w-4 h-4 mr-2" />
+              Limpiar BD
+            </Button>
+          </div>
         </div>
-      </div>
+      </header>
 
       {error && (
-        <Alert variant="destructive">
-          <AlertDescription>{error}</AlertDescription>
+        <Alert variant="destructive" className="mx-1">
+          <AlertDescription className="text-sm">{error}</AlertDescription>
         </Alert>
       )}
 
       {success && (
-        <Alert className="border-green-200 bg-green-50 text-green-800">
-          <AlertDescription>{success}</AlertDescription>
+        <Alert className="border-green-200 bg-green-50 text-green-800 mx-1">
+          <AlertDescription className="text-sm">{success}</AlertDescription>
         </Alert>
       )}
 
-      {/* Barra de búsqueda */}
       <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Search className="w-5 h-5" />
-            Buscar en Base de Datos
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-lg">
+            <Search className="w-4 h-4" />
+            Filtros
           </CardTitle>
         </CardHeader>
-        <CardContent>
-          <div className="flex flex-col sm:flex-row gap-4">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-              <Input
-                placeholder="Buscar por nombre, identificación, puesto o programa..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10 pr-10 h-11"
-              />
-              {searchTerm && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={clearSearch}
-                  className="absolute right-1 top-1/2 transform -translate-y-1/2 h-8 w-8 p-0"
-                >
-                  <X className="h-4 w-4" />
-                </Button>
-              )}
+        <CardContent className="space-y-4">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <Input
+              placeholder="Buscar por nombre, identificación..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10 pr-10 h-11"
+            />
+            {searchTerm && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setSearchTerm("")}
+                className="absolute right-1 top-1/2 transform -translate-y-1/2 h-8 w-8 p-0"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            )}
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">Programa</Label>
+              <Select value={selectedPrograma} onValueChange={setSelectedPrograma}>
+                <SelectTrigger className="h-11">
+                  <SelectValue placeholder="Todos los programas" />
+                </SelectTrigger>
+                <SelectContent className="max-h-60 w-[var(--radix-select-trigger-width)] min-w-[300px] max-w-[90vw]">
+                  <SelectItem value="todos">Todos los programas</SelectItem>
+                  {uniquePrograms.map((programa) => (
+                    <SelectItem
+                      key={programa}
+                      value={programa}
+                      className="whitespace-normal break-words py-3 px-3 leading-relaxed min-h-[2.5rem] cursor-pointer"
+                    >
+                      <span className="block text-sm">{programa}</span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
+
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">Acciones</Label>
+              <Button
+                variant="outline"
+                onClick={clearAllFilters}
+                disabled={!hasActiveFilters}
+                className="w-full h-11 justify-center bg-transparent"
+              >
+                <X className="w-4 h-4 mr-2" />
+                Limpiar Filtros
+              </Button>
+            </div>
+          </div>
+
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div className="flex items-center gap-2">
               <Label htmlFor="items-per-page" className="text-sm whitespace-nowrap">
                 Mostrar:
@@ -391,7 +491,7 @@ export function DatabaseManagement() {
                   setCurrentPage(1)
                 }}
               >
-                <SelectTrigger className="w-20">
+                <SelectTrigger className="w-20 h-9">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -402,60 +502,95 @@ export function DatabaseManagement() {
                 </SelectContent>
               </Select>
             </div>
+
+            {hasActiveFilters && (
+              <p className="text-sm text-muted-foreground">
+                {filteredPersons.length} de {persons.length} registros
+              </p>
+            )}
           </div>
-          {searchTerm && (
-            <p className="text-sm text-muted-foreground mt-2">
-              Mostrando {filteredPersons.length} de {persons.length} registros
-            </p>
-          )}
         </CardContent>
       </Card>
 
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Registros</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-xs sm:text-sm font-medium">Total Registros</CardTitle>
+            <Users className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{persons.length}</div>
-            {searchTerm && <p className="text-xs text-muted-foreground">Filtrados: {filteredPersons.length}</p>}
+            <div className="text-lg sm:text-2xl font-bold">{filteredPersons.length}</div>
+            {hasActiveFilters && <p className="text-xs text-muted-foreground">de {persons.length} total</p>}
+            <p className="text-xs text-muted-foreground mt-1">Estudiantes</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Programas Únicos</CardTitle>
-            <FileSpreadsheet className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-xs sm:text-sm font-medium">Programas</CardTitle>
+            <FileSpreadsheet className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{new Set(persons.map((p) => p.programa)).size}</div>
+            <div className="text-lg sm:text-2xl font-bold">{new Set(filteredPersons.map((p) => p.programa)).size}</div>
+            {hasActiveFilters && (
+              <p className="text-xs text-muted-foreground">de {new Set(persons.map((p) => p.programa)).size} total</p>
+            )}
+            <p className="text-xs text-muted-foreground mt-1">Únicos</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Cupos Extras</CardTitle>
-            <Database className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-xs sm:text-sm font-medium">Cupos Extras</CardTitle>
+            <Database className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{persons.reduce((sum, p) => sum + p.cuposExtras, 0)}</div>
+            <div className="text-lg sm:text-2xl font-bold">
+              {filteredPersons.reduce((sum, p) => sum + (Number(p.cuposExtras) || 0), 0)}
+            </div>
+            {hasActiveFilters && (
+              <p className="text-xs text-muted-foreground">
+                de {persons.reduce((sum, p) => sum + (Number(p.cuposExtras) || 0), 0)} total
+              </p>
+            )}
+            <p className="text-xs text-muted-foreground mt-1">Adicionales</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-xs sm:text-sm font-medium">Bufete Disponible</CardTitle>
+            <CheckCircle className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-lg sm:text-2xl font-bold">
+              {filteredPersons.reduce((sum, p) => sum + 2 + (Number(p.cuposExtras) || 0), 0)}
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              {filteredPersons.length * 2} base +{" "}
+              {filteredPersons.reduce((sum, p) => sum + (Number(p.cuposExtras) || 0), 0)} extras
+            </p>
+            {hasActiveFilters && (
+              <p className="text-xs text-muted-foreground">
+                de {persons.reduce((sum, p) => sum + 2 + (Number(p.cuposExtras) || 0), 0)} total
+              </p>
+            )}
           </CardContent>
         </Card>
       </div>
 
       <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Database className="w-5 h-5" />
-            Base de Datos ({filteredPersons.length} registros)
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-lg">
+            <Database className="w-4 h-4" />
+            Registros ({filteredPersons.length})
           </CardTitle>
-          <CardDescription>
-            {searchTerm ? `Resultados de búsqueda para "${searchTerm}"` : "Registros importados en el sistema"}
+          <CardDescription className="text-sm">
+            {searchTerm ? `Resultados para "${searchTerm}"` : "Registros en el sistema"}
             {filteredPersons.length > 0 && (
-              <span className="ml-2">
-                • Página {currentPage} de {totalPages} • Mostrando {startIndex + 1}-
-                {Math.min(endIndex, filteredPersons.length)} de {filteredPersons.length}
+              <span className="block sm:inline sm:ml-2">
+                Página {currentPage} de {totalPages} • {startIndex + 1}-{Math.min(endIndex, filteredPersons.length)} de{" "}
+                {filteredPersons.length}
               </span>
             )}
           </CardDescription>
@@ -466,13 +601,13 @@ export function DatabaseManagement() {
               <Database className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
               {searchTerm ? (
                 <>
-                  <p className="text-muted-foreground">No se encontraron resultados para "{searchTerm}"</p>
-                  <p className="text-sm text-muted-foreground">Intenta con otros términos de búsqueda</p>
+                  <p className="text-muted-foreground">No se encontraron resultados</p>
+                  <p className="text-sm text-muted-foreground">Intenta con otros términos</p>
                 </>
               ) : (
                 <>
-                  <p className="text-muted-foreground">No hay registros en la base de datos</p>
-                  <p className="text-sm text-muted-foreground">Importa un archivo Excel para comenzar</p>
+                  <p className="text-muted-foreground">No hay registros</p>
+                  <p className="text-sm text-muted-foreground">Importa un archivo Excel</p>
                 </>
               )}
             </div>
@@ -480,37 +615,55 @@ export function DatabaseManagement() {
             <>
               <div className="space-y-3">
                 {currentPersons.map((person) => (
-                  <div
-                    key={person.id}
-                    className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 border rounded-lg bg-muted/20 gap-3"
-                  >
-                    <div className="flex-1 space-y-1">
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium text-sm bg-blue-100 text-blue-700 px-2 py-1 rounded">
-                          {person.puesto}
+                  <div key={person.id} className="p-3 sm:p-4 border rounded-lg bg-muted/20 space-y-2">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-xs font-medium bg-blue-100 text-blue-700 px-2 py-1 rounded">
+                          #{person.puesto}
                         </span>
-                        <span className="text-sm text-muted-foreground">{person.identificacion}</span>
+                        {person.cuposExtras > 0 && (
+                          <span className="text-xs bg-orange-100 text-orange-700 px-2 py-1 rounded font-medium">
+                            +{person.cuposExtras} extra{person.cuposExtras !== 1 ? "s" : ""}
+                          </span>
+                        )}
                       </div>
-                      <p className="font-medium">{person.nombre}</p>
-                      <div className="flex flex-col sm:flex-row sm:items-center gap-2 text-sm text-muted-foreground">
-                        <span>{person.programa}</span>
-                        <span className="hidden sm:inline">•</span>
-                        <span>Cupos extras: {person.cuposExtras}</span>
-                      </div>
+                      <span className="text-xs text-muted-foreground font-mono">{person.identificacion}</span>
+                    </div>
+
+                    <div>
+                      <p className="font-medium text-sm sm:text-base">{person.nombre}</p>
+                      <p className="text-xs sm:text-sm text-muted-foreground break-words">{person.programa}</p>
+                    </div>
+
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-4 text-xs">
+                      <span className="font-medium text-green-600">
+                        🎫 {2 + (Number(person.cuposExtras) || 0)} cupos total
+                      </span>
+                      <span className="text-muted-foreground">
+                        (
+                        {(Number(person.cuposExtras) || 0) > 0
+                          ? `2 base + ${Number(person.cuposExtras) || 0} extra${(Number(person.cuposExtras) || 0) !== 1 ? "s" : ""}`
+                          : "2 base"}
+                        )
+                      </span>
+                      {person.fechaImportacion && (
+                        <span className="text-muted-foreground">
+                          📅 {new Date(person.fechaImportacion).toLocaleDateString()}
+                        </span>
+                      )}
                     </div>
                   </div>
                 ))}
               </div>
 
-              {/* Paginación */}
               {totalPages > 1 && (
-                <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-6 pt-4 border-t">
-                  <div className="text-sm text-muted-foreground">
-                    Mostrando {startIndex + 1} a {Math.min(endIndex, filteredPersons.length)} de{" "}
-                    {filteredPersons.length} registros
+                <div className="flex flex-col gap-3 mt-6 pt-4 border-t">
+                  <div className="text-xs text-center text-muted-foreground">
+                    {startIndex + 1} - {Math.min(endIndex, filteredPersons.length)} de {filteredPersons.length}{" "}
+                    registros
                   </div>
 
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center justify-center gap-1">
                     <Button
                       variant="outline"
                       size="sm"
@@ -518,7 +671,7 @@ export function DatabaseManagement() {
                       disabled={currentPage === 1}
                       className="h-8 w-8 p-0 bg-transparent"
                     >
-                      <ChevronsLeft className="h-4 w-4" />
+                      <ChevronsLeft className="h-3 w-3" />
                     </Button>
 
                     <Button
@@ -528,20 +681,20 @@ export function DatabaseManagement() {
                       disabled={currentPage === 1}
                       className="h-8 w-8 p-0 bg-transparent"
                     >
-                      <ChevronLeft className="h-4 w-4" />
+                      <ChevronLeft className="h-3 w-3" />
                     </Button>
 
                     <div className="flex items-center gap-1">
-                      {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                      {Array.from({ length: Math.min(3, totalPages) }, (_, i) => {
                         let pageNumber
-                        if (totalPages <= 5) {
+                        if (totalPages <= 3) {
                           pageNumber = i + 1
-                        } else if (currentPage <= 3) {
+                        } else if (currentPage <= 2) {
                           pageNumber = i + 1
-                        } else if (currentPage >= totalPages - 2) {
-                          pageNumber = totalPages - 4 + i
+                        } else if (currentPage >= totalPages - 1) {
+                          pageNumber = totalPages - 2 + i
                         } else {
-                          pageNumber = currentPage - 2 + i
+                          pageNumber = currentPage - 1 + i
                         }
 
                         return (
@@ -550,7 +703,7 @@ export function DatabaseManagement() {
                             variant={currentPage === pageNumber ? "default" : "outline"}
                             size="sm"
                             onClick={() => setCurrentPage(pageNumber)}
-                            className="h-8 w-8 p-0"
+                            className="h-8 w-8 p-0 text-xs"
                           >
                             {pageNumber}
                           </Button>
@@ -565,7 +718,7 @@ export function DatabaseManagement() {
                       disabled={currentPage === totalPages}
                       className="h-8 w-8 p-0 bg-transparent"
                     >
-                      <ChevronRight className="h-4 w-4" />
+                      <ChevronRight className="h-3 w-3" />
                     </Button>
 
                     <Button
@@ -575,7 +728,7 @@ export function DatabaseManagement() {
                       disabled={currentPage === totalPages}
                       className="h-8 w-8 p-0 bg-transparent"
                     >
-                      <ChevronsRight className="h-4 w-4" />
+                      <ChevronsRight className="h-3 w-3" />
                     </Button>
                   </div>
                 </div>
@@ -584,6 +737,6 @@ export function DatabaseManagement() {
           )}
         </CardContent>
       </Card>
-    </div>
+    </main>
   )
 }

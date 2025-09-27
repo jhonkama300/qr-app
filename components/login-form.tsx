@@ -10,7 +10,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Loader2, Mail, Lock } from "lucide-react"
+import { Loader2, Mail, Lock, Eye, EyeOff } from "lucide-react"
 import { useRouter } from "next/navigation"
 
 export default function LoginForm() {
@@ -18,6 +18,7 @@ export default function LoginForm() {
   const [password, setPassword] = useState("")
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
+  const [showPassword, setShowPassword] = useState(false)
   const { login } = useAuth()
   const router = useRouter()
 
@@ -50,73 +51,88 @@ export default function LoginForm() {
   }
 
   return (
-    <Card className="w-full border-0 shadow-lg sm:border sm:shadow-md">
-      <CardHeader className="space-y-2 px-4 pt-6 pb-4 sm:px-6 sm:pt-6 sm:pb-4">
-        <CardTitle className="text-xl sm:text-2xl font-bold text-center">Iniciar Sesión</CardTitle>
-        <CardDescription className="text-center text-sm sm:text-base px-2">
-          Ingresa tu correo electrónico y contraseña para acceder a tu cuenta
-        </CardDescription>
-      </CardHeader>
-      <form onSubmit={handleSubmit}>
-        <CardContent className="space-y-4 px-4 sm:px-6">
-          {error && (
-            <Alert variant="destructive" className="text-sm">
-              <AlertDescription className="text-xs sm:text-sm">{error}</AlertDescription>
-            </Alert>
-          )}
-
-          <div className="space-y-2">
-            <Label htmlFor="email" className="text-sm font-medium">
-              Correo Electrónico
-            </Label>
-            <div className="relative">
-              <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-              <Input
-                id="email"
-                type="email"
-                placeholder="tu@ejemplo.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="pl-10 h-11 text-base sm:text-sm"
-                required
-                disabled={loading}
-              />
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="password" className="text-sm font-medium">
-              Contraseña
-            </Label>
-            <div className="relative">
-              <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-              <Input
-                id="password"
-                type="password"
-                placeholder="••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="pl-10 h-11 text-base sm:text-sm"
-                required
-                disabled={loading}
-              />
-            </div>
-          </div>
-        </CardContent>
-
-        <CardFooter className="px-4 pb-6 sm:px-6 sm:pb-6">
-          <Button type="submit" className="w-full h-11 text-base font-medium" disabled={loading}>
-            {loading ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Iniciando sesión...
-              </>
-            ) : (
-              "Iniciar Sesión"
+    <main className="min-h-screen flex items-center justify-center bg-gradient-to-br from-green-50 to-green-100 p-4">
+      <Card className="w-full max-w-sm border-0 shadow-lg sm:border sm:shadow-md bg-white">
+        <CardHeader className="space-y-2 px-4 pt-6 pb-4 sm:px-6 sm:pt-6 sm:pb-4">
+          <CardTitle className="text-xl sm:text-2xl font-bold text-center text-primary">Control de Acceso</CardTitle>
+          <CardDescription className="text-center text-sm sm:text-base px-2 text-primary/70">
+            Sistema Uparsistem - Ingresa tus credenciales para acceder
+          </CardDescription>
+        </CardHeader>
+        <form onSubmit={handleSubmit}>
+          <CardContent className="space-y-4 px-4 sm:px-6">
+            {error && (
+              <Alert variant="destructive" className="text-sm">
+                <AlertDescription className="text-xs sm:text-sm">{error}</AlertDescription>
+              </Alert>
             )}
-          </Button>
-        </CardFooter>
-      </form>
-    </Card>
+
+            <div className="space-y-2">
+              <Label htmlFor="email" className="text-sm font-medium text-primary">
+                Correo Electrónico
+              </Label>
+              <div className="relative">
+                <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-primary/60" />
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder="tu@ejemplo.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="pl-10 h-10 text-base sm:text-sm border-primary/20 focus:border-primary"
+                  required
+                  disabled={loading}
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="password" className="text-sm font-medium text-primary">
+                Contraseña
+              </Label>
+              <div className="relative">
+                <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-primary/60" />
+                <Input
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  placeholder="••••••••"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="pl-10 pr-10 h-10 text-base sm:text-sm border-primary/20 focus:border-primary"
+                  required
+                  disabled={loading}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-primary/60 hover:text-primary min-h-[40px] min-w-[40px] flex items-center justify-center"
+                  disabled={loading}
+                  aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+                >
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
+            </div>
+          </CardContent>
+
+          <CardFooter className="px-4 pb-6 sm:px-6 sm:pb-6">
+            <Button
+              type="submit"
+              className="w-full h-10 text-base font-medium bg-primary hover:bg-primary/90 min-h-[44px]"
+              disabled={loading}
+            >
+              {loading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Iniciando sesión...
+                </>
+              ) : (
+                "Iniciar Sesión"
+              )}
+            </Button>
+          </CardFooter>
+        </form>
+      </Card>
+    </main>
   )
 }

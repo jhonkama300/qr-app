@@ -199,113 +199,112 @@ export function MesaControlAdmin() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center p-8">
+      <div className="flex items-center justify-center p-6 sm:p-8">
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto"></div>
-          <p className="mt-2 text-muted-foreground">Cargando estadísticas de mesas...</p>
+          <p className="mt-2 text-sm sm:text-base text-muted-foreground">Cargando estadísticas de mesas...</p>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Control de Mesas</h1>
-          <p className="text-muted-foreground">
+    <div className="space-y-4 sm:space-y-6 p-3 sm:p-0">
+      <header className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="space-y-1">
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Control de Mesas</h1>
+          <p className="text-sm sm:text-base text-muted-foreground">
             Administra el estado de las 10 mesas del bufete y monitorea las estadísticas
           </p>
         </div>
-        <Badge variant="outline" className="text-sm">
+        <Badge variant="outline" className="text-xs sm:text-sm w-fit">
           Solo Administradores
         </Badge>
-      </div>
+      </header>
 
-      {/* Estadísticas Generales */}
-      <div className="grid gap-4 md:grid-cols-4">
+      <section className="grid gap-3 sm:gap-4 grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Estudiantes</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-xs sm:text-sm font-medium">Total Estudiantes</CardTitle>
+            <Users className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{totalEstudiantes}</div>
+            <div className="text-xl sm:text-2xl font-bold">{totalEstudiantes}</div>
             <p className="text-xs text-muted-foreground">Atendidos en total</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Mesas Activas</CardTitle>
-            <Activity className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-xs sm:text-sm font-medium">Mesas Activas</CardTitle>
+            <Activity className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{mesasActivas}/10</div>
+            <div className="text-xl sm:text-2xl font-bold">{mesasActivas}/10</div>
             <p className="text-xs text-muted-foreground">Mesas habilitadas</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Promedio por Mesa</CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-xs sm:text-sm font-medium">Promedio por Mesa</CardTitle>
+            <TrendingUp className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{promedioEstudiantes}</div>
+            <div className="text-xl sm:text-2xl font-bold">{promedioEstudiantes}</div>
             <p className="text-xs text-muted-foreground">Estudiantes por mesa</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Comidas por Entregar</CardTitle>
-            <Utensils className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-xs sm:text-sm font-medium">Comidas por Entregar</CardTitle>
+            <Utensils className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-orange-600">{totalComidasPorEntregar}</div>
+            <div className="text-xl sm:text-2xl font-bold text-orange-600">{totalComidasPorEntregar}</div>
             <p className="text-xs text-muted-foreground">Cupos disponibles totales</p>
           </CardContent>
         </Card>
-      </div>
+      </section>
 
-      {/* Control de Mesas */}
       <Card>
-        <CardHeader>
-          <CardTitle>Estado de las Mesas</CardTitle>
-          <CardDescription>
+        <CardHeader className="pb-3 sm:pb-4">
+          <CardTitle className="text-lg sm:text-xl">Estado de las Mesas</CardTitle>
+          <CardDescription className="text-sm">
             Habilita o deshabilita mesas individualmente. Solo las mesas activas pueden atender estudiantes.
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
+          <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
             {mesas.map((mesa) => (
               <Card
                 key={mesa.numero}
                 className={`transition-all ${mesa.activa ? "border-green-200 bg-green-50" : "border-red-200 bg-red-50"}`}
               >
-                <CardHeader className="pb-3">
+                <CardHeader className="pb-2 sm:pb-3">
                   <div className="flex items-center justify-between">
-                    <CardTitle className="text-lg">Mesa {mesa.numero}</CardTitle>
+                    <CardTitle className="text-base sm:text-lg">Mesa {mesa.numero}</CardTitle>
                     <Switch
                       checked={mesa.activa}
                       onCheckedChange={() => toggleMesaStatus(mesa.numero)}
                       disabled={updating === mesa.numero}
+                      className="scale-90 sm:scale-100"
+                      aria-label={`${mesa.activa ? "Desactivar" : "Activar"} Mesa ${mesa.numero}`}
                     />
                   </div>
                 </CardHeader>
                 <CardContent className="pt-0">
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
-                      <span className="text-sm text-muted-foreground">Estado:</span>
-                      <Badge variant={mesa.activa ? "default" : "secondary"}>
+                      <span className="text-xs sm:text-sm text-muted-foreground">Estado:</span>
+                      <Badge variant={mesa.activa ? "default" : "secondary"} className="text-xs px-2 py-1">
                         {mesa.activa ? "Activa" : "Inactiva"}
                       </Badge>
                     </div>
                     <div className="flex items-center justify-between">
-                      <span className="text-sm text-muted-foreground">Atendidos:</span>
-                      <span className="font-semibold">{mesa.estudiantesAtendidos}</span>
+                      <span className="text-xs sm:text-sm text-muted-foreground">Atendidos:</span>
+                      <span className="text-sm sm:text-base font-semibold">{mesa.estudiantesAtendidos}</span>
                     </div>
                     {mesa.ultimoAcceso && (
                       <div className="text-xs text-muted-foreground">
@@ -320,14 +319,13 @@ export function MesaControlAdmin() {
         </CardContent>
       </Card>
 
-      {/* Acciones Rápidas */}
       <Card>
-        <CardHeader>
-          <CardTitle>Acciones Rápidas</CardTitle>
-          <CardDescription>Controla todas las mesas de una vez</CardDescription>
+        <CardHeader className="pb-3 sm:pb-4">
+          <CardTitle className="text-lg sm:text-xl">Acciones Rápidas</CardTitle>
+          <CardDescription className="text-sm">Controla todas las mesas de una vez</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="flex gap-4">
+          <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
             <Button
               onClick={() => {
                 mesasConfig.forEach((mesa) => {
@@ -337,6 +335,9 @@ export function MesaControlAdmin() {
                 })
               }}
               variant="default"
+              size="sm"
+              className="w-full sm:w-auto h-9 text-sm font-medium"
+              aria-label="Activar todas las mesas del bufete"
             >
               Activar Todas las Mesas
             </Button>
@@ -349,6 +350,9 @@ export function MesaControlAdmin() {
                 })
               }}
               variant="destructive"
+              size="sm"
+              className="w-full sm:w-auto h-9 text-sm font-medium"
+              aria-label="Desactivar todas las mesas del bufete"
             >
               Desactivar Todas las Mesas
             </Button>

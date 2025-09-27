@@ -177,12 +177,12 @@ export function SPADashboard({ initialView = "inicio" }: SPADashboardProps) {
     <SidebarProvider>
       <AppSidebar currentView={currentView} onViewChange={setCurrentView} />
       <SidebarInset>
-        <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4">
+        <header className="flex h-14 md:h-16 shrink-0 items-center gap-2 border-b px-2 md:px-4">
           <SidebarTrigger className="-ml-1" />
           <Separator orientation="vertical" className="mr-2 h-4" />
           <Breadcrumb>
             <BreadcrumbList>
-              <BreadcrumbItem className="hidden md:block">
+              <BreadcrumbItem className="hidden sm:block">
                 <BreadcrumbLink
                   href="#"
                   onClick={(e) => {
@@ -193,14 +193,14 @@ export function SPADashboard({ initialView = "inicio" }: SPADashboardProps) {
                   Dashboard
                 </BreadcrumbLink>
               </BreadcrumbItem>
-              <BreadcrumbSeparator className="hidden md:block" />
+              <BreadcrumbSeparator className="hidden sm:block" />
               <BreadcrumbItem>
-                <BreadcrumbPage>{getBreadcrumbTitle()}</BreadcrumbPage>
+                <BreadcrumbPage className="text-sm md:text-base">{getBreadcrumbTitle()}</BreadcrumbPage>
               </BreadcrumbItem>
             </BreadcrumbList>
           </Breadcrumb>
         </header>
-        <div className="flex flex-1 flex-col gap-4 p-4">{renderCurrentView()}</div>
+        <div className="flex flex-1 flex-col gap-2 md:gap-4 p-2 md:p-4 mobile-optimized">{renderCurrentView()}</div>
       </SidebarInset>
     </SidebarProvider>
   )

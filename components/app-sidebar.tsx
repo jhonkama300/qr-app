@@ -14,6 +14,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarRail,
+  useSidebar,
 } from "@/components/ui/sidebar"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { useAuth } from "@/components/auth-provider"
@@ -51,16 +52,16 @@ const items = [
     title: "Control de Acceso",
     view: "control-acceso" as ViewType,
     icon: Shield,
-    adminOnly: true, // Solo administradores pueden ver el control general
+    adminOnly: true,
     bufeteOnly: false,
     operativoOnly: false,
   },
   {
     title: "Gestión de Mesas",
     view: "mesas-bufete" as ViewType,
-    icon: Utensils, // Icono más apropiado para bufete
+    icon: Utensils,
     adminOnly: false,
-    bufeteOnly: true, // Solo para rol bufete
+    bufeteOnly: true,
     operativoOnly: false,
   },
   {
@@ -92,6 +93,7 @@ const items = [
 export function AppSidebar({ currentView = "inicio", onViewChange }: AppSidebarProps) {
   const { user, userRole, isAdmin, isBufete, logout } = useAuth()
   const router = useRouter()
+  const { setOpenMobile, isMobile } = useSidebar()
 
   const handleLogout = () => {
     logout()
@@ -101,6 +103,9 @@ export function AppSidebar({ currentView = "inicio", onViewChange }: AppSidebarP
   const handleViewChange = (view: ViewType) => {
     if (onViewChange) {
       onViewChange(view)
+    }
+    if (isMobile) {
+      setOpenMobile(false)
     }
   }
 
@@ -127,15 +132,9 @@ export function AppSidebar({ currentView = "inicio", onViewChange }: AppSidebarP
                 <User className="size-4" />
               </div>
               <div className="grid flex-1 text-left text-sm leading-tight">
-                <span className="truncate font-semibold">Control de Acceso QR</span>
+                <span className="truncate font-semibold">Aplicativo Control de Acceso</span>
                 <span className="truncate text-xs">
-                  {isAdmin
-                    ? "Administrador - Control Total"
-                    : isBufete
-                      ? "Bufete - Entrega de Comida"
-                      : isOperativo
-                        ? "Operativo - Control de Acceso"
-                        : "Dashboard"}
+                  Uparsistem - {isAdmin ? "Administrador" : isBufete ? "Bufete" : isOperativo ? "Operativo" : "Usuario"}
                 </span>
               </div>
             </SidebarMenuButton>

@@ -142,11 +142,11 @@ export function DashboardStats() {
   }
 
   return (
-    <div className="flex flex-1 flex-col gap-6 p-4">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+    <div className="flex flex-1 flex-col gap-4 md:gap-6 p-2 md:p-4">
+      <div className="flex flex-col items-start justify-between gap-2 md:gap-4">
         <div>
-          <h1 className="text-2xl font-bold">Dashboard Principal</h1>
-          <p className="text-muted-foreground">Resumen general del sistema de control de acceso</p>
+          <h1 className="text-xl md:text-2xl font-bold">Dashboard Principal</h1>
+          <p className="text-sm md:text-base text-muted-foreground">Resumen general del sistema de control de acceso</p>
         </div>
       </div>
 
@@ -156,57 +156,57 @@ export function DashboardStats() {
         </Alert>
       )}
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-3 md:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Estudiantes Registrados</CardTitle>
+            <CardTitle className="text-xs md:text-sm font-medium">Estudiantes Registrados</CardTitle>
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{totalPersonsCount}</div>
+            <div className="text-xl md:text-2xl font-bold">{totalPersonsCount}</div>
             <p className="text-xs text-muted-foreground">Total en la base de datos</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Registros</CardTitle>
+            <CardTitle className="text-xs md:text-sm font-medium">Total Registros</CardTitle>
             <BarChart3 className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{totalRegistrosCount}</div>
+            <div className="text-xl md:text-2xl font-bold">{totalRegistrosCount}</div>
             <p className="text-xs text-muted-foreground">Registros de acceso totales</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-green-600">Accesos Concedidos</CardTitle>
+            <CardTitle className="text-xs md:text-sm font-medium text-green-600">Accesos Concedidos</CardTitle>
             <CheckCircle className="h-4 w-4 text-green-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-800">{grantedAccessCount}</div>
+            <div className="text-xl md:text-2xl font-bold text-green-800">{grantedAccessCount}</div>
             <p className="text-xs text-muted-foreground">Personas con acceso permitido</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-red-600">Accesos Denegados</CardTitle>
+            <CardTitle className="text-xs md:text-sm font-medium text-red-600">Accesos Denegados</CardTitle>
             <XCircle className="h-4 w-4 text-red-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-red-800">{deniedAccessCount}</div>
+            <div className="text-xl md:text-2xl font-bold text-red-800">{deniedAccessCount}</div>
             <p className="text-xs text-muted-foreground">Personas con acceso denegado</p>
           </CardContent>
         </Card>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid gap-3 md:gap-4 grid-cols-1 lg:grid-cols-2">
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <TrendingUp className="w-5 h-5 text-blue-600" />
+            <CardTitle className="flex items-center gap-2 text-base md:text-lg">
+              <TrendingUp className="w-4 h-4 md:w-5 md:h-5 text-blue-600" />
               Usuario Más Activo
             </CardTitle>
           </CardHeader>
@@ -215,37 +215,37 @@ export function DashboardStats() {
               <div className="space-y-2">
                 <div className="flex items-center gap-2">
                   <UserCheck className="w-4 h-4 text-blue-600" />
-                  <span className="font-medium">{topUser.userName}</span>
+                  <span className="font-medium text-sm md:text-base">{topUser.userName}</span>
                 </div>
-                <p className="text-sm text-muted-foreground">{topUser.userEmail}</p>
-                <div className="text-2xl font-bold text-blue-800">{topUser.registrosCount}</div>
+                <p className="text-xs md:text-sm text-muted-foreground">{topUser.userEmail}</p>
+                <div className="text-xl md:text-2xl font-bold text-blue-800">{topUser.registrosCount}</div>
                 <p className="text-xs text-muted-foreground">registros realizados</p>
               </div>
             ) : (
-              <p className="text-muted-foreground">No hay datos de usuarios disponibles</p>
+              <p className="text-muted-foreground text-sm">No hay datos de usuarios disponibles</p>
             )}
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Clock className="w-5 h-5 text-orange-600" />
+            <CardTitle className="flex items-center gap-2 text-base md:text-lg">
+              <Clock className="w-4 h-4 md:w-5 md:h-5 text-orange-600" />
               Estado General
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
               <div className="flex justify-between items-center">
-                <span className="text-sm">En espera</span>
+                <span className="text-xs md:text-sm">En espera</span>
                 <span className="font-medium text-orange-600">{waitingPersonsCount}</span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-sm">Procesados</span>
+                <span className="text-xs md:text-sm">Procesados</span>
                 <span className="font-medium">{grantedAccessCount + deniedAccessCount}</span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-sm">Tasa de aprobación</span>
+                <span className="text-xs md:text-sm">Tasa de aprobación</span>
                 <span className="font-medium text-green-600">
                   {grantedAccessCount + deniedAccessCount > 0
                     ? Math.round((grantedAccessCount / (grantedAccessCount + deniedAccessCount)) * 100)
@@ -261,15 +261,15 @@ export function DashboardStats() {
       {userStats.length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle>Ranking de Usuarios por Actividad</CardTitle>
+            <CardTitle className="text-base md:text-lg">Ranking de Usuarios por Actividad</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
               {userStats.slice(0, 5).map((user, index) => (
-                <div key={user.userId} className="flex items-center justify-between p-3 border rounded-lg">
-                  <div className="flex items-center gap-3">
+                <div key={user.userId} className="flex items-center justify-between p-2 md:p-3 border rounded-lg">
+                  <div className="flex items-center gap-2 md:gap-3">
                     <div
-                      className={`flex items-center justify-center w-8 h-8 rounded-full ${
+                      className={`flex items-center justify-center w-6 h-6 md:w-8 md:h-8 rounded-full text-xs md:text-sm ${
                         index === 0
                           ? "bg-yellow-100 text-yellow-800"
                           : index === 1
@@ -282,12 +282,12 @@ export function DashboardStats() {
                       {index + 1}
                     </div>
                     <div>
-                      <p className="font-medium">{user.userName}</p>
-                      <p className="text-sm text-muted-foreground">{user.userEmail}</p>
+                      <p className="font-medium text-sm md:text-base">{user.userName}</p>
+                      <p className="text-xs md:text-sm text-muted-foreground">{user.userEmail}</p>
                     </div>
                   </div>
                   <div className="text-right">
-                    <p className="font-bold">{user.registrosCount}</p>
+                    <p className="font-bold text-sm md:text-base">{user.registrosCount}</p>
                     <p className="text-xs text-muted-foreground">registros</p>
                   </div>
                 </div>

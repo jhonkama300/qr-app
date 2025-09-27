@@ -7,7 +7,7 @@ import { createUser, resetUserPassword } from "@/lib/auth-service"
 import { collection, getDocs, deleteDoc, doc, updateDoc, query } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Alert, AlertDescription } from "@/components/ui/alert"
@@ -27,7 +27,7 @@ interface UserData {
   id: string
   email: string
   role: "administrador" | "operativo" | "bufete"
-  mesaAsignada?: number // Agregado campo para mesa asignada
+  mesaAsignada?: number
   createdAt: string
 }
 
@@ -42,20 +42,17 @@ export function UserManagement() {
 
   const [mesasActivas, setMesasActivas] = useState<number[]>([])
 
-  // Formulario de nuevo usuario
   const [newUser, setNewUser] = useState({
     email: "",
     password: "",
     role: "operativo" as "administrador" | "operativo" | "bufete",
-    mesaAsignada: 1, // Agregado campo para mesa por defecto
+    mesaAsignada: 1,
   })
 
-  // Cargar usuarios al montar el componente
   useEffect(() => {
     loadUsers()
   }, [])
 
-  // Cargar mesas activas al montar el componente
   useEffect(() => {
     loadMesasActivas()
   }, [])
@@ -89,7 +86,7 @@ export function UserManagement() {
           id: doc.id,
           email: data.email,
           role: data.role,
-          mesaAsignada: data.mesaAsignada, // Cargar mesa asignada
+          mesaAsignada: data.mesaAsignada,
           createdAt: data.createdAt,
         })
       })
@@ -205,34 +202,56 @@ export function UserManagement() {
     }
   }
 
+  const getRoleIcon = (role: string) => {
+    switch (role) {
+      case "administrador":
+        return <Shield className="w-3.5 h-3.5 text-red-600" />
+      case "bufete":
+        return <Scale className="w-3.5 h-3.5 text-green-600" />
+      default:
+        return <User className="w-3.5 h-3.5 text-blue-600" />
+    }
+  }
+
+  const getRoleBadge = (role: string) => {
+    const colors = {
+      administrador: "bg-red-100 text-red-800",
+      bufete: "bg-green-100 text-green-800",
+      operativo: "bg-blue-100 text-blue-800",
+    }
+    return colors[role as keyof typeof colors] || colors.operativo
+  }
+
   if (loading) {
     return (
-      <div className="flex flex-1 flex-col gap-4 p-4">
+      <main className="flex flex-1 flex-col gap-4 p-4">
         <div className="flex items-center justify-center min-h-[400px]">
           <div className="text-center">
             <Loader2 className="h-8 w-8 animate-spin mx-auto mb-2" />
-            <p className="text-muted-foreground">Cargando usuarios...</p>
+            <p className="text-muted-foreground text-sm">Cargando usuarios...</p>
           </div>
         </div>
-      </div>
+      </main>
     )
   }
 
   return (
-    <div className="flex flex-1 flex-col gap-4 p-4">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold">Gestión de Usuarios</h1>
-          <p className="text-muted-foreground">Administra los usuarios del sistema</p>
+    <main className="flex flex-1 flex-col gap-4 p-4">
+      <header className="flex items-center justify-between gap-4">
+        <div className="min-w-0 flex-1">
+          <h1 className="text-xl font-bold">Gestión de Usuarios</h1>
+          <p className="text-sm text-muted-foreground">
+            {users.length} usuario{users.length !== 1 ? "s" : ""} registrado{users.length !== 1 ? "s" : ""}
+          </p>
         </div>
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
-            <Button className="w-full sm:w-auto">
+            <Button size="sm" className="shrink-0">
               <Plus className="w-4 h-4 mr-2" />
-              Nuevo Usuario
+              Nuevo
             </Button>
           </DialogTrigger>
-          <DialogContent className="sm:max-w-md">
+          <DialogContent className="w-[95vw] max-w-md mx-auto">
             <DialogHeader>
               <DialogTitle>Crear Nuevo Usuario</DialogTitle>
               <DialogDescription>Ingresa los datos del nuevo usuario del sistema</DialogDescription>
@@ -331,7 +350,7 @@ export function UserManagement() {
                       </SelectContent>
                     </Select>
                     {mesasActivas.length === 0 && (
-                      <p className="text-sm text-red-600">
+                      <p className="text-xs text-red-600">
                         No hay mesas activas. Contacta al administrador para activar mesas.
                       </p>
                     )}
@@ -354,7 +373,7 @@ export function UserManagement() {
             </form>
           </DialogContent>
         </Dialog>
-      </div>
+      </header>
 
       {error && (
         <Alert variant="destructive">
@@ -368,131 +387,143 @@ export function UserManagement() {
         </Alert>
       )}
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <User className="w-5 h-5" />
-            Lista de Usuarios ({users.length})
-          </CardTitle>
-          <CardDescription>Usuarios registrados en el sistema</CardDescription>
-        </CardHeader>
-        <CardContent>
-          {users.length === 0 ? (
-            <div className="text-center py-8">
+      {users.length === 0 ? (
+        <Card>
+          <CardContent className="py-12">
+            <div className="text-center">
               <User className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
-              <p className="text-muted-foreground">No hay usuarios registrados</p>
+              <p className="text-muted-foreground mb-2">No hay usuarios registrados</p>
               <p className="text-sm text-muted-foreground">Crea el primer usuario para comenzar</p>
             </div>
-          ) : (
-            <div className="space-y-3">
-              {users.map((user) => (
-                <div
-                  key={user.id}
-                  className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 border rounded-lg bg-muted/20 gap-3"
-                >
-                  <div className="flex items-center gap-3 flex-1">
-                    <div className="flex items-center justify-center w-10 h-10 rounded-full bg-sidebar-primary/10">
-                      {user.role === "administrador" ? (
-                        <Shield className="w-5 h-5 text-red-600" />
-                      ) : user.role === "bufete" ? (
-                        <Scale className="w-5 h-5 text-green-600" />
-                      ) : (
-                        <User className="w-5 h-5 text-blue-600" />
-                      )}
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="space-y-3">
+          {users.map((user) => (
+            <Card key={user.id}>
+              <CardContent className="p-4">
+                <div className="space-y-3">
+                  {/* User info section */}
+                  <div className="flex items-start gap-3">
+                    <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center shrink-0">
+                      {getRoleIcon(user.role)}
                     </div>
-                    <div className="flex-1">
-                      <p className="font-medium">{user.email}</p>
-                      <p className="text-sm text-muted-foreground">
-                        Creado: {new Date(user.createdAt).toLocaleDateString()}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <p className="font-medium text-sm truncate">{user.email}</p>
+                      </div>
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground mb-2">
+                        <span>{new Date(user.createdAt).toLocaleDateString()}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${getRoleBadge(user.role)}`}>
+                          {user.role === "administrador"
+                            ? "Administrador"
+                            : user.role === "bufete"
+                              ? "Bufete"
+                              : "Operativo"}
+                        </span>
                         {user.role === "bufete" && user.mesaAsignada && (
-                          <span className="ml-2 px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs">
+                          <span className="px-2 py-1 bg-green-100 text-green-700 rounded-full text-xs font-medium">
                             Mesa {user.mesaAsignada}
                           </span>
                         )}
-                      </p>
+                      </div>
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2 w-full sm:w-auto">
-                    <Select
-                      value={user.role}
-                      onValueChange={(value: "administrador" | "operativo" | "bufete") =>
-                        handleRoleChange(user.id, value)
-                      }
-                    >
-                      <SelectTrigger className="w-full sm:w-[140px]">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="operativo">
-                          <div className="flex items-center gap-2">
-                            <User className="w-4 h-4" />
-                            Operativo
-                          </div>
-                        </SelectItem>
-                        <SelectItem value="administrador">
-                          <div className="flex items-center gap-2">
-                            <Shield className="w-4 h-4" />
-                            Administrador
-                          </div>
-                        </SelectItem>
-                        <SelectItem value="bufete">
-                          <div className="flex items-center gap-2">
-                            <Scale className="w-4 h-4" />
-                            Bufete
-                          </div>
-                        </SelectItem>
-                      </SelectContent>
-                    </Select>
-
-                    {user.role === "bufete" && (
-                      <Select
-                        value={user.mesaAsignada?.toString() || "1"}
-                        onValueChange={(value) => handleMesaChange(user.id, Number.parseInt(value))}
-                      >
-                        <SelectTrigger className="w-full sm:w-[100px]">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {mesasActivas.length > 0 ? (
-                            mesasActivas.map((mesa) => (
-                              <SelectItem key={mesa} value={mesa.toString()}>
-                                Mesa {mesa}
-                              </SelectItem>
-                            ))
-                          ) : (
-                            <SelectItem value="0" disabled>
-                              Sin mesas activas
+                  {/* Actions section - individual buttons */}
+                  <div className="flex flex-col gap-2 pt-2 border-t">
+                    {/* Role and Mesa controls */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      <div className="space-y-1">
+                        <Label className="text-xs text-muted-foreground">Rol</Label>
+                        <Select
+                          value={user.role}
+                          onValueChange={(value: "administrador" | "operativo" | "bufete") =>
+                            handleRoleChange(user.id, value)
+                          }
+                        >
+                          <SelectTrigger className="h-8 text-xs">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="operativo">
+                              <div className="flex items-center gap-2">
+                                <User className="w-3 h-3" />
+                                Operativo
+                              </div>
                             </SelectItem>
-                          )}
-                        </SelectContent>
-                      </Select>
-                    )}
+                            <SelectItem value="administrador">
+                              <div className="flex items-center gap-2">
+                                <Shield className="w-3 h-3" />
+                                Administrador
+                              </div>
+                            </SelectItem>
+                            <SelectItem value="bufete">
+                              <div className="flex items-center gap-2">
+                                <Scale className="w-3 h-3" />
+                                Bufete
+                              </div>
+                            </SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
 
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleResetPassword(user.id, user.email)}
-                      disabled={resettingPassword === user.id}
-                      title="Restaurar contraseña"
-                    >
-                      {resettingPassword === user.id ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                      ) : (
-                        <KeyRound className="w-4 h-4" />
+                      {user.role === "bufete" && (
+                        <div className="space-y-1">
+                          <Label className="text-xs text-muted-foreground">Mesa</Label>
+                          <Select
+                            value={user.mesaAsignada?.toString() || ""}
+                            onValueChange={(value) => handleMesaChange(user.id, Number.parseInt(value))}
+                          >
+                            <SelectTrigger className="h-8 text-xs">
+                              <SelectValue placeholder="Seleccionar mesa" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {mesasActivas.map((mesa) => (
+                                <SelectItem key={mesa} value={mesa.toString()}>
+                                  Mesa {mesa}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
                       )}
-                    </Button>
+                    </div>
 
-                    <Button variant="destructive" size="sm" onClick={() => handleDeleteUser(user.id, user.email)}>
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
+                    {/* Action buttons */}
+                    <div className="flex gap-2 pt-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleResetPassword(user.id, user.email)}
+                        disabled={resettingPassword === user.id}
+                        className="flex-1 h-8 text-xs"
+                      >
+                        {resettingPassword === user.id ? (
+                          <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                        ) : (
+                          <KeyRound className="w-3 h-3 mr-1" />
+                        )}
+                        {resettingPassword === user.id ? "Restaurando..." : "Restaurar"}
+                      </Button>
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={() => handleDeleteUser(user.id, user.email)}
+                        className="h-8 px-3"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </Button>
+                    </div>
                   </div>
                 </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-    </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+    </main>
   )
 }

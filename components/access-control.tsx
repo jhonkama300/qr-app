@@ -23,6 +23,9 @@ import {
   ChevronsRight,
   Clock,
   UserCheck,
+  Briefcase,
+  GraduationCap,
+  Plus,
 } from "lucide-react"
 
 interface PersonData {
@@ -182,29 +185,30 @@ export function AccessControl() {
 
   if (loading) {
     return (
-      <div className="flex flex-1 flex-col gap-4 p-2 sm:p-4">
+      <main className="flex flex-1 flex-col gap-4 p-3 sm:p-6">
         <div className="flex items-center justify-center min-h-[400px]">
           <div className="text-center">
             <Loader2 className="h-8 w-8 animate-spin mx-auto mb-2" />
             <p className="text-muted-foreground text-sm">Cargando control de acceso...</p>
           </div>
         </div>
-      </div>
+      </main>
     )
   }
 
   return (
-    <div className="flex flex-1 flex-col gap-4 sm:gap-6 p-2 sm:p-4">
-      <div className="flex flex-col space-y-2 sm:flex-row sm:items-center sm:justify-between sm:space-y-0 gap-2 sm:gap-4">
+    <main className="flex flex-1 flex-col gap-4 sm:gap-6 p-3 sm:p-6">
+      <header className="flex flex-col space-y-3 sm:flex-row sm:items-center sm:justify-between sm:space-y-0">
         <div>
           <h1 className="text-xl sm:text-2xl font-bold">Control de Acceso</h1>
           <p className="text-muted-foreground text-sm">Monitoreo de accesos al sistema</p>
         </div>
         <Button onClick={loadData} variant="outline" size="sm" className="w-full sm:w-auto bg-transparent">
           <RefreshCw className="w-4 h-4 mr-2" />
-          Actualizar
+          <span className="sm:hidden">Actualizar</span>
+          <span className="hidden sm:inline">Actualizar</span>
         </Button>
-      </div>
+      </header>
 
       {error && (
         <Alert variant="destructive">
@@ -212,37 +216,43 @@ export function AccessControl() {
         </Alert>
       )}
 
-      <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+      <section className="grid gap-3 grid-cols-1 sm:grid-cols-3">
         <Card
-          className={`cursor-pointer transition-colors ${activeTab === "granted" ? "ring-2 ring-green-500" : ""}`}
+          className={`cursor-pointer transition-all hover:shadow-md ${
+            activeTab === "granted" ? "ring-2 ring-green-500 bg-green-50" : ""
+          }`}
           onClick={() => setActiveTab("granted")}
         >
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-green-600">Acceso Concedido</CardTitle>
+            <CardTitle className="text-sm font-medium text-green-600">Concedido</CardTitle>
             <CheckCircle className="h-4 w-4 text-green-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-xl sm:text-2xl font-bold text-green-800">{grantedAccess.length}</div>
-            <p className="text-xs text-muted-foreground">Personas con acceso permitido</p>
+            <div className="text-2xl font-bold text-green-800">{grantedAccess.length}</div>
+            <p className="text-xs text-muted-foreground">Con acceso</p>
           </CardContent>
         </Card>
 
         <Card
-          className={`cursor-pointer transition-colors ${activeTab === "denied" ? "ring-2 ring-red-500" : ""}`}
+          className={`cursor-pointer transition-all hover:shadow-md ${
+            activeTab === "denied" ? "ring-2 ring-red-500 bg-red-50" : ""
+          }`}
           onClick={() => setActiveTab("denied")}
         >
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-red-600">Acceso Denegado</CardTitle>
+            <CardTitle className="text-sm font-medium text-red-600">Denegado</CardTitle>
             <XCircle className="h-4 w-4 text-red-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-xl sm:text-2xl font-bold text-red-800">{deniedAccess.length}</div>
-            <p className="text-xs text-muted-foreground">Personas con acceso denegado</p>
+            <div className="text-2xl font-bold text-red-800">{deniedAccess.length}</div>
+            <p className="text-xs text-muted-foreground">Sin acceso</p>
           </CardContent>
         </Card>
 
         <Card
-          className={`cursor-pointer transition-colors ${activeTab === "waiting" ? "ring-2 ring-blue-500" : ""} sm:col-span-2 lg:col-span-1`}
+          className={`cursor-pointer transition-all hover:shadow-md ${
+            activeTab === "waiting" ? "ring-2 ring-blue-500 bg-blue-50" : ""
+          }`}
           onClick={() => setActiveTab("waiting")}
         >
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -250,31 +260,32 @@ export function AccessControl() {
             <Clock className="h-4 w-4 text-blue-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-xl sm:text-2xl font-bold text-blue-800">{waitingPersons.length}</div>
-            <p className="text-xs text-muted-foreground">Personas sin escanear</p>
+            <div className="text-2xl font-bold text-blue-800">{waitingPersons.length}</div>
+            <p className="text-xs text-muted-foreground">Sin escanear</p>
           </CardContent>
         </Card>
-      </div>
+      </section>
 
       <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
-            {activeTab === "granted" && <CheckCircle className="w-4 h-4 sm:w-5 sm:h-5 text-green-600" />}
-            {activeTab === "denied" && <XCircle className="w-4 h-4 sm:w-5 sm:h-5 text-red-600" />}
-            {activeTab === "waiting" && <Clock className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600" />}
-            <span className="truncate">
+        <CardHeader className="pb-4">
+          <div className="flex items-center gap-2">
+            {activeTab === "granted" && <CheckCircle className="w-5 h-5 text-green-600" />}
+            {activeTab === "denied" && <XCircle className="w-5 h-5 text-red-600" />}
+            {activeTab === "waiting" && <Clock className="w-5 h-5 text-blue-600" />}
+            <CardTitle className="text-lg">
               {activeTab === "granted" && "Acceso Concedido"}
               {activeTab === "denied" && "Acceso Denegado"}
               {activeTab === "waiting" && "En Espera"}
-            </span>
-            <span className="text-sm font-normal">({filteredData.length})</span>
-          </CardTitle>
-          <CardDescription className="text-xs sm:text-sm">
-            {activeTab === "granted" && "Lista de personas que han obtenido acceso al sistema"}
-            {activeTab === "denied" && "Lista de personas a las que se les ha denegado el acceso"}
-            {activeTab === "waiting" && "Lista de personas registradas que aún no han sido escaneadas"}
+              <span className="text-sm font-normal ml-2">({filteredData.length})</span>
+            </CardTitle>
+          </div>
+          <CardDescription className="text-sm">
+            {activeTab === "granted" && "Personas que han obtenido acceso al sistema"}
+            {activeTab === "denied" && "Personas a las que se les ha denegado el acceso"}
+            {activeTab === "waiting" && "Personas registradas que aún no han sido escaneadas"}
           </CardDescription>
         </CardHeader>
+
         <CardContent className="space-y-4">
           <div className="flex flex-col space-y-3 sm:flex-row sm:space-y-0 sm:gap-4">
             <div className="relative flex-1">
@@ -283,7 +294,7 @@ export function AccessControl() {
                 placeholder="Buscar por nombre, ID, puesto..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10 text-sm"
+                className="pl-10"
               />
             </div>
             <div className="flex items-center gap-2">
@@ -295,7 +306,7 @@ export function AccessControl() {
                   setCurrentPage(1)
                 }}
               >
-                <SelectTrigger className="w-16">
+                <SelectTrigger className="w-20">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -308,11 +319,11 @@ export function AccessControl() {
             </div>
           </div>
 
-          <div className="space-y-2 sm:space-y-3">
+          <div className="space-y-3">
             {currentData.length === 0 ? (
-              <div className="text-center py-8">
-                <Users className="w-8 h-8 sm:w-12 sm:h-12 mx-auto text-muted-foreground mb-4" />
-                <p className="text-muted-foreground text-sm">
+              <div className="text-center py-12">
+                <Users className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
+                <p className="text-muted-foreground">
                   {searchTerm ? "No se encontraron resultados" : "No hay datos disponibles"}
                 </p>
               </div>
@@ -324,17 +335,17 @@ export function AccessControl() {
                 return (
                   <div
                     key={item.id || index}
-                    className={`flex flex-col p-3 sm:p-4 border rounded-lg gap-2 sm:gap-3 ${
+                    className={`border rounded-lg p-4 transition-all hover:shadow-sm ${
                       activeTab === "granted"
-                        ? "bg-green-50 border-green-200"
+                        ? "bg-green-50/50 border-green-200"
                         : activeTab === "denied"
-                          ? "bg-red-50 border-red-200"
-                          : "bg-blue-50 border-blue-200"
+                          ? "bg-red-50/50 border-red-200"
+                          : "bg-blue-50/50 border-blue-200"
                     }`}
                   >
-                    <div className="flex items-start gap-3">
+                    <div className="flex items-start gap-3 mb-3">
                       <div
-                        className={`flex items-center justify-center w-8 h-8 sm:w-10 sm:h-10 rounded-full flex-shrink-0 ${
+                        className={`flex items-center justify-center w-10 h-10 rounded-full flex-shrink-0 ${
                           activeTab === "granted"
                             ? "bg-green-100"
                             : activeTab === "denied"
@@ -343,7 +354,7 @@ export function AccessControl() {
                         }`}
                       >
                         <User
-                          className={`w-4 h-4 sm:w-5 sm:h-5 ${
+                          className={`w-5 h-5 ${
                             activeTab === "granted"
                               ? "text-green-600"
                               : activeTab === "denied"
@@ -353,38 +364,95 @@ export function AccessControl() {
                         />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="font-medium text-sm sm:text-base truncate">{person.nombre}</p>
-                        <div className="flex flex-col gap-1 text-xs sm:text-sm text-muted-foreground">
-                          <div className="flex flex-wrap items-center gap-1 sm:gap-2">
-                            <span className="font-mono bg-gray-100 px-1 rounded text-xs">
-                              ID: {person.identificacion}
-                            </span>
-                            <span className="hidden sm:inline">•</span>
-                            <span className="truncate">{person.puesto}</span>
-                          </div>
-                          <div className="truncate">{person.programa}</div>
+                        <h3 className="font-semibold text-base leading-tight">{person.nombre}</h3>
+                        <div className="flex items-center gap-2 mt-1 flex-wrap">
+                          <Badge variant="outline" className="text-xs font-mono">
+                            ID: {person.identificacion}
+                          </Badge>
+                          {person.cuposExtras > 0 && (
+                            <Badge
+                              variant="secondary"
+                              className="text-xs bg-orange-100 text-orange-800 border-orange-200"
+                            >
+                              <Plus className="w-3 h-3 mr-1" />
+                              {person.cuposExtras} cupo{person.cuposExtras > 1 ? "s" : ""} extra
+                              {person.cuposExtras > 1 ? "s" : ""}
+                            </Badge>
+                          )}
+                          <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 border-blue-200">
+                            Total: {2 + (person.cuposExtras || 0)} cupos
+                          </Badge>
                         </div>
-                        {isAccessLog && (
-                          <div className="mt-2 space-y-1">
-                            <p className="text-xs text-muted-foreground">
-                              Último acceso: {new Date(item.timestamp).toLocaleString()}
-                            </p>
-                            {item.grantedByUserName && (
-                              <div className="flex items-center gap-1 text-xs">
-                                <UserCheck className="w-3 h-3 text-blue-600 flex-shrink-0" />
-                                <span className="text-blue-600 font-medium truncate">
-                                  Autorizado por {item.grantedByUserName}
+                      </div>
+                    </div>
+
+                    <div className="grid gap-2 sm:gap-3">
+                      <div className="flex items-start gap-2">
+                        <Briefcase className="w-4 h-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-medium">Puesto</p>
+                          <p className="text-sm text-muted-foreground">{person.puesto}</p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-start gap-2">
+                        <GraduationCap className="w-4 h-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-medium">Programa</p>
+                          <p className="text-sm text-muted-foreground break-words leading-relaxed hyphens-auto">
+                            {person.programa}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-start gap-2">
+                        <Plus className="w-4 h-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-medium">Cupos Disponibles</p>
+                          <div className="flex items-center gap-2 mt-1">
+                            <span className="text-sm text-muted-foreground">Base: 2 cupos</span>
+                            {person.cuposExtras > 0 && (
+                              <>
+                                <span className="text-sm text-muted-foreground">+</span>
+                                <span className="text-sm font-medium text-orange-600">
+                                  {person.cuposExtras} extra{person.cuposExtras > 1 ? "s" : ""}
                                 </span>
+                              </>
+                            )}
+                            <span className="text-sm font-semibold text-blue-600 ml-2">
+                              = {2 + (person.cuposExtras || 0)} total
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {isAccessLog && (
+                        <div className="pt-2 border-t border-gray-200">
+                          <div className="flex items-start gap-2 mb-2">
+                            <Clock className="w-4 h-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+                            <div className="min-w-0 flex-1">
+                              <p className="text-sm font-medium">Último acceso</p>
+                              <p className="text-sm text-muted-foreground">
+                                {new Date(item.timestamp).toLocaleString()}
+                              </p>
+                            </div>
+                          </div>
+
+                          {item.grantedByUserName && (
+                            <div className="flex items-start gap-2">
+                              <UserCheck className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
+                              <div className="min-w-0 flex-1">
+                                <p className="text-sm font-medium text-blue-600">
+                                  Autorizado por {item.grantedByUserName}
+                                </p>
                                 {item.grantedByUserEmail && (
-                                  <Badge variant="outline" className="text-xs px-1 py-0 ml-1 hidden sm:inline-flex">
-                                    {item.grantedByUserEmail}
-                                  </Badge>
+                                  <p className="text-xs text-muted-foreground mt-1">{item.grantedByUserEmail}</p>
                                 )}
                               </div>
-                            )}
-                          </div>
-                        )}
-                      </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
                 )
@@ -393,21 +461,21 @@ export function AccessControl() {
           </div>
 
           {totalPages > 1 && (
-            <div className="flex flex-col space-y-3 sm:flex-row sm:items-center sm:justify-between sm:space-y-0 gap-4 pt-4 border-t">
-              <div className="text-xs sm:text-sm text-muted-foreground text-center sm:text-left">
+            <div className="flex flex-col space-y-3 sm:flex-row sm:items-center sm:justify-between sm:space-y-0 pt-4 border-t">
+              <div className="text-sm text-muted-foreground text-center sm:text-left">
                 Mostrando {startIndex + 1} a {Math.min(endIndex, filteredData.length)} de {filteredData.length}{" "}
                 registros
               </div>
 
-              <div className="flex items-center justify-center gap-1 sm:gap-2">
+              <div className="flex items-center justify-center gap-1">
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={goToFirstPage}
                   disabled={currentPage === 1}
-                  className="h-8 w-8 p-0 bg-transparent"
+                  className="h-9 w-9 p-0 bg-transparent"
                 >
-                  <ChevronsLeft className="h-3 w-3 sm:h-4 sm:w-4" />
+                  <ChevronsLeft className="h-4 w-4" />
                 </Button>
 
                 <Button
@@ -415,9 +483,9 @@ export function AccessControl() {
                   size="sm"
                   onClick={goToPreviousPage}
                   disabled={currentPage === 1}
-                  className="h-8 w-8 p-0 bg-transparent"
+                  className="h-9 w-9 p-0 bg-transparent"
                 >
-                  <ChevronLeft className="h-3 w-3 sm:h-4 sm:w-4" />
+                  <ChevronLeft className="h-4 w-4" />
                 </Button>
 
                 <div className="flex items-center gap-1">
@@ -439,7 +507,7 @@ export function AccessControl() {
                         variant={currentPage === pageNumber ? "default" : "outline"}
                         size="sm"
                         onClick={() => setCurrentPage(pageNumber)}
-                        className="h-8 w-8 p-0 text-xs"
+                        className="h-9 w-9 p-0"
                       >
                         {pageNumber}
                       </Button>
@@ -452,9 +520,9 @@ export function AccessControl() {
                   size="sm"
                   onClick={goToNextPage}
                   disabled={currentPage === totalPages}
-                  className="h-8 w-8 p-0 bg-transparent"
+                  className="h-9 w-9 p-0 bg-transparent"
                 >
-                  <ChevronRight className="h-3 w-3 sm:h-4 sm:w-4" />
+                  <ChevronRight className="h-4 w-4" />
                 </Button>
 
                 <Button
@@ -462,15 +530,15 @@ export function AccessControl() {
                   size="sm"
                   onClick={goToLastPage}
                   disabled={currentPage === totalPages}
-                  className="h-8 w-8 p-0 bg-transparent"
+                  className="h-9 w-9 p-0 bg-transparent"
                 >
-                  <ChevronsRight className="h-3 w-3 sm:h-4 sm:w-4" />
+                  <ChevronsRight className="h-4 w-4" />
                 </Button>
               </div>
             </div>
           )}
         </CardContent>
       </Card>
-    </div>
+    </main>
   )
 }
