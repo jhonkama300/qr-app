@@ -61,9 +61,11 @@ export function OperativoScanner() {
   const [isManualProcessing, setIsManualProcessing] = useState(false)
   const [manualInputError, setManualInputError] = useState<string | null>(null)
   const [showResult, setShowResult] = useState(false)
+  const [isScanning, setIsScanning] = useState(false)
 
   const webcamRef = useRef<Webcam>(null)
   const codeReader = useRef<BrowserMultiFormatReader | null>(null)
+  const scannerActive = useRef(false)
 
   useEffect(() => {
     setIsClient(true)
@@ -72,14 +74,19 @@ export function OperativoScanner() {
   useEffect(() => {
     if (!isClient) return
 
-    const hints = new Map<DecodeHintType, any>()
-    hints.set(DecodeHintType.POSSIBLE_FORMATS, [BarcodeFormat.QR_CODE, BarcodeFormat.CODE_128, BarcodeFormat.CODE_39])
-    hints.set(DecodeHintType.TRY_HARDER, true)
-    codeReader.current = new BrowserMultiFormatReader(hints)
+    if (!codeReader.current) {
+      const hints = new Map<DecodeHintType, any>()
+      hints.set(DecodeHintType.POSSIBLE_FORMATS, [BarcodeFormat.QR_CODE])
+      hints.set(DecodeHintType.TRY_HARDER, true)
+      codeReader.current = new BrowserMultiFormatReader(hints)
+      console.log("[v0] ZXing reader initialized")
+    }
 
     return () => {
       if (codeReader.current) {
+        console.log("[v0] Cleaning up ZXing reader")
         codeReader.current.reset()
+        scannerActive.current = false
       }
     }
   }, [isClient])
@@ -119,9 +126,14 @@ export function OperativoScanner() {
 
   const processScanResult = useCallback(
     async (scannedContent: string, source: "direct" | "q10" | "manual") => {
+      if (isScanning) {
+        console.log("[v0] Scan already in progress, ignoring")
+        return
+      }
+
+      setIsScanning(true)
       let currentScanResult: ScanResultDisplay
 
-      // Información del usuario que autoriza el acceso
       const userInfo = user
         ? {
             userId: user.id,
@@ -142,10 +154,11 @@ export function OperativoScanner() {
           timestamp: new Date().toISOString(),
         }
         setScanResultDisplay(currentScanResult)
-        setShowResult(true) // Show modal for Q10 processing
+        setShowResult(true)
         await processQ10Url(scannedContent)
         setScanResultDisplay(null)
         setShowResult(false)
+        setIsScanning(false)
         return
       } else {
         const alreadyScanned = await checkIfAlreadyScanned(scannedContent)
@@ -164,6 +177,7 @@ export function OperativoScanner() {
           setTimeout(() => {
             setScanResultDisplay(null)
             setShowResult(false)
+            setIsScanning(false)
           }, 4000)
           return
         }
@@ -192,98 +206,65 @@ export function OperativoScanner() {
       }
 
       setScanResultDisplay(currentScanResult)
-      setShowResult(true) // Always show modal for results
+      setShowResult(true)
 
       setTimeout(() => {
         setShowResult(false)
         setScanResultDisplay(null)
+        setIsScanning(false)
       }, 5000)
     },
-    [getStudentById, markStudentAccess, processQ10Url, user, checkIfAlreadyScanned],
+    [getStudentById, markStudentAccess, processQ10Url, user, checkIfAlreadyScanned, isScanning],
   )
 
   useEffect(() => {
-    if (
-      !isClient ||
-      !hasPermission ||
-      !selectedDeviceId ||
-      isProcessingQ10 ||
-      scanResultDisplay ||
-      isManualProcessing
-    ) {
-      if (codeReader.current) {
-        codeReader.current.reset()
-      }
+    if (!isClient || !hasPermission || !selectedDeviceId || isProcessingQ10 || isScanning || !codeReader.current) {
       return
     }
 
     const video = webcamRef.current?.video
     if (!video) {
+      console.log("[v0] Video element not ready")
       return
     }
 
-    if (!codeReader.current) {
-      setError("El lector de códigos no está inicializado.")
+    if (scannerActive.current) {
+      console.log("[v0] Scanner already active")
       return
     }
 
+    console.log("[v0] Starting scanner with device:", selectedDeviceId)
+    scannerActive.current = true
     setError(null)
 
-    const scanTimeout = setTimeout(() => {
-      if (codeReader.current) {
-        codeReader.current.reset()
-        console.log("[v0] Scanner timeout - resetting")
-      }
-    }, 30000) // Reset after 30 seconds if no scan
-
-    codeReader.current
-      .decodeFromVideoDevice(selectedDeviceId, video, (result, err) => {
-        if (result) {
-          clearTimeout(scanTimeout)
-          if (!scanResultDisplay && !isProcessingQ10 && !isManualProcessing) {
+    const startScanning = async () => {
+      try {
+        await codeReader.current!.decodeFromVideoDevice(selectedDeviceId, video, (result, err) => {
+          if (result && !isScanning) {
             console.log("[v0] Scan successful:", result.getText())
             processScanResult(result.getText(), "direct")
           }
-        }
-        if (err && err.name !== "NotFoundException" && err.name !== "AbortException") {
-          console.log("[v0] Scanner error (non-critical):", err.name, err.message)
-          // Don't show error for common scanning issues
-          if (err.message.includes("No MultiFormat Readers")) {
-            console.log("[v0] Resetting scanner due to MultiFormat error")
-            if (codeReader.current) {
-              codeReader.current.reset()
-            }
+          if (err && err.name !== "NotFoundException") {
+            console.log("[v0] Scanner error:", err.name)
           }
-        }
-      })
-      .catch((err) => {
-        clearTimeout(scanTimeout)
-        console.error("[v0] Error al iniciar el escaneo continuo:", err)
-        setError("Error al iniciar el escáner. Intentando reiniciar...")
-        if (codeReader.current) {
-          codeReader.current.reset()
-        }
-        // Auto-retry after 2 seconds
-        setTimeout(() => {
-          setError(null)
-        }, 2000)
-      })
-
-    return () => {
-      clearTimeout(scanTimeout)
-      if (codeReader.current) {
-        codeReader.current.reset()
+        })
+      } catch (err) {
+        console.error("[v0] Error starting scanner:", err)
+        setError("Error al iniciar el escáner")
+        scannerActive.current = false
       }
     }
-  }, [
-    isClient,
-    hasPermission,
-    selectedDeviceId,
-    isProcessingQ10,
-    scanResultDisplay,
-    isManualProcessing,
-    processScanResult,
-  ])
+
+    startScanning()
+
+    return () => {
+      console.log("[v0] Cleaning up scanner")
+      if (codeReader.current && scannerActive.current) {
+        codeReader.current.reset()
+        scannerActive.current = false
+      }
+    }
+  }, [isClient, hasPermission, selectedDeviceId, isProcessingQ10, isScanning, processScanResult])
 
   const requestCameraPermission = () => {
     if (!isClient) return
@@ -304,8 +285,10 @@ export function OperativoScanner() {
   const switchCamera = () => {
     if (!isClient || devices.length <= 1) return
 
-    if (codeReader.current) {
+    console.log("[v0] Switching camera")
+    if (codeReader.current && scannerActive.current) {
       codeReader.current.reset()
+      scannerActive.current = false
     }
 
     const currentIndex = devices.findIndex((device) => device.deviceId === selectedDeviceId)
@@ -352,6 +335,7 @@ export function OperativoScanner() {
     setError(null)
     setManualIdInput("")
     setManualInputError(null)
+    setIsScanning(false)
   }
 
   if (user?.role !== "operativo") {
@@ -445,6 +429,9 @@ export function OperativoScanner() {
                       facingMode: "environment",
                     }}
                     className="absolute inset-0 w-full h-full object-cover"
+                    onUserMedia={() => {
+                      console.log("[v0] Camera stream ready")
+                    }}
                   />
                 )}
                 <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[90%] h-[50%] border-4 border-primary rounded-lg shadow-[0_0_0_9999px_rgba(0,0,0,0.5)]">
@@ -462,7 +449,9 @@ export function OperativoScanner() {
               </div>
 
               <div className="text-center">
-                <p className="text-sm text-muted-foreground">Escaneando automáticamente... Apunta al código</p>
+                <p className="text-sm text-muted-foreground">
+                  {isScanning ? "Procesando..." : "Escaneando automáticamente... Apunta al código"}
+                </p>
               </div>
             </CardContent>
           </Card>
@@ -516,7 +505,6 @@ export function OperativoScanner() {
         </div>
       </div>
 
-      {/* Modal de resultados */}
       <Dialog open={showResult} onOpenChange={setShowResult}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
