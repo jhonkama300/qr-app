@@ -1,8 +1,8 @@
 "use client"
 
-import type React from "react"
-
-import { useState, useRef, useEffect } from "react"
+import { useState, useRef, useEffect, useCallback } from "react"
+import Webcam from "react-webcam"
+import { BrowserMultiFormatReader, BarcodeFormat, DecodeHintType } from "@zxing/library"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
@@ -12,9 +12,8 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useAuth } from "@/components/auth-provider"
 import { useStudentStoreContext } from "@/components/providers/student-store-provider"
+import { useQ10Validation } from "@/hooks/use-q10-validation"
 import {
-  Loader2,
-  Camera,
   CameraOff,
   CheckCircle,
   XCircle,
@@ -23,7 +22,11 @@ import {
   AlertTriangle,
   RefreshCw,
   Shield,
-  Hash,
+  CameraIcon,
+  RefreshCcwIcon,
+  Loader2Icon,
+  Keyboard,
+  AlertCircle,
 } from "lucide-react"
 
 interface ScanResult {
@@ -34,145 +37,321 @@ interface ScanResult {
   timestamp: string
 }
 
+interface ScanResultDisplay {
+  type: "success" | "denied" | "error" | "info"
+  identificacion: string
+  person?: any
+  message: string
+  source?: "direct" | "q10" | "manual"
+  timestamp: string
+}
+
 export function OperativoScanner() {
   const { user } = useAuth()
   const { getStudentById, markStudentAccess, checkIfAlreadyScanned } = useStudentStoreContext()
+  const { processQ10Url, isProcessingQ10, q10Message } = useQ10Validation()
 
-  const [isScanning, setIsScanning] = useState(false)
-  const [processing, setProcessing] = useState(false)
-  const [error, setError] = useState("")
-  const [scanResult, setScanResult] = useState<ScanResult | null>(null)
+  const [isClient, setIsClient] = useState(false)
+  const [hasPermission, setHasPermission] = useState<boolean | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [devices, setDevices] = useState<MediaDeviceInfo[]>([])
+  const [selectedDeviceId, setSelectedDeviceId] = useState<string>("")
+  const [scanResultDisplay, setScanResultDisplay] = useState<ScanResultDisplay | null>(null)
+  const [manualIdInput, setManualIdInput] = useState<string>("")
+  const [isManualProcessing, setIsManualProcessing] = useState(false)
+  const [manualInputError, setManualInputError] = useState<string | null>(null)
   const [showResult, setShowResult] = useState(false)
-  const [stream, setStream] = useState<MediaStream | null>(null)
-  const [manualId, setManualId] = useState("")
-  const [showManualInput, setShowManualInput] = useState(false)
 
-  const videoRef = useRef<HTMLVideoElement>(null)
-  const canvasRef = useRef<HTMLCanvasElement>(null)
+  const webcamRef = useRef<Webcam>(null)
+  const codeReader = useRef<BrowserMultiFormatReader | null>(null)
 
-  // Limpiar stream al desmontar
   useEffect(() => {
+    setIsClient(true)
+  }, [])
+
+  useEffect(() => {
+    if (!isClient) return
+
+    const hints = new Map<DecodeHintType, any>()
+    hints.set(DecodeHintType.POSSIBLE_FORMATS, [BarcodeFormat.QR_CODE, BarcodeFormat.CODE_128, BarcodeFormat.CODE_39])
+    hints.set(DecodeHintType.TRY_HARDER, true)
+    codeReader.current = new BrowserMultiFormatReader(hints)
+
     return () => {
-      if (stream) {
-        stream.getTracks().forEach((track) => track.stop())
+      if (codeReader.current) {
+        codeReader.current.reset()
       }
     }
-  }, [stream])
+  }, [isClient])
 
-  const startCamera = async () => {
-    try {
-      setError("")
-      const mediaStream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "environment" },
+  const handleDevices = useCallback((mediaDevices: MediaDeviceInfo[]) => {
+    const videoDevices = mediaDevices.filter(({ kind }) => kind === "videoinput")
+    setDevices(videoDevices)
+    const backCamera = videoDevices.find(
+      (device) =>
+        device.label.toLowerCase().includes("back") ||
+        device.label.toLowerCase().includes("trasera") ||
+        device.label.toLowerCase().includes("rear") ||
+        device.label.toLowerCase().includes("environment"),
+    )
+    if (backCamera) {
+      setSelectedDeviceId(backCamera.deviceId)
+    } else if (videoDevices.length > 0) {
+      setSelectedDeviceId(videoDevices[0].deviceId)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!isClient) return
+
+    navigator.mediaDevices
+      .getUserMedia({ video: true })
+      .then(() => {
+        setHasPermission(true)
+        navigator.mediaDevices.enumerateDevices().then(handleDevices)
+      })
+      .catch((err) => {
+        console.error("Error al acceder a la cámara:", err)
+        setError("No se pudo acceder a la cámara. Por favor, conceda permisos e inténtelo de nuevo.")
+        setHasPermission(false)
+      })
+  }, [handleDevices, isClient])
+
+  const processScanResult = useCallback(
+    async (scannedContent: string, source: "direct" | "q10" | "manual") => {
+      let currentScanResult: ScanResultDisplay
+
+      // Información del usuario que autoriza el acceso
+      const userInfo = user
+        ? {
+            userId: user.id,
+            userName: user.email || "Usuario",
+            userEmail: user.email || undefined,
+          }
+        : undefined
+
+      if (
+        scannedContent.startsWith("https://site2.q10.com/CertificadosAcademicos/") ||
+        scannedContent.startsWith("https://uparsistemvalledupar.q10.com/CertificadosAcademicos/")
+      ) {
+        currentScanResult = {
+          type: "info",
+          identificacion: scannedContent,
+          message: "Procesando certificado Q10...",
+          source: "q10",
+          timestamp: new Date().toISOString(),
+        }
+        setScanResultDisplay(currentScanResult)
+        setShowResult(true) // Show modal for Q10 processing
+        await processQ10Url(scannedContent)
+        setScanResultDisplay(null)
+        setShowResult(false)
+        return
+      } else {
+        const alreadyScanned = await checkIfAlreadyScanned(scannedContent)
+
+        if (alreadyScanned) {
+          currentScanResult = {
+            type: "error",
+            identificacion: scannedContent,
+            message: `Esta persona ya ingresó al evento anteriormente. No se puede volver a escanear.`,
+            source: source,
+            timestamp: new Date().toISOString(),
+          }
+          setScanResultDisplay(currentScanResult)
+          setShowResult(true)
+
+          setTimeout(() => {
+            setScanResultDisplay(null)
+            setShowResult(false)
+          }, 4000)
+          return
+        }
+
+        const student = await getStudentById(scannedContent)
+        if (student) {
+          await markStudentAccess(scannedContent, true, "Acceso concedido al evento", source, userInfo)
+          currentScanResult = {
+            type: "success",
+            identificacion: scannedContent,
+            person: student,
+            message: `Acceso concedido al evento para ${student.nombre}.`,
+            source: source,
+            timestamp: new Date().toISOString(),
+          }
+        } else {
+          await markStudentAccess(scannedContent, false, "Persona no encontrada", source, userInfo)
+          currentScanResult = {
+            type: "denied",
+            identificacion: scannedContent,
+            message: `Identificación ${scannedContent} no encontrada en la base de datos.`,
+            source: source,
+            timestamp: new Date().toISOString(),
+          }
+        }
+      }
+
+      setScanResultDisplay(currentScanResult)
+      setShowResult(true) // Always show modal for results
+
+      setTimeout(() => {
+        setShowResult(false)
+        setScanResultDisplay(null)
+      }, 5000)
+    },
+    [getStudentById, markStudentAccess, processQ10Url, user, checkIfAlreadyScanned],
+  )
+
+  useEffect(() => {
+    if (
+      !isClient ||
+      !hasPermission ||
+      !selectedDeviceId ||
+      isProcessingQ10 ||
+      scanResultDisplay ||
+      isManualProcessing
+    ) {
+      if (codeReader.current) {
+        codeReader.current.reset()
+      }
+      return
+    }
+
+    const video = webcamRef.current?.video
+    if (!video) {
+      return
+    }
+
+    if (!codeReader.current) {
+      setError("El lector de códigos no está inicializado.")
+      return
+    }
+
+    setError(null)
+
+    const scanTimeout = setTimeout(() => {
+      if (codeReader.current) {
+        codeReader.current.reset()
+        console.log("[v0] Scanner timeout - resetting")
+      }
+    }, 30000) // Reset after 30 seconds if no scan
+
+    codeReader.current
+      .decodeFromVideoDevice(selectedDeviceId, video, (result, err) => {
+        if (result) {
+          clearTimeout(scanTimeout)
+          if (!scanResultDisplay && !isProcessingQ10 && !isManualProcessing) {
+            console.log("[v0] Scan successful:", result.getText())
+            processScanResult(result.getText(), "direct")
+          }
+        }
+        if (err && err.name !== "NotFoundException" && err.name !== "AbortException") {
+          console.log("[v0] Scanner error (non-critical):", err.name, err.message)
+          // Don't show error for common scanning issues
+          if (err.message.includes("No MultiFormat Readers")) {
+            console.log("[v0] Resetting scanner due to MultiFormat error")
+            if (codeReader.current) {
+              codeReader.current.reset()
+            }
+          }
+        }
+      })
+      .catch((err) => {
+        clearTimeout(scanTimeout)
+        console.error("[v0] Error al iniciar el escaneo continuo:", err)
+        setError("Error al iniciar el escáner. Intentando reiniciar...")
+        if (codeReader.current) {
+          codeReader.current.reset()
+        }
+        // Auto-retry after 2 seconds
+        setTimeout(() => {
+          setError(null)
+        }, 2000)
       })
 
-      if (videoRef.current) {
-        videoRef.current.srcObject = mediaStream
-        setStream(mediaStream)
-        setIsScanning(true)
+    return () => {
+      clearTimeout(scanTimeout)
+      if (codeReader.current) {
+        codeReader.current.reset()
       }
-    } catch (error) {
-      console.error("Error al acceder a la cámara:", error)
-      setError("No se pudo acceder a la cámara. Verifica los permisos.")
     }
+  }, [
+    isClient,
+    hasPermission,
+    selectedDeviceId,
+    isProcessingQ10,
+    scanResultDisplay,
+    isManualProcessing,
+    processScanResult,
+  ])
+
+  const requestCameraPermission = () => {
+    if (!isClient) return
+    navigator.mediaDevices
+      .getUserMedia({ video: true })
+      .then(() => {
+        setHasPermission(true)
+        setError(null)
+        navigator.mediaDevices.enumerateDevices().then(handleDevices)
+      })
+      .catch((err) => {
+        console.error("Error al acceder a la cámara:", err)
+        setError("No se pudo acceder a la cámara. Por favor, conceda permisos e inténtelo de nuevo.")
+        setHasPermission(false)
+      })
   }
 
-  const stopCamera = () => {
-    if (stream) {
-      stream.getTracks().forEach((track) => track.stop())
-      setStream(null)
+  const switchCamera = () => {
+    if (!isClient || devices.length <= 1) return
+
+    if (codeReader.current) {
+      codeReader.current.reset()
     }
-    setIsScanning(false)
+
+    const currentIndex = devices.findIndex((device) => device.deviceId === selectedDeviceId)
+    const nextIndex = (currentIndex + 1) % devices.length
+    setSelectedDeviceId(devices[nextIndex].deviceId)
   }
 
-  const processEventAccess = async (identificacion: string) => {
+  const handleManualSubmit = async () => {
+    if (!manualIdInput.trim()) {
+      setManualInputError("Por favor, ingresa una identificación.")
+      return
+    }
+
+    setIsManualProcessing(true)
+    setManualInputError(null)
+    setScanResultDisplay({
+      type: "info",
+      identificacion: manualIdInput,
+      message: "Validando identificación manual...",
+      timestamp: new Date().toISOString(),
+    })
+    setError(null)
+
     try {
-      setProcessing(true)
-      setError("")
-
-      // Verificar si ya fue escaneado para acceso al evento
-      const alreadyScanned = await checkIfAlreadyScanned(identificacion)
-
-      if (alreadyScanned) {
-        setScanResult({
-          identificacion,
-          student: null,
-          status: "already_scanned",
-          message: "Esta persona ya ingresó al evento anteriormente",
-          timestamp: new Date().toISOString(),
-        })
-        setShowResult(true)
-        return
-      }
-
-      // Obtener datos del estudiante
-      const student = await getStudentById(identificacion)
-
-      if (!student) {
-        setScanResult({
-          identificacion,
-          student: null,
-          status: "not_found",
-          message: "Persona no encontrada en la base de datos",
-          timestamp: new Date().toISOString(),
-        })
-        setShowResult(true)
-        return
-      }
-
-      // Marcar acceso exitoso al evento
-      await markStudentAccess(identificacion, true, "Acceso concedido al evento", "manual", {
-        userId: user?.uid,
-        userName: user?.email,
-        userEmail: user?.email,
-      })
-
-      setScanResult({
-        identificacion,
-        student,
-        status: "success",
-        message: "Acceso concedido al evento",
-        timestamp: new Date().toISOString(),
-      })
-      setShowResult(true)
-      stopCamera()
-    } catch (error) {
-      console.error("Error al procesar acceso:", error)
-      setScanResult({
-        identificacion,
-        student: null,
-        status: "error",
-        message: "Error al procesar el acceso",
+      await processScanResult(manualIdInput.trim(), "manual")
+    } catch (err) {
+      console.error("Error al procesar identificación manual:", err)
+      setScanResultDisplay({
+        type: "error",
+        identificacion: manualIdInput,
+        message: "Error al validar la identificación manual.",
         timestamp: new Date().toISOString(),
       })
       setShowResult(true)
     } finally {
-      setProcessing(false)
-    }
-  }
-
-  const handleManualSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (manualId.trim()) {
-      await processEventAccess(manualId.trim())
-      setManualId("")
-      setShowManualInput(false)
+      setIsManualProcessing(false)
+      setManualIdInput("")
     }
   }
 
   const resetScanner = () => {
-    setScanResult(null)
+    setScanResultDisplay(null)
     setShowResult(false)
-    setError("")
-    setManualId("")
-    setShowManualInput(false)
-  }
-
-  // Simulación de escaneo QR (reemplazar con librería real)
-  const simulateQRScan = async () => {
-    // En producción, aquí iría la lógica real de escaneo QR
-    const simulatedId = "119276897" // ID de prueba
-    await processEventAccess(simulatedId)
+    setError(null)
+    setManualIdInput("")
+    setManualInputError(null)
   }
 
   if (user?.role !== "operativo") {
@@ -182,6 +361,44 @@ export function OperativoScanner() {
           <AlertTriangle className="h-4 w-4" />
           <AlertDescription>Esta funcionalidad solo está disponible para usuarios con rol "Operativo"</AlertDescription>
         </Alert>
+      </div>
+    )
+  }
+
+  if (!isClient) {
+    return (
+      <div className="flex flex-col items-center justify-center p-8 text-center bg-card rounded-lg border border-border shadow-sm">
+        <Loader2Icon className="text-primary mb-4 size-16 animate-spin" />
+        <p className="text-muted-foreground text-lg">Cargando escáner...</p>
+      </div>
+    )
+  }
+
+  if (hasPermission === false) {
+    return (
+      <div className="flex flex-col items-center justify-center p-8 text-center bg-card rounded-lg border border-border shadow-sm">
+        <CameraOff className="text-destructive mb-6 size-20" />
+        <h3 className="text-2xl font-bold mb-3 text-foreground">Acceso a la cámara denegado</h3>
+        <p className="text-muted-foreground mb-8 text-base">
+          {error || "Se requiere acceso a la cámara para escanear códigos de barras."}
+        </p>
+        <Button
+          onClick={requestCameraPermission}
+          className="bg-primary text-primary-foreground h-12 px-6 text-base rounded-md"
+        >
+          <CameraIcon className="mr-2 size-5" />
+          Permitir acceso a la cámara
+        </Button>
+      </div>
+    )
+  }
+
+  if (isProcessingQ10) {
+    return (
+      <div className="flex flex-col items-center justify-center p-8 text-center bg-card rounded-lg border border-border shadow-sm">
+        <Loader2Icon className="text-primary mb-4 size-16 animate-spin" />
+        <p className="text-muted-foreground text-lg">Procesando certificado Q10...</p>
+        {q10Message && <p className="text-sm text-muted-foreground mt-2">{q10Message.text}</p>}
       </div>
     )
   }
@@ -199,150 +416,121 @@ export function OperativoScanner() {
             <Shield className="w-4 h-4 mr-1" />
             Control de Acceso
           </Badge>
-          <Badge variant="outline">Solo Ingreso al Evento</Badge>
+          <Badge variant="outline">Escáner Avanzado</Badge>
         </div>
 
-        <Card className="w-full max-w-md">
-          <CardHeader className="text-center">
-            <CardTitle className="flex items-center justify-center gap-2">
-              <Camera className="w-5 h-5" />
-              Escáner Operativo
-            </CardTitle>
-            <CardDescription>Escanea QR o ingresa identificación manualmente</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {error && (
-              <Alert variant="destructive">
-                <AlertTriangle className="h-4 w-4" />
-                <AlertDescription>{error}</AlertDescription>
-              </Alert>
-            )}
-
-            {!showManualInput && (
-              <>
-                <div className="relative">
-                  {isScanning ? (
-                    <div className="relative">
-                      <video
-                        ref={videoRef}
-                        autoPlay
-                        playsInline
-                        muted
-                        className="w-full h-64 object-cover rounded-lg bg-black"
-                      />
-                      <canvas ref={canvasRef} className="hidden" />
-
-                      <div className="absolute inset-0 flex items-center justify-center">
-                        <div className="w-48 h-48 border-2 border-white border-dashed rounded-lg flex items-center justify-center">
-                          {processing && (
-                            <div className="text-white text-center">
-                              <Loader2 className="w-8 h-8 animate-spin mx-auto mb-2" />
-                              <p className="text-sm">Procesando...</p>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="w-full h-64 bg-muted rounded-lg flex items-center justify-center">
-                      <div className="text-center text-muted-foreground">
-                        <CameraOff className="w-12 h-12 mx-auto mb-2" />
-                        <p>Cámara desactivada</p>
-                      </div>
-                    </div>
-                  )}
+        <div className="w-full max-w-md @container">
+          <Card>
+            <CardHeader className="text-center">
+              <CardTitle className="flex items-center justify-center gap-2">
+                <CameraIcon className="w-5 h-5" />
+                Escáner QR/Código Operativo
+              </CardTitle>
+              <CardDescription>Escáner avanzado para control de acceso al evento</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {error && (
+                <div className="p-3 bg-red-50 border border-red-200 rounded-md">
+                  <p className="text-sm text-red-600">{error}</p>
                 </div>
+              )}
 
-                <div className="flex gap-2">
-                  {!isScanning ? (
-                    <Button onClick={startCamera} className="flex-1">
-                      <Camera className="w-4 h-4 mr-2" />
-                      Iniciar Cámara
-                    </Button>
-                  ) : (
-                    <>
-                      <Button onClick={simulateQRScan} disabled={processing} className="flex-1">
-                        {processing ? (
-                          <>
-                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                            Procesando...
-                          </>
-                        ) : (
-                          <>
-                            <Search className="w-4 h-4 mr-2" />
-                            Escanear QR
-                          </>
-                        )}
-                      </Button>
-                      <Button variant="outline" onClick={stopCamera}>
-                        <CameraOff className="w-4 h-4" />
-                      </Button>
-                    </>
-                  )}
-                </div>
-              </>
-            )}
-
-            {showManualInput && (
-              <form onSubmit={handleManualSubmit} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="manual-id">Número de Identificación</Label>
-                  <Input
-                    id="manual-id"
-                    type="text"
-                    placeholder="Ingresa la identificación"
-                    value={manualId}
-                    onChange={(e) => setManualId(e.target.value)}
-                    disabled={processing}
-                    required
+              <div className="relative w-full pt-[100%] overflow-hidden rounded-lg bg-card shadow-lg border border-border">
+                {selectedDeviceId && (
+                  <Webcam
+                    ref={webcamRef}
+                    audio={false}
+                    videoConstraints={{
+                      deviceId: selectedDeviceId,
+                      facingMode: "environment",
+                    }}
+                    className="absolute inset-0 w-full h-full object-cover"
                   />
+                )}
+                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[90%] h-[50%] border-4 border-primary rounded-lg shadow-[0_0_0_9999px_rgba(0,0,0,0.5)]">
+                  <div className="absolute top-1/2 left-[5%] right-[5%] h-[2px] bg-primary animate-scan"></div>
                 </div>
-                <div className="flex gap-2">
-                  <Button type="submit" disabled={processing || !manualId.trim()} className="flex-1">
-                    {processing ? (
-                      <>
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        Procesando...
-                      </>
-                    ) : (
-                      <>
-                        <Search className="w-4 h-4 mr-2" />
-                        Procesar
-                      </>
-                    )}
-                  </Button>
-                  <Button type="button" variant="outline" onClick={() => setShowManualInput(false)}>
-                    Cancelar
-                  </Button>
-                </div>
-              </form>
-            )}
+                {devices.length > 1 && (
+                  <button
+                    onClick={switchCamera}
+                    className="absolute top-4 right-4 bg-secondary/70 text-foreground p-3 rounded-full hover:bg-secondary transition-colors shadow-md"
+                    aria-label="Cambiar cámara"
+                  >
+                    <RefreshCcwIcon className="size-6" />
+                  </button>
+                )}
+              </div>
 
-            {!showManualInput && (
-              <Button variant="outline" onClick={() => setShowManualInput(true)} className="w-full">
-                <Hash className="w-4 h-4 mr-2" />
-                Ingresar ID Manualmente
+              <div className="text-center">
+                <p className="text-sm text-muted-foreground">Escaneando automáticamente... Apunta al código</p>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="mt-6">
+            <CardHeader className="text-center">
+              <CardTitle className="flex items-center justify-center gap-2">
+                <Keyboard className="w-5 h-5" />
+                Entrada Manual
+              </CardTitle>
+              <CardDescription>Ingresa la identificación si el escaneo no es posible</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {manualInputError && (
+                <Alert variant="destructive">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription>{manualInputError}</AlertDescription>
+                </Alert>
+              )}
+              <div className="space-y-2">
+                <Label htmlFor="manual-id">Número de Identificación</Label>
+                <Input
+                  id="manual-id"
+                  type="text"
+                  placeholder="Ej: 123456789"
+                  value={manualIdInput}
+                  onChange={(e) => setManualIdInput(e.target.value)}
+                  disabled={isManualProcessing || isProcessingQ10}
+                  className="h-11 text-base"
+                />
+              </div>
+              <Button
+                onClick={handleManualSubmit}
+                disabled={isManualProcessing || isProcessingQ10 || !manualIdInput.trim()}
+                className="w-full h-11 text-base"
+              >
+                {isManualProcessing ? (
+                  <>
+                    <Loader2Icon className="mr-2 h-4 w-4 animate-spin" />
+                    Validando...
+                  </>
+                ) : (
+                  <>
+                    <Search className="mr-2 h-4 w-4" />
+                    Validar Identificación
+                  </>
+                )}
               </Button>
-            )}
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        </div>
       </div>
 
-      {/* Dialog de resultados */}
+      {/* Modal de resultados */}
       <Dialog open={showResult} onOpenChange={setShowResult}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              {scanResult?.status === "success" && <CheckCircle className="w-5 h-5 text-green-600" />}
-              {scanResult?.status === "already_scanned" && <XCircle className="w-5 h-5 text-orange-600" />}
-              {scanResult?.status === "not_found" && <XCircle className="w-5 h-5 text-red-600" />}
-              {scanResult?.status === "error" && <AlertTriangle className="w-5 h-5 text-red-600" />}
+              {scanResultDisplay?.type === "success" && <CheckCircle className="w-5 h-5 text-green-600" />}
+              {scanResultDisplay?.type === "denied" && <XCircle className="w-5 h-5 text-red-600" />}
+              {scanResultDisplay?.type === "error" && <AlertTriangle className="w-5 h-5 text-red-600" />}
+              {scanResultDisplay?.type === "info" && <Loader2Icon className="w-5 h-5 animate-spin text-blue-600" />}
               Resultado del Control de Acceso
             </DialogTitle>
           </DialogHeader>
 
           <div className="space-y-4">
-            {scanResult && (
+            {scanResultDisplay && (
               <>
                 <div className="space-y-2">
                   <div className="flex items-center gap-2">
@@ -350,56 +538,60 @@ export function OperativoScanner() {
                     <span className="text-sm font-medium">Identificación:</span>
                   </div>
                   <Badge variant="outline" className="text-sm">
-                    {scanResult.identificacion}
+                    {scanResultDisplay.identificacion}
                   </Badge>
                 </div>
 
-                {scanResult.status === "success" && scanResult.student && (
+                {scanResultDisplay.type === "success" && scanResultDisplay.person && (
                   <Card className="border-green-200 bg-green-50">
                     <CardHeader className="pb-2">
-                      <CardTitle className="text-sm text-green-800">✅ Acceso Concedido</CardTitle>
+                      <CardTitle className="text-sm text-green-800">✅ Acceso Concedido al Evento</CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-2">
                       <div>
                         <span className="font-medium text-sm">Nombre:</span>
-                        <p className="text-sm">{scanResult.student.nombre}</p>
+                        <p className="text-sm">{scanResultDisplay.person.nombre}</p>
                       </div>
                       <div>
                         <span className="font-medium text-sm">Programa:</span>
-                        <p className="text-sm">{scanResult.student.programa}</p>
+                        <p className="text-sm">{scanResultDisplay.person.programa}</p>
                       </div>
                       <div>
                         <span className="font-medium text-sm">Puesto:</span>
-                        <p className="text-sm">{scanResult.student.puesto}</p>
+                        <p className="text-sm">{scanResultDisplay.person.puesto}</p>
+                      </div>
+                      <div>
+                        <span className="font-medium text-sm">Cupos Extras:</span>
+                        <p className="text-sm">{scanResultDisplay.person.cuposExtras || 0}</p>
                       </div>
                       <div className="text-xs text-green-700 bg-green-100 p-2 rounded">Bienvenido al evento</div>
                     </CardContent>
                   </Card>
                 )}
 
-                {scanResult.status === "already_scanned" && (
+                {scanResultDisplay.type === "error" && (
                   <Alert className="border-orange-200 bg-orange-50">
                     <XCircle className="h-4 w-4 text-orange-600" />
-                    <AlertDescription className="text-orange-800">{scanResult.message}</AlertDescription>
+                    <AlertDescription className="text-orange-800">{scanResultDisplay.message}</AlertDescription>
                   </Alert>
                 )}
 
-                {scanResult.status === "not_found" && (
+                {scanResultDisplay.type === "denied" && (
                   <Alert variant="destructive">
                     <XCircle className="h-4 w-4" />
-                    <AlertDescription>{scanResult.message}</AlertDescription>
+                    <AlertDescription>{scanResultDisplay.message}</AlertDescription>
                   </Alert>
                 )}
 
-                {scanResult.status === "error" && (
-                  <Alert variant="destructive">
-                    <AlertTriangle className="h-4 w-4" />
-                    <AlertDescription>{scanResult.message}</AlertDescription>
+                {scanResultDisplay.type === "info" && (
+                  <Alert className="border-blue-200 bg-blue-50">
+                    <Loader2Icon className="h-4 w-4 text-blue-600 animate-spin" />
+                    <AlertDescription className="text-blue-800">{scanResultDisplay.message}</AlertDescription>
                   </Alert>
                 )}
 
                 <div className="text-xs text-muted-foreground text-center">
-                  Procesado el {new Date(scanResult.timestamp).toLocaleString()}
+                  Procesado el {new Date(scanResultDisplay.timestamp).toLocaleString()}
                 </div>
               </>
             )}
