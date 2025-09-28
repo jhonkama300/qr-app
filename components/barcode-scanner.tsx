@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from "react"
 import Webcam from "react-webcam"
-import { BrowserMultiFormatReader, BarcodeFormat, DecodeHintType } from "@zxing/library"
+import { BrowserMultiFormatReader } from "@zxing/library"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
@@ -62,17 +62,8 @@ export function BarcodeScanner() {
   useEffect(() => {
     if (!isClient) return
 
-    const hints = new Map<DecodeHintType, any>()
-    hints.set(DecodeHintType.POSSIBLE_FORMATS, [
-      BarcodeFormat.CODE_39,
-      BarcodeFormat.CODE_128,
-      BarcodeFormat.EAN_13,
-      BarcodeFormat.QR_CODE,
-      BarcodeFormat.DATA_MATRIX,
-      BarcodeFormat.AZTEC,
-      BarcodeFormat.PDF_417,
-    ])
-    codeReader.current = new BrowserMultiFormatReader(hints)
+    // Remove complex hints and use default configuration for better compatibility
+    codeReader.current = new BrowserMultiFormatReader()
 
     return () => {
       if (codeReader.current) {
@@ -235,14 +226,21 @@ export function BarcodeScanner() {
             processScanResult(result.getText(), "direct")
           }
         }
-        if (err && err.name !== "NotFoundException" && err.name !== "AbortException") {
+        if (
+          err &&
+          err.name !== "NotFoundException" &&
+          err.name !== "AbortException" &&
+          !err.message.includes("No MultiFormat Readers were able to detect the code")
+        ) {
           console.error("[v0] Error al escanear:", err)
           setError("Error en el escáner: " + err.message)
         }
       })
       .catch((err) => {
-        console.error("[v0] Error al iniciar el escaneo continuo:", err)
-        setError("Error al iniciar el escáner: " + err.message)
+        if (!err.message.includes("No MultiFormat Readers were able to detect the code")) {
+          console.error("[v0] Error al iniciar el escaneo continuo:", err)
+          setError("Error al iniciar el escáner: " + err.message)
+        }
         codeReader.current?.reset()
       })
 
