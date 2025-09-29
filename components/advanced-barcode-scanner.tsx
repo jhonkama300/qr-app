@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import {
   CameraOffIcon,
   CameraIcon,
@@ -22,6 +23,7 @@ import {
   Keyboard,
   Search,
   AlertCircle,
+  RefreshCw,
 } from "lucide-react"
 import { useStudentStoreContext } from "@/components/providers/student-store-provider"
 import { useQ10Validation } from "@/hooks/use-q10-validation"
@@ -50,6 +52,7 @@ export function BarcodeScanner() {
   const [manualIdInput, setManualIdInput] = useState<string>("")
   const [isManualProcessing, setIsManualProcessing] = useState(false)
   const [manualInputError, setManualInputError] = useState<string | null>(null)
+  const [showResult, setShowResult] = useState(false)
 
   const router = useRouter()
   const webcamRef = useRef<Webcam>(null)
@@ -139,8 +142,10 @@ export function BarcodeScanner() {
           timestamp: new Date().toISOString(),
         }
         setScanResultDisplay(currentScanResult)
+        setShowResult(true)
         await processQ10Url(scannedContent)
-        setScanResultDisplay(null) // Limpiar el mensaje temporal después de la redirección de Q10
+        setScanResultDisplay(null)
+        setShowResult(false)
         return
       } else {
         const alreadyScanned = await checkIfAlreadyScanned(scannedContent)
@@ -154,10 +159,11 @@ export function BarcodeScanner() {
             timestamp: new Date().toISOString(),
           }
           setScanResultDisplay(currentScanResult)
+          setShowResult(true)
 
-          // Limpiar después de mostrar el error y reiniciar escaneo
           setTimeout(() => {
             setScanResultDisplay(null)
+            setShowResult(false)
           }, 4000)
           return
         }
@@ -186,8 +192,10 @@ export function BarcodeScanner() {
       }
 
       setScanResultDisplay(currentScanResult)
+      setShowResult(true)
 
       setTimeout(() => {
+        setShowResult(false)
         setScanResultDisplay(null)
       }, 5000)
     },
@@ -195,8 +203,6 @@ export function BarcodeScanner() {
   )
 
   useEffect(() => {
-    // Solo iniciar el escaneo si el cliente está listo, tiene permisos, hay un dispositivo seleccionado,
-    // no se está procesando Q10, no se está mostrando un resultado de escaneo temporal, y no se está procesando manualmente.
     if (
       !isClient ||
       !hasPermission ||
@@ -223,13 +229,12 @@ export function BarcodeScanner() {
       return
     }
 
-    setError(null) // Limpiar errores previos
+    setError(null)
 
     console.log("[v0] Iniciando escaneo continuo con dispositivo:", selectedDeviceId)
     codeReader.current
       .decodeFromVideoDevice(selectedDeviceId, video, (result, err) => {
         if (result) {
-          // Solo procesar si no se está mostrando un resultado temporal y no se está procesando Q10 o manualmente
           if (!scanResultDisplay && !isProcessingQ10 && !isManualProcessing) {
             console.log("[v0] QR detectado:", result.getText())
             processScanResult(result.getText(), "direct")
@@ -288,7 +293,6 @@ export function BarcodeScanner() {
     const currentIndex = devices.findIndex((device) => device.deviceId === selectedDeviceId)
     const nextIndex = (currentIndex + 1) % devices.length
     setSelectedDeviceId(devices[nextIndex].deviceId)
-    // El useEffect principal se encargará de reiniciar el escaneo con la nueva cámara
   }
 
   const handleManualSubmit = async () => {
@@ -298,14 +302,15 @@ export function BarcodeScanner() {
     }
 
     setIsManualProcessing(true)
-    setManualInputError(null) // Limpiar errores previos de entrada manual
+    setManualInputError(null)
     setScanResultDisplay({
       type: "info",
       identificacion: manualIdInput,
       message: "Validando identificación manual...",
       timestamp: new Date().toISOString(),
     })
-    setError(null) // Limpiar errores de cámara si los hubiera
+    setShowResult(true)
+    setError(null)
 
     try {
       await processScanResult(manualIdInput.trim(), "manual")
@@ -317,10 +322,19 @@ export function BarcodeScanner() {
         message: "Error al validar la identificación manual.",
         timestamp: new Date().toISOString(),
       })
+      setShowResult(true)
     } finally {
       setIsManualProcessing(false)
-      setManualIdInput("") // Limpiar el input después de procesar
+      setManualIdInput("")
     }
+  }
+
+  const resetScanner = () => {
+    setScanResultDisplay(null)
+    setShowResult(false)
+    setError(null)
+    setManualIdInput("")
+    setManualInputError(null)
   }
 
   if (!isClient) {
@@ -409,54 +423,6 @@ export function BarcodeScanner() {
         </CardContent>
       </Card>
 
-      {scanResultDisplay && (
-        <div
-          className={`mt-4 p-4 rounded-lg border ${
-            scanResultDisplay.type === "success"
-              ? "bg-green-50 border-green-200 text-green-800"
-              : scanResultDisplay.type === "denied"
-                ? "bg-red-50 border-red-200 text-red-800"
-                : scanResultDisplay.type === "error"
-                  ? "bg-yellow-50 border-yellow-200 text-yellow-800"
-                  : "bg-blue-50 border-blue-200 text-blue-800" // Para 'info' type
-          }`}
-        >
-          <div className="flex items-center gap-2 mb-2">
-            {scanResultDisplay.type === "success" && <CheckCircle className="w-5 h-5" />}
-            {scanResultDisplay.type === "denied" && <XCircle className="w-5 h-5" />}
-            {scanResultDisplay.type === "error" && <AlertTriangle className="w-5 h-5" />}
-            {scanResultDisplay.type === "info" && <Loader2Icon className="w-5 h-5 animate-spin" />}
-            <p className="font-semibold text-lg">{scanResultDisplay.message}</p>
-          </div>
-          {scanResultDisplay.identificacion && scanResultDisplay.identificacion !== "N/A" && (
-            <p className="text-sm">
-              <span className="font-medium">Identificación:</span>{" "}
-              <Badge variant="outline">{scanResultDisplay.identificacion}</Badge>
-            </p>
-          )}
-          {scanResultDisplay.person && (
-            <div className="mt-2 text-sm space-y-1">
-              <div className="flex items-center gap-2">
-                <User className="w-4 h-4 text-muted-foreground" />
-                <span className="font-medium">{scanResultDisplay.person.nombre}</span>
-              </div>
-              <p>
-                <span className="font-medium">Puesto:</span> {scanResultDisplay.person.puesto}
-              </p>
-              <p>
-                <span className="font-medium">Programa:</span> {scanResultDisplay.person.programa}
-              </p>
-              <p>
-                <span className="font-medium">Cupos Extras:</span> {scanResultDisplay.person.cuposExtras}
-              </p>
-            </div>
-          )}
-          <p className="text-xs text-right mt-2 text-muted-foreground">
-            Escaneado: {new Date(scanResultDisplay.timestamp).toLocaleTimeString()}
-          </p>
-        </div>
-      )}
-
       <Card className="mt-6">
         <CardHeader className="text-center">
           <CardTitle className="flex items-center justify-center gap-2">
@@ -503,6 +469,98 @@ export function BarcodeScanner() {
           </Button>
         </CardContent>
       </Card>
+
+      <Dialog open={showResult} onOpenChange={setShowResult}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              {scanResultDisplay?.type === "success" && <CheckCircle className="w-5 h-5 text-green-600" />}
+              {scanResultDisplay?.type === "denied" && <XCircle className="w-5 h-5 text-red-600" />}
+              {scanResultDisplay?.type === "error" && <AlertTriangle className="w-5 h-5 text-red-600" />}
+              {scanResultDisplay?.type === "info" && <Loader2Icon className="w-5 h-5 animate-spin text-blue-600" />}
+              Resultado del Control de Acceso
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            {scanResultDisplay && (
+              <>
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <User className="w-4 h-4 text-muted-foreground" />
+                    <span className="text-sm font-medium">Identificación:</span>
+                  </div>
+                  <Badge variant="outline" className="text-sm">
+                    {scanResultDisplay.identificacion}
+                  </Badge>
+                </div>
+
+                {scanResultDisplay.type === "success" && scanResultDisplay.person && (
+                  <Card className="border-green-200 bg-green-50">
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm text-green-800">✅ Acceso Concedido al Evento</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-2">
+                      <div>
+                        <span className="font-medium text-sm">Nombre:</span>
+                        <p className="text-sm">{scanResultDisplay.person.nombre}</p>
+                      </div>
+                      <div>
+                        <span className="font-medium text-sm">Programa:</span>
+                        <p className="text-sm">{scanResultDisplay.person.programa}</p>
+                      </div>
+                      <div>
+                        <span className="font-medium text-sm">Puesto:</span>
+                        <p className="text-sm">{scanResultDisplay.person.puesto}</p>
+                      </div>
+                      <div>
+                        <span className="font-medium text-sm">Cupos Extras:</span>
+                        <p className="text-sm">{scanResultDisplay.person.cuposExtras || 0}</p>
+                      </div>
+                      <div className="text-xs text-green-700 bg-green-100 p-2 rounded">Bienvenido al evento</div>
+                    </CardContent>
+                  </Card>
+                )}
+
+                {scanResultDisplay.type === "error" && (
+                  <Alert className="border-orange-200 bg-orange-50">
+                    <XCircle className="h-4 w-4 text-orange-600" />
+                    <AlertDescription className="text-orange-800">{scanResultDisplay.message}</AlertDescription>
+                  </Alert>
+                )}
+
+                {scanResultDisplay.type === "denied" && (
+                  <Alert variant="destructive">
+                    <XCircle className="h-4 w-4" />
+                    <AlertDescription>{scanResultDisplay.message}</AlertDescription>
+                  </Alert>
+                )}
+
+                {scanResultDisplay.type === "info" && (
+                  <Alert className="border-blue-200 bg-blue-50">
+                    <Loader2Icon className="h-4 w-4 text-blue-600 animate-spin" />
+                    <AlertDescription className="text-blue-800">{scanResultDisplay.message}</AlertDescription>
+                  </Alert>
+                )}
+
+                <div className="text-xs text-muted-foreground text-center">
+                  Procesado el {new Date(scanResultDisplay.timestamp).toLocaleString()}
+                </div>
+              </>
+            )}
+          </div>
+
+          <div className="flex gap-2">
+            <Button onClick={resetScanner} className="flex-1">
+              <RefreshCw className="w-4 h-4 mr-2" />
+              Procesar Otro
+            </Button>
+            <Button variant="outline" onClick={() => setShowResult(false)}>
+              Cerrar
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
