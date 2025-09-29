@@ -38,14 +38,16 @@ interface AccessLog {
   grantedByUserId?: string
   grantedByUserName?: string
   grantedByUserEmail?: string
-  mesaUsada?: number // Agregado campo para mesa utilizada
+  mesaUsada?: number
 }
 
 interface UserStats {
   userId: string
   userName: string
   userEmail: string
-  registrosCount: number
+  accedidos: number
+  denegados: number
+  total: number
 }
 
 interface MesaConfig {
@@ -78,7 +80,7 @@ export function DashboardStats() {
     mesaMasActiva: null,
     promedioEntregasPorMesa: 0,
   })
-  const [realTimeUpdates, setRealTimeUpdates] = useState(0) // Para forzar re-renders
+  const [realTimeUpdates, setRealTimeUpdates] = useState(0)
 
   useEffect(() => {
     loadInitialData()
@@ -89,7 +91,6 @@ export function DashboardStats() {
     setLoading(true)
     setError(null)
     try {
-      // Cargar todas las personas
       const personsSnapshot = await getDocs(collection(db, "personas"))
       const personsData: PersonData[] = []
       personsSnapshot.forEach((doc) => {
@@ -100,7 +101,6 @@ export function DashboardStats() {
       })
       setAllPersons(personsData)
 
-      // Cargar configuración de mesas
       const mesasSnapshot = await getDocs(collection(db, "mesas_config"))
       const mesasData: MesaConfig[] = []
       mesasSnapshot.forEach((doc) => {
@@ -119,7 +119,6 @@ export function DashboardStats() {
   }
 
   const setupRealTimeListeners = () => {
-    // Listener para access_logs en tiempo real
     const logsQuery = query(collection(db, "access_logs"), orderBy("timestamp", "desc"))
     const unsubscribeLogs = onSnapshot(logsQuery, (snapshot) => {
       const logsData: AccessLog[] = []
@@ -134,7 +133,6 @@ export function DashboardStats() {
       console.log("[v0] Logs actualizados en tiempo real:", logsData.length)
     })
 
-    // Listener para mesas_config en tiempo real
     const mesasQuery = query(collection(db, "mesas_config"))
     const unsubscribeMesas = onSnapshot(mesasQuery, (snapshot) => {
       const mesasData: MesaConfig[] = []
@@ -148,7 +146,6 @@ export function DashboardStats() {
       console.log("[v0] Configuración de mesas actualizada:", mesasData.length)
     })
 
-    // Cleanup function
     return () => {
       unsubscribeLogs()
       unsubscribeMesas()
@@ -165,16 +162,14 @@ export function DashboardStats() {
     const mesasActivas = mesasConfig.filter((mesa) => mesa.activa).length
     const totalMesas = mesasConfig.length
 
-    // Filtrar logs de entregas de comida (con mesaUsada)
     const entregasComida = accessLogs.filter(
       (log) => (log.status === "granted" || log.status === "q10_success") && log.mesaUsada !== undefined,
     )
 
     const comidasEntregadas = entregasComida.length
-    const precioPorComida = 8000 // Precio estimado por comida en pesos colombianos
+    const precioPorComida = 8000
     const ingresosPorComida = comidasEntregadas * precioPorComida
 
-    // Calcular mesa más activa
     const entregasPorMesa = new Map<number, number>()
     entregasComida.forEach((log) => {
       if (log.mesaUsada) {
@@ -216,20 +211,27 @@ export function DashboardStats() {
     accessLogs.forEach((log) => {
       if (log.grantedByUserId && log.grantedByUserName) {
         const existing = userStatsMap.get(log.grantedByUserId)
+        const isGranted = log.status === "granted" || log.status === "q10_success"
+        const isDenied = log.status === "denied" || log.status === "q10_failed"
+
         if (existing) {
-          existing.registrosCount++
+          if (isGranted) existing.accedidos++
+          if (isDenied) existing.denegados++
+          existing.total++
         } else {
           userStatsMap.set(log.grantedByUserId, {
             userId: log.grantedByUserId,
             userName: log.grantedByUserName,
             userEmail: log.grantedByUserEmail || "",
-            registrosCount: 1,
+            accedidos: isGranted ? 1 : 0,
+            denegados: isDenied ? 1 : 0,
+            total: 1,
           })
         }
       }
     })
 
-    return Array.from(userStatsMap.values()).sort((a, b) => b.registrosCount - a.registrosCount)
+    return Array.from(userStatsMap.values()).sort((a, b) => b.total - a.total)
   }
 
   const getUniqueAccessLogs = () => {
@@ -264,7 +266,7 @@ export function DashboardStats() {
 
   const uniqueAccessLogs = getUniqueAccessLogs()
   const userStats = getUserStats()
-  const topUser = userStats[0] // Usuario con más registros
+  const topUser = userStats[0]
 
   const grantedAccessCount = uniqueAccessLogs.filter(
     (log) => log.status === "granted" || log.status === "q10_success",
@@ -275,7 +277,6 @@ export function DashboardStats() {
   const scannedIdentifications = new Set(uniqueAccessLogs.map((log) => log.identificacion))
   const waitingPersonsCount = allPersons.filter((person) => !scannedIdentifications.has(person.identificacion)).length
   const totalPersonsCount = allPersons.length
-  const totalRegistrosCount = accessLogs.length // Total de registros de acceso
   const graduandosRegistrados = totalPersonsCount - scannedIdentifications.size
   const entregasPorMesa = getEntregasPorMesa()
 
@@ -428,7 +429,6 @@ export function DashboardStats() {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {/* Barra de Concedidos */}
               <div className="space-y-2">
                 <div className="flex justify-between items-center">
                   <span className="text-xs md:text-sm text-green-600">Concedidos</span>
@@ -444,7 +444,6 @@ export function DashboardStats() {
                 </div>
               </div>
 
-              {/* Barra de Denegados */}
               <div className="space-y-2">
                 <div className="flex justify-between items-center">
                   <span className="text-xs md:text-sm text-red-600">Denegados</span>
@@ -460,7 +459,6 @@ export function DashboardStats() {
                 </div>
               </div>
 
-              {/* Barra de En Espera */}
               <div className="space-y-2">
                 <div className="flex justify-between items-center">
                   <span className="text-xs md:text-sm text-orange-600">En Espera</span>
@@ -488,14 +486,27 @@ export function DashboardStats() {
           </CardHeader>
           <CardContent>
             {topUser ? (
-              <div className="space-y-2">
+              <div className="space-y-3">
                 <div className="flex items-center gap-2">
                   <UserCheck className="w-4 h-4 text-blue-600" />
                   <span className="font-medium text-sm md:text-base">{topUser.userName}</span>
                 </div>
                 <p className="text-xs md:text-sm text-muted-foreground">{topUser.userEmail}</p>
-                <div className="text-xl md:text-2xl font-bold text-blue-800">{topUser.registrosCount}</div>
-                <p className="text-xs text-muted-foreground">registros realizados</p>
+                <div className="grid grid-cols-2 gap-3 mt-3">
+                  <div className="text-center p-2 bg-green-50 rounded-lg">
+                    <div className="text-lg md:text-xl font-bold text-green-800">{topUser.accedidos}</div>
+                    <p className="text-xs text-green-600">Accedidos</p>
+                  </div>
+                  <div className="text-center p-2 bg-red-50 rounded-lg">
+                    <div className="text-lg md:text-xl font-bold text-red-800">{topUser.denegados}</div>
+                    <p className="text-xs text-red-600">Denegados</p>
+                  </div>
+                </div>
+                <div className="text-center mt-2">
+                  <div className="text-sm text-muted-foreground">
+                    Total: <span className="font-semibold">{topUser.total}</span> registros
+                  </div>
+                </div>
               </div>
             ) : (
               <p className="text-muted-foreground text-sm">No hay datos de usuarios disponibles</p>
@@ -531,13 +542,13 @@ export function DashboardStats() {
       {userStats.length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-base md:text-lg">Usuarios que Más Registran</CardTitle>
+            <CardTitle className="text-base md:text-lg">Historial de Registros por Usuario</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              {userStats.slice(0, 5).map((user, index) => (
+              {userStats.slice(0, 10).map((user, index) => (
                 <div key={user.userId} className="flex items-center justify-between p-2 md:p-3 border rounded-lg">
-                  <div className="flex items-center gap-2 md:gap-3">
+                  <div className="flex items-center gap-2 md:gap-3 flex-1">
                     <div
                       className={`flex items-center justify-center w-6 h-6 md:w-8 md:h-8 rounded-full text-xs md:text-sm ${
                         index === 0
@@ -551,14 +562,20 @@ export function DashboardStats() {
                     >
                       {index + 1}
                     </div>
-                    <div>
-                      <p className="font-medium text-sm md:text-base">{user.userName}</p>
-                      <p className="text-xs md:text-sm text-muted-foreground">{user.userEmail}</p>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-sm md:text-base truncate">{user.userName}</p>
+                      <p className="text-xs md:text-sm text-muted-foreground truncate">{user.userEmail}</p>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <p className="font-bold text-sm md:text-base">{user.registrosCount}</p>
-                    <p className="text-xs text-muted-foreground">registros</p>
+                  <div className="flex items-center gap-2 md:gap-4 ml-2">
+                    <div className="text-center">
+                      <p className="font-bold text-xs md:text-sm text-green-600">{user.accedidos}</p>
+                      <p className="text-[10px] md:text-xs text-muted-foreground">Accedidos</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="font-bold text-xs md:text-sm text-red-600">{user.denegados}</p>
+                      <p className="text-[10px] md:text-xs text-muted-foreground">Denegados</p>
+                    </div>
                   </div>
                 </div>
               ))}
