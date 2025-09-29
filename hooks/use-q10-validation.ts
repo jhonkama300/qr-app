@@ -1,7 +1,6 @@
 "use client"
 
 import { useState, useCallback } from "react"
-import { useRouter } from "next/navigation"
 import { useStudentStoreContext } from "@/components/providers/student-store-provider"
 
 interface Q10Message {
@@ -9,14 +8,21 @@ interface Q10Message {
   text: string
 }
 
+interface Q10Result {
+  success: boolean
+  identificacion?: string
+  student?: any
+  message: string
+  type: "success" | "denied" | "error"
+}
+
 export function useQ10Validation() {
   const [isProcessingQ10, setIsProcessingQ10] = useState(false)
   const [q10Message, setQ10Message] = useState<Q10Message | null>(null)
   const { getStudentById, markQ10Access } = useStudentStoreContext()
-  const router = useRouter()
 
   const processQ10Url = useCallback(
-    async (url: string) => {
+    async (url: string): Promise<Q10Result> => {
       setIsProcessingQ10(true)
       setQ10Message({ type: "info", text: "Accediendo a la URL de Q10..." })
 
@@ -34,8 +40,11 @@ export function useQ10Validation() {
         if (!identificacion) {
           setQ10Message({ type: "error", text: "No se encontró identificación en la página de Q10." })
           await markQ10Access("N/A", "q10_failed", "No se encontró identificación en la página de Q10.")
-          router.push(`/access-denied?reason=no_id_q10`)
-          return
+          return {
+            success: false,
+            message: "No se encontró identificación en la página de Q10.",
+            type: "error",
+          }
         }
 
         setQ10Message({
@@ -49,22 +58,37 @@ export function useQ10Validation() {
         if (student) {
           setQ10Message({ type: "success", text: `Estudiante ${student.nombre} encontrado y validado.` })
           await markQ10Access(identificacion, "q10_success", `Estudiante ${student.nombre} validado por Q10.`)
-          router.push(`/access-granted?id=${identificacion}&source=q10`)
+          return {
+            success: true,
+            identificacion,
+            student,
+            message: `Acceso concedido al evento para ${student.nombre}.`,
+            type: "success",
+          }
         } else {
           setQ10Message({ type: "error", text: `Identificación ${identificacion} no encontrada en la base de datos.` })
           await markQ10Access(identificacion, "q10_failed", `Identificación ${identificacion} no encontrada en BD.`)
-          router.push(`/access-denied?id=${identificacion}&source=q10`)
+          return {
+            success: false,
+            identificacion,
+            message: `Identificación ${identificacion} no encontrada en la base de datos.`,
+            type: "denied",
+          }
         }
       } catch (error: any) {
         console.error("Error en processQ10Url:", error)
         setQ10Message({ type: "error", text: `Error al validar Q10: ${error.message}` })
         await markQ10Access("N/A", "q10_failed", `Error al validar Q10: ${error.message}`)
-        router.push(`/access-denied?reason=q10_error`)
+        return {
+          success: false,
+          message: `Error al validar Q10: ${error.message}`,
+          type: "error",
+        }
       } finally {
         setIsProcessingQ10(false)
       }
     },
-    [getStudentById, markQ10Access, router],
+    [getStudentById, markQ10Access],
   )
 
   return { processQ10Url, isProcessingQ10, q10Message }

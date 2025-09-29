@@ -155,10 +155,37 @@ export function OperativoScanner() {
         }
         setScanResultDisplay(currentScanResult)
         setShowResult(true)
-        await processQ10Url(scannedContent)
-        setScanResultDisplay(null)
-        setShowResult(false)
-        setIsScanning(false)
+
+        const q10Result = await processQ10Url(scannedContent)
+
+        if (q10Result.success && q10Result.student) {
+          await markStudentAccess(q10Result.identificacion!, true, "Acceso concedido al evento", "q10", userInfo)
+          currentScanResult = {
+            type: "success",
+            identificacion: q10Result.identificacion!,
+            person: q10Result.student,
+            message: q10Result.message,
+            source: "q10",
+            timestamp: new Date().toISOString(),
+          }
+        } else {
+          currentScanResult = {
+            type: q10Result.type as "denied" | "error",
+            identificacion: q10Result.identificacion || scannedContent,
+            message: q10Result.message,
+            source: "q10",
+            timestamp: new Date().toISOString(),
+          }
+        }
+
+        setScanResultDisplay(currentScanResult)
+        setShowResult(true)
+
+        setTimeout(() => {
+          setShowResult(false)
+          setScanResultDisplay(null)
+          setIsScanning(false)
+        }, 5000)
         return
       } else {
         const alreadyScanned = await checkIfAlreadyScanned(scannedContent)

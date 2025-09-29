@@ -53,6 +53,7 @@ export function BarcodeScanner() {
   const [isManualProcessing, setIsManualProcessing] = useState(false)
   const [manualInputError, setManualInputError] = useState<string | null>(null)
   const [showResult, setShowResult] = useState(false)
+  const [isScanning, setIsScanning] = useState(false)
 
   const router = useRouter()
   const webcamRef = useRef<Webcam>(null)
@@ -119,6 +120,12 @@ export function BarcodeScanner() {
 
   const processScanResult = useCallback(
     async (scannedContent: string, source: "direct" | "q10" | "manual") => {
+      if (isScanning) {
+        console.log("[v0] Scan already in progress, ignoring")
+        return
+      }
+
+      setIsScanning(true)
       let currentScanResult: ScanResultDisplay
 
       // Información del usuario que autoriza el acceso
@@ -143,9 +150,37 @@ export function BarcodeScanner() {
         }
         setScanResultDisplay(currentScanResult)
         setShowResult(true)
-        await processQ10Url(scannedContent)
-        setScanResultDisplay(null)
-        setShowResult(false)
+
+        const q10Result = await processQ10Url(scannedContent)
+
+        if (q10Result.success && q10Result.student) {
+          await markStudentAccess(q10Result.identificacion!, true, "Acceso concedido al evento", "q10", userInfo)
+          currentScanResult = {
+            type: "success",
+            identificacion: q10Result.identificacion!,
+            person: q10Result.student,
+            message: q10Result.message,
+            source: "q10",
+            timestamp: new Date().toISOString(),
+          }
+        } else {
+          currentScanResult = {
+            type: q10Result.type as "denied" | "error",
+            identificacion: q10Result.identificacion || scannedContent,
+            message: q10Result.message,
+            source: "q10",
+            timestamp: new Date().toISOString(),
+          }
+        }
+
+        setScanResultDisplay(currentScanResult)
+        setShowResult(true)
+
+        setTimeout(() => {
+          setShowResult(false)
+          setScanResultDisplay(null)
+          setIsScanning(false)
+        }, 5000)
         return
       } else {
         const alreadyScanned = await checkIfAlreadyScanned(scannedContent)
@@ -164,23 +199,24 @@ export function BarcodeScanner() {
           setTimeout(() => {
             setScanResultDisplay(null)
             setShowResult(false)
+            setIsScanning(false)
           }, 4000)
           return
         }
 
         const student = await getStudentById(scannedContent)
         if (student) {
-          await markStudentAccess(scannedContent, true, undefined, source, userInfo)
+          await markStudentAccess(scannedContent, true, "Acceso concedido al evento", source, userInfo)
           currentScanResult = {
             type: "success",
             identificacion: scannedContent,
             person: student,
-            message: `Acceso concedido para ${student.nombre}.`,
+            message: `Acceso concedido al evento para ${student.nombre}.`,
             source: source,
             timestamp: new Date().toISOString(),
           }
         } else {
-          await markStudentAccess(scannedContent, false, undefined, source, userInfo)
+          await markStudentAccess(scannedContent, false, "Persona no encontrada", source, userInfo)
           currentScanResult = {
             type: "denied",
             identificacion: scannedContent,
@@ -197,20 +233,14 @@ export function BarcodeScanner() {
       setTimeout(() => {
         setShowResult(false)
         setScanResultDisplay(null)
+        setIsScanning(false)
       }, 5000)
     },
-    [getStudentById, markStudentAccess, processQ10Url, user, checkIfAlreadyScanned],
+    [getStudentById, markStudentAccess, processQ10Url, user, checkIfAlreadyScanned, isScanning],
   )
 
   useEffect(() => {
-    if (
-      !isClient ||
-      !hasPermission ||
-      !selectedDeviceId ||
-      isProcessingQ10 ||
-      scanResultDisplay ||
-      isManualProcessing
-    ) {
+    if (!isClient || !hasPermission || !selectedDeviceId || isProcessingQ10 || isScanning || isManualProcessing) {
       if (codeReader.current) {
         console.log("[v0] Reseteando lector (condiciones no cumplidas)...")
         codeReader.current.reset()
@@ -235,7 +265,7 @@ export function BarcodeScanner() {
     codeReader.current
       .decodeFromVideoDevice(selectedDeviceId, video, (result, err) => {
         if (result) {
-          if (!scanResultDisplay && !isProcessingQ10 && !isManualProcessing) {
+          if (!isScanning && !isProcessingQ10 && !isManualProcessing) {
             console.log("[v0] QR detectado:", result.getText())
             processScanResult(result.getText(), "direct")
           }
@@ -257,15 +287,7 @@ export function BarcodeScanner() {
         codeReader.current.reset()
       }
     }
-  }, [
-    isClient,
-    hasPermission,
-    selectedDeviceId,
-    isProcessingQ10,
-    scanResultDisplay,
-    isManualProcessing,
-    processScanResult,
-  ])
+  }, [isClient, hasPermission, selectedDeviceId, isProcessingQ10, isScanning, isManualProcessing, processScanResult])
 
   const requestCameraPermission = () => {
     if (!isClient) return
@@ -335,6 +357,7 @@ export function BarcodeScanner() {
     setError(null)
     setManualIdInput("")
     setManualInputError(null)
+    setIsScanning(false)
   }
 
   if (!isClient) {
@@ -418,7 +441,9 @@ export function BarcodeScanner() {
           </div>
 
           <div className="text-center">
-            <p className="text-sm text-muted-foreground">Escaneando... Apunta al código</p>
+            <p className="text-sm text-muted-foreground">
+              {isScanning ? "Procesando..." : "Escaneando... Apunta al código"}
+            </p>
           </div>
         </CardContent>
       </Card>
