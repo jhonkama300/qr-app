@@ -404,16 +404,6 @@ export function OperativoScanner() {
     )
   }
 
-  if (isProcessingQ10) {
-    return (
-      <div className="flex flex-col items-center justify-center p-8 text-center bg-card rounded-lg border border-border shadow-sm">
-        <Loader2Icon className="text-primary mb-4 size-16 animate-spin" />
-        <p className="text-muted-foreground text-lg">Procesando certificado Q10...</p>
-        {q10Message && <p className="text-sm text-muted-foreground mt-2">{q10Message.text}</p>}
-      </div>
-    )
-  }
-
   return (
     <div className="flex flex-1 flex-col gap-4 p-4">
       <div className="flex flex-col items-center gap-4">
