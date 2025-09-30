@@ -94,29 +94,29 @@ export function MesaControlAdmin() {
       try {
         setLoading(true)
 
-        // Escuchar cambios en access_logs en tiempo real
         const accessLogsQuery = query(collection(db, "access_logs"), where("status", "==", "granted"))
 
         const unsubscribe = onSnapshot(accessLogsQuery, async (snapshot) => {
           const mesasStats: MesaStats[] = []
 
           for (let i = 1; i <= 10; i++) {
-            // Contar estudiantes atendidos por mesa desde el snapshot
             const mesaLogs = snapshot.docs.filter((doc) => {
               const data = doc.data()
               return data.mesaUsada === i
             })
 
-            // Obtener último acceso
+            const estudiantesAtendidos = mesaLogs.length
+
+            // Get last access
             const ultimoAcceso = mesaLogs.length > 0 ? mesaLogs[mesaLogs.length - 1].data().timestamp : undefined
 
-            // Buscar configuración de la mesa
+            // Find mesa configuration
             const mesaConfig = mesasConfig.find((m) => m.numero === i)
 
             mesasStats.push({
               numero: i,
               activa: mesaConfig?.activa ?? true,
-              estudiantesAtendidos: mesaLogs.length,
+              estudiantesAtendidos, // Now counts total scans/meals
               ultimoAcceso,
             })
           }
@@ -233,7 +233,7 @@ export function MesaControlAdmin() {
           </CardHeader>
           <CardContent>
             <div className="text-xl sm:text-2xl font-bold">{totalEstudiantes}</div>
-            <p className="text-xs text-muted-foreground">Atendidos en total</p>
+            <p className="text-xs text-muted-foreground">Comidas entregadas</p>
           </CardContent>
         </Card>
 
@@ -260,8 +260,8 @@ export function MesaControlAdmin() {
         </Card>
 
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-xs sm:text-sm font-medium">Comidas por Entregar</CardTitle>
+          <CardHeader className="pb-2 p-3">
+            <CardTitle className="text-sm sm:text-base">Comidas por Entregar</CardTitle>
             <Utensils className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>

@@ -277,7 +277,7 @@ export function DashboardStats() {
   const scannedIdentifications = new Set(uniqueAccessLogs.map((log) => log.identificacion))
   const waitingPersonsCount = allPersons.filter((person) => !scannedIdentifications.has(person.identificacion)).length
   const totalPersonsCount = allPersons.length
-  const graduandosRegistrados = totalPersonsCount - scannedIdentifications.size
+  const graduandosRegistrados = totalPersonsCount
   const entregasPorMesa = getEntregasPorMesa()
 
   if (loading) {
@@ -301,7 +301,7 @@ export function DashboardStats() {
           <p className="text-xs md:text-base text-muted-foreground">
             Resumen general del sistema de control de acceso
             <span className="ml-2 inline-flex items-center gap-1 text-green-600">
-              <Activity className="w-3 h-3" />
+              <Activity className="w-3 h-3 md:w-4 md:h-4 text-green-600 flex-shrink-0" />
               <span className="text-[10px] md:text-xs">Tiempo Real</span>
             </span>
           </p>
@@ -325,7 +325,7 @@ export function DashboardStats() {
           <CardContent className="p-1.5 md:p-2 pt-0">
             <div className="text-sm sm:text-base md:text-lg font-bold text-blue-800">{graduandosRegistrados}</div>
             <p className="text-[8px] sm:text-[9px] md:text-xs text-muted-foreground leading-tight">
-              Pendientes por procesar
+              Total de graduandos registrados
             </p>
           </CardContent>
         </Card>

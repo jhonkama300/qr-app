@@ -3,7 +3,7 @@
 import type React from "react"
 
 import { useState, useEffect } from "react"
-import { collection, getDocs, doc, writeBatch } from "firebase/firestore"
+import { collection, getDocs, doc, writeBatch, query, where } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -35,6 +35,7 @@ import {
   ChevronsLeft,
   ChevronsRight,
   RotateCcw,
+  UtensilsCrossed,
 } from "lucide-react"
 import * as XLSX from "xlsx"
 
@@ -46,6 +47,7 @@ interface PersonData {
   programa: string
   cuposExtras: number
   fechaImportacion?: string
+  cuposConsumidos?: number
 }
 
 export function DatabaseManagement() {
@@ -67,6 +69,11 @@ export function DatabaseManagement() {
   const [currentPage, setCurrentPage] = useState(1)
   const [itemsPerPage, setItemsPerPage] = useState(10)
 
+  // Estados para el diálogo de reinicio de bufetes
+  const [isResetBufetesDialogOpen, setIsResetBufetesDialogOpen] = useState(false)
+  const [resetting, setResetting] = useState(false)
+  const [mesas, setMesas] = useState<Array<{ id: string; numero: number; nombre: string; activa: boolean }>>([])
+
   const totalPages = Math.ceil(filteredPersons.length / itemsPerPage)
   const startIndex = (currentPage - 1) * itemsPerPage
   const endIndex = startIndex + itemsPerPage
@@ -75,6 +82,7 @@ export function DatabaseManagement() {
 
   useEffect(() => {
     loadPersons()
+    loadMesas() // Cargar mesas al iniciar
   }, [])
 
   useEffect(() => {
@@ -197,6 +205,56 @@ export function DatabaseManagement() {
     setSuccess("")
 
     try {
+      // Obtener todas las identificaciones existentes en la base de datos
+      const existingPersonsSnapshot = await getDocs(collection(db, "personas"))
+      const existingIdentificaciones = new Set<string>()
+
+      existingPersonsSnapshot.forEach((doc) => {
+        const data = doc.data()
+        if (data.identificacion) {
+          existingIdentificaciones.add(data.identificacion.trim())
+        }
+      })
+
+      // Verificar duplicados en los datos a importar
+      const duplicatesInFile = new Set<string>()
+      const identificacionesInFile = new Set<string>()
+      const duplicatesWithDB: string[] = []
+
+      previewData.forEach((person) => {
+        const id = person.identificacion.trim()
+
+        // Verificar duplicados dentro del archivo
+        if (identificacionesInFile.has(id)) {
+          duplicatesInFile.add(id)
+        } else {
+          identificacionesInFile.add(id)
+        }
+
+        // Verificar duplicados con la base de datos
+        if (existingIdentificaciones.has(id)) {
+          duplicatesWithDB.push(id)
+        }
+      })
+
+      // Si hay duplicados, mostrar error y no importar
+      if (duplicatesInFile.size > 0 || duplicatesWithDB.length > 0) {
+        let errorMessage = "❌ No se puede importar debido a identificaciones duplicadas:\n\n"
+
+        if (duplicatesWithDB.length > 0) {
+          errorMessage += `• ${duplicatesWithDB.length} identificación(es) ya existe(n) en la base de datos: ${duplicatesWithDB.slice(0, 5).join(", ")}${duplicatesWithDB.length > 5 ? "..." : ""}\n`
+        }
+
+        if (duplicatesInFile.size > 0) {
+          errorMessage += `• ${duplicatesInFile.size} identificación(es) duplicada(s) dentro del archivo: ${Array.from(duplicatesInFile).slice(0, 5).join(", ")}${duplicatesInFile.size > 5 ? "..." : ""}\n`
+        }
+
+        errorMessage += "\nPor favor, corrige el archivo Excel y vuelve a intentar."
+        setError(errorMessage)
+        setImporting(false)
+        return
+      }
+
       const batch = writeBatch(db)
       const collectionRef = collection(db, "personas")
 
@@ -290,7 +348,7 @@ export function DatabaseManagement() {
       setSuccess(`✅ Métricas reiniciadas exitosamente: ${accessLogsSnapshot.size} registros de acceso eliminados`)
     } catch (error) {
       console.error("Error al reiniciar métricas:", error)
-      setError("Error al reiniciar las métricas. Intenta nuevamente")
+      setError("Error al reiniciar las métricas")
     } finally {
       setImporting(false)
     }
@@ -298,6 +356,119 @@ export function DatabaseManagement() {
 
   const clearSearch = () => {
     setSearchTerm("")
+  }
+
+  const loadMesas = async () => {
+    try {
+      const mesasSnapshot = await getDocs(collection(db, "mesas_config"))
+      const mesasData = mesasSnapshot.docs.map((doc) => ({
+        id: doc.id,
+        numero: doc.data().numero,
+        nombre: doc.data().nombre,
+        activa: doc.data().activa,
+      }))
+      setMesas(mesasData.sort((a, b) => a.numero - b.numero))
+    } catch (error) {
+      console.error("Error al cargar mesas:", error)
+    }
+  }
+
+  const handleResetAllBufetes = async () => {
+    setResetting(true)
+    setError("")
+    setSuccess("")
+
+    try {
+      const batch = writeBatch(db)
+
+      // Reiniciar cuposConsumidos de todas las personas
+      persons.forEach((person) => {
+        if (person.id) {
+          batch.update(doc(db, "personas", person.id), {
+            cuposConsumidos: 0,
+          })
+        }
+      })
+
+      await batch.commit()
+
+      setSuccess(`✅ Todos los bufetes han sido reiniciados exitosamente. ${persons.length} registros actualizados.`)
+      setIsResetBufetesDialogOpen(false)
+      loadPersons()
+    } catch (error) {
+      console.error("Error al reiniciar bufetes:", error)
+      setError("Error al reiniciar los bufetes. Intenta nuevamente")
+    } finally {
+      setResetting(false)
+    }
+  }
+
+  const handleResetBufeteByMesa = async (mesaNumero: number) => {
+    setResetting(true)
+    setError("")
+    setSuccess("")
+
+    try {
+      // Obtener todos los access_logs de la mesa específica con status "granted"
+      const logsQuery = query(
+        collection(db, "access_logs"),
+        where("mesaUsada", "==", mesaNumero),
+        where("status", "==", "granted"),
+      )
+      const logsSnapshot = await getDocs(logsQuery)
+
+      // Extraer identificaciones únicas de los estudiantes que consumieron en esta mesa
+      const identificacionesSet = new Set<string>()
+      logsSnapshot.forEach((doc) => {
+        const data = doc.data()
+        if (data.identificacion) {
+          identificacionesSet.add(data.identificacion)
+        }
+      })
+
+      const identificaciones = Array.from(identificacionesSet)
+
+      if (identificaciones.length === 0) {
+        setSuccess(`No hay consumos registrados para la Mesa ${mesaNumero}`)
+        setIsResetBufetesDialogOpen(false)
+        return
+      }
+
+      // Obtener los documentos de personas con esas identificaciones
+      const batch = writeBatch(db)
+      let updatedCount = 0
+
+      for (const identificacion of identificaciones) {
+        const personQuery = query(collection(db, "personas"), where("identificacion", "==", identificacion))
+        const personSnapshot = await getDocs(personQuery)
+
+        if (!personSnapshot.empty) {
+          const personDoc = personSnapshot.docs[0]
+          const currentCuposConsumidos = personDoc.data().cuposConsumidos || 0
+
+          // Decrementar en 1 el cupo consumido (ya que cada escaneo en esa mesa consumió 1 cupo)
+          const newCuposConsumidos = Math.max(0, currentCuposConsumidos - 1)
+
+          batch.update(doc(db, "personas", personDoc.id), {
+            cuposConsumidos: newCuposConsumidos,
+          })
+          updatedCount++
+        }
+      }
+
+      await batch.commit()
+
+      setSuccess(
+        `✅ Bufete de Mesa ${mesaNumero} reiniciado exitosamente. ${updatedCount} estudiante(s) actualizado(s).`,
+      )
+      setIsResetBufetesDialogOpen(false)
+      loadPersons()
+    } catch (error) {
+      console.error("Error al reiniciar bufete por mesa:", error)
+      setError("Error al reiniciar el bufete. Intenta nuevamente")
+    } finally {
+      setResetting(false)
+    }
   }
 
   // Funciones de paginación
@@ -459,6 +630,89 @@ export function DatabaseManagement() {
               {importing ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <RotateCcw className="w-4 h-4 mr-2" />}
               Reiniciar Métricas
             </Button>
+
+            <Dialog open={isResetBufetesDialogOpen} onOpenChange={setIsResetBufetesDialogOpen}>
+              <DialogTrigger asChild>
+                <Button
+                  variant="outline"
+                  className="w-full sm:w-auto justify-center border-green-200 text-green-700 hover:bg-green-50 bg-transparent"
+                >
+                  <UtensilsCrossed className="w-4 h-4 mr-2" />
+                  Reiniciar Bufetes
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="mx-4 sm:mx-0 sm:max-w-md">
+                <DialogHeader>
+                  <DialogTitle className="text-lg">Reiniciar Bufetes</DialogTitle>
+                  <DialogDescription className="text-sm">
+                    Restaura las comidas consumidas para permitir nuevas entregas
+                  </DialogDescription>
+                </DialogHeader>
+
+                <div className="space-y-4 py-4">
+                  <div className="space-y-3">
+                    <Button
+                      onClick={handleResetAllBufetes}
+                      disabled={resetting}
+                      className="w-full h-11 justify-start bg-transparent"
+                      variant="outline"
+                    >
+                      {resetting ? (
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      ) : (
+                        <RotateCcw className="w-4 h-4 mr-2" />
+                      )}
+                      Reiniciar Todos los Bufetes
+                    </Button>
+
+                    <div className="relative">
+                      <div className="absolute inset-0 flex items-center">
+                        <span className="w-full border-t" />
+                      </div>
+                      <div className="relative flex justify-center text-xs uppercase">
+                        <span className="bg-background px-2 text-muted-foreground">O por mesa</span>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium">Reiniciar por Mesa</Label>
+                      <div className="grid grid-cols-2 gap-2">
+                        {mesas.map((mesa) => (
+                          <Button
+                            key={mesa.id}
+                            onClick={() => handleResetBufeteByMesa(mesa.numero)}
+                            disabled={resetting || !mesa.activa}
+                            variant="outline"
+                            className="h-11 justify-start"
+                          >
+                            {resetting ? (
+                              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                            ) : (
+                              <UtensilsCrossed className="w-4 h-4 mr-2" />
+                            )}
+                            Mesa {mesa.numero}
+                          </Button>
+                        ))}
+                      </div>
+                      {mesas.some((m) => !m.activa) && (
+                        <p className="text-xs text-muted-foreground">* Las mesas inactivas no se pueden reiniciar</p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <DialogFooter>
+                  <Button
+                    variant="ghost"
+                    onClick={() => setIsResetBufetesDialogOpen(false)}
+                    disabled={resetting}
+                    className="w-full"
+                  >
+                    Cancelar
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
           </div>
         </div>
       </header>

@@ -54,6 +54,7 @@ interface StudentStoreContextType {
   checkIfAlreadyScanned: (identificacion: string) => Promise<boolean>
   validateMesaAccess: (identificacion: string, mesaRequerida: number) => Promise<{ valid: boolean; message: string }> // Nueva función para validar mesa
   checkMesaStatus: (mesaNumero: number) => Promise<boolean> // Nueva función para verificar si una mesa está activa
+  checkAccessGranted: (identificacion: string) => Promise<boolean>
 }
 
 const StudentStoreContext = createContext<StudentStoreContextType | undefined>(undefined)
@@ -132,9 +133,36 @@ export function StudentStoreProvider({ children }: { children: React.ReactNode }
     }
   }, [])
 
+  const checkAccessGranted = useCallback(async (identificacion: string): Promise<boolean> => {
+    try {
+      console.log("[v0] Verificando si el estudiante tiene acceso concedido:", identificacion)
+      const q = query(
+        collection(db, "access_logs"),
+        where("identificacion", "==", identificacion),
+        where("status", "==", "granted"),
+      )
+      const querySnapshot = await getDocs(q)
+
+      const hasAccess = !querySnapshot.empty
+      console.log("[v0] Estudiante tiene acceso concedido:", hasAccess)
+      return hasAccess
+    } catch (error) {
+      console.error("Error al verificar acceso concedido:", error)
+      return false
+    }
+  }, [])
+
   const validateMesaAccess = useCallback(
     async (identificacion: string, mesaRequerida: number): Promise<{ valid: boolean; message: string }> => {
       try {
+        const hasAccessGranted = await checkAccessGranted(identificacion)
+        if (!hasAccessGranted) {
+          return {
+            valid: false,
+            message: "El estudiante debe pasar primero por control de acceso antes de reclamar comida.",
+          }
+        }
+
         const mesaActiva = await checkMesaStatus(mesaRequerida)
         if (!mesaActiva) {
           return {
@@ -143,37 +171,29 @@ export function StudentStoreProvider({ children }: { children: React.ReactNode }
           }
         }
 
-        // Obtener estudiante
         const student = await getStudentById(identificacion)
         if (!student) {
           return { valid: false, message: "Estudiante no encontrado en la base de datos" }
         }
 
-        // Verificar si ya fue escaneado
-        const alreadyScanned = await checkIfAlreadyScanned(identificacion)
-        if (alreadyScanned) {
-          return { valid: false, message: "Este estudiante ya fue escaneado anteriormente" }
-        }
-
-        // Calcular cupos disponibles (2 predeterminados + extras)
         const cuposTotales = 2 + student.cuposExtras
         const cuposConsumidos = student.cuposConsumidos || 0
         const cuposDisponibles = cuposTotales - cuposConsumidos
 
         if (cuposDisponibles <= 0) {
-          return { valid: false, message: "No tiene cupos disponibles" }
+          return { valid: false, message: "No tiene cupos disponibles. Ya consumió todas sus comidas." }
         }
 
         return {
           valid: true,
-          message: `Acceso válido. Cupos disponibles: ${cuposDisponibles}/${cuposTotales}`,
+          message: `Comida entregada exitosamente. Cupos restantes: ${cuposDisponibles - 1}/${cuposTotales}`,
         }
       } catch (error) {
         console.error("Error al validar acceso por mesa:", error)
         return { valid: false, message: "Error al validar el acceso" }
       }
     },
-    [getStudentById, checkIfAlreadyScanned, checkMesaStatus],
+    [getStudentById, checkMesaStatus, checkAccessGranted],
   )
 
   const markStudentAccess = useCallback(
@@ -185,7 +205,9 @@ export function StudentStoreProvider({ children }: { children: React.ReactNode }
       userInfo?: UserInfo,
     ) => {
       try {
-        if (granted) {
+        const shouldConsumeCupo = userInfo?.mesaAsignada !== undefined && userInfo?.mesaAsignada !== null
+
+        if (granted && shouldConsumeCupo) {
           const student = await getStudentById(identificacion)
           if (student) {
             const cuposConsumidos = (student.cuposConsumidos || 0) + 1
@@ -194,6 +216,8 @@ export function StudentStoreProvider({ children }: { children: React.ReactNode }
             })
             console.log(`[v0] Cupo consumido para ${identificacion}. Total consumidos: ${cuposConsumidos}`)
           }
+        } else if (granted && !shouldConsumeCupo) {
+          console.log(`[v0] Acceso registrado para ${identificacion} sin consumir cupo (rol admin/operativo)`)
         }
 
         const log: AccessLog = {
@@ -207,7 +231,6 @@ export function StudentStoreProvider({ children }: { children: React.ReactNode }
           grantedByUserEmail: userInfo?.userEmail || "sin-email@sistema.com",
         }
 
-        // Solo agregar mesaUsada si existe y no es undefined
         if (userInfo?.mesaAsignada !== undefined && userInfo?.mesaAsignada !== null) {
           log.mesaUsada = userInfo.mesaAsignada
         }
@@ -217,7 +240,7 @@ export function StudentStoreProvider({ children }: { children: React.ReactNode }
         console.log("Registro de acceso guardado exitosamente")
       } catch (error) {
         console.error("Error al registrar acceso:", error)
-        throw error // Re-lanzar el error para que se maneje en el componente
+        throw error
       }
     },
     [getStudentById],
@@ -243,7 +266,6 @@ export function StudentStoreProvider({ children }: { children: React.ReactNode }
           grantedByUserEmail: userInfo?.userEmail || "sin-email@sistema.com",
         }
 
-        // Solo agregar mesaUsada si existe y no es undefined
         if (userInfo?.mesaAsignada !== undefined && userInfo?.mesaAsignada !== null) {
           log.mesaUsada = userInfo.mesaAsignada
         }
@@ -253,7 +275,7 @@ export function StudentStoreProvider({ children }: { children: React.ReactNode }
         console.log("Registro de acceso Q10 guardado exitosamente")
       } catch (error) {
         console.error("Error al registrar acceso Q10:", error)
-        throw error // Re-lanzar el error para que se maneje en el componente
+        throw error
       }
     },
     [],
@@ -267,7 +289,8 @@ export function StudentStoreProvider({ children }: { children: React.ReactNode }
         markQ10Access,
         checkIfAlreadyScanned,
         validateMesaAccess,
-        checkMesaStatus, // Agregar nueva función al contexto
+        checkMesaStatus,
+        checkAccessGranted,
       }}
     >
       {children}
