@@ -15,6 +15,8 @@ import {
 } from "@/components/ui/breadcrumb"
 import { useRouter } from "next/navigation"
 import { useEffect } from "react"
+import { collection, query, where, onSnapshot } from "firebase/firestore"
+import { db } from "@/lib/firebase"
 
 // Importar todos los componentes de las vistas
 import { DashboardStats } from "@/components/dashboard-stats"
@@ -43,6 +45,8 @@ export function SPADashboard({ initialView = "inicio" }: SPADashboardProps) {
   const { user, loading, userRole, isAdmin, isBufete, mesaAsignada } = useAuth()
   const router = useRouter()
   const [currentView, setCurrentView] = useState<ViewType>(initialView)
+  const [estudiantesAtendidos, setEstudiantesAtendidos] = useState(0)
+  const [mesaActiva, setMesaActiva] = useState(true)
 
   useEffect(() => {
     if (!loading && user && userRole === "operativo") {
@@ -55,6 +59,49 @@ export function SPADashboard({ initialView = "inicio" }: SPADashboardProps) {
       router.push("/")
     }
   }, [user, loading, router])
+
+  useEffect(() => {
+    if (!isBufete || !mesaAsignada) {
+      return
+    }
+
+    console.log("[v0] Setting up real-time listener for mesa", mesaAsignada)
+
+    const logsQuery = query(
+      collection(db, "access_logs"),
+      where("mesaUsada", "==", mesaAsignada),
+      where("status", "==", "granted"),
+    )
+
+    const unsubscribe = onSnapshot(logsQuery, (snapshot) => {
+      const count = snapshot.size
+      console.log("[v0] Meals delivered count updated:", count)
+      setEstudiantesAtendidos(count)
+    })
+
+    return () => unsubscribe()
+  }, [isBufete, mesaAsignada])
+
+  useEffect(() => {
+    if (!isBufete || !mesaAsignada) {
+      return
+    }
+
+    console.log("[v0] Setting up real-time listener for mesa status", mesaAsignada)
+
+    const mesaConfigQuery = query(collection(db, "mesas_config"), where("numero", "==", mesaAsignada))
+
+    const unsubscribe = onSnapshot(mesaConfigQuery, (snapshot) => {
+      if (!snapshot.empty) {
+        const mesaData = snapshot.docs[0].data()
+        const isActive = mesaData.activa ?? true
+        console.log("[v0] Mesa active status updated:", isActive)
+        setMesaActiva(isActive)
+      }
+    })
+
+    return () => unsubscribe()
+  }, [isBufete, mesaAsignada])
 
   if (loading) {
     return (
@@ -159,11 +206,13 @@ export function SPADashboard({ initialView = "inicio" }: SPADashboardProps) {
               </div>
               <div className="aspect-video rounded-xl bg-muted/50 p-4">
                 <h3 className="font-semibold mb-2">Estado</h3>
-                <div className="text-lg font-medium text-green-600">Activo</div>
+                <div className={`text-lg font-medium ${mesaActiva ? "text-green-600" : "text-red-600"}`}>
+                  {mesaActiva ? "Activo" : "Inactivo"}
+                </div>
               </div>
               <div className="aspect-video rounded-xl bg-muted/50 p-4">
                 <h3 className="font-semibold mb-2">Estudiantes Atendidos</h3>
-                <div className="text-2xl font-bold">0</div>
+                <div className="text-2xl font-bold">{estudiantesAtendidos}</div>
               </div>
             </div>
             <div className="min-h-[100vh] flex-1 rounded-xl bg-muted/50 p-4">

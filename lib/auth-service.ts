@@ -6,7 +6,8 @@ import CryptoJS from "crypto-js"
 
 export interface User {
   id: string
-  email: string
+  idNumber: string
+  fullName: string
   role: "administrador" | "operativo" | "bufete"
   mesaAsignada?: number
   createdAt: string
@@ -22,12 +23,12 @@ const DEFAULT_PASSWORD = "Uparsistem123"
 const DEFAULT_PASSWORD_HASH = hashPassword(DEFAULT_PASSWORD)
 
 // Función para validar login
-export const validateLogin = async (email: string, password: string): Promise<User | null> => {
+export const validateLogin = async (idNumber: string, password: string): Promise<User | null> => {
   try {
     const hashedPassword = hashPassword(password)
 
-    // Buscar usuario por email y contraseña
-    const q = query(collection(db, "users"), where("email", "==", email), where("password", "==", hashedPassword))
+    // Buscar usuario por número de identificación y contraseña
+    const q = query(collection(db, "users"), where("idNumber", "==", idNumber), where("password", "==", hashedPassword))
 
     const querySnapshot = await getDocs(q)
 
@@ -42,7 +43,8 @@ export const validateLogin = async (email: string, password: string): Promise<Us
 
     return {
       id: userDoc.id,
-      email: userData.email,
+      idNumber: userData.idNumber,
+      fullName: userData.fullName,
       role: userData.role,
       mesaAsignada: userData.mesaAsignada,
       createdAt: userData.createdAt,
@@ -56,7 +58,8 @@ export const validateLogin = async (email: string, password: string): Promise<Us
 
 // Función para crear usuario
 export const createUser = async (
-  email: string,
+  idNumber: string,
+  fullName: string,
   password: string,
   role: "administrador" | "operativo" | "bufete",
   mesaAsignada?: number,
@@ -65,7 +68,7 @@ export const createUser = async (
     const hashedPassword = hashPassword(password)
 
     // Verificar si el usuario ya existe
-    const q = query(collection(db, "users"), where("email", "==", email))
+    const q = query(collection(db, "users"), where("idNumber", "==", idNumber))
     const querySnapshot = await getDocs(q)
 
     if (!querySnapshot.empty) {
@@ -73,7 +76,8 @@ export const createUser = async (
     }
 
     const userData: any = {
-      email,
+      idNumber,
+      fullName,
       password: hashedPassword,
       role,
       createdAt: new Date().toISOString(),
@@ -117,14 +121,70 @@ export const changePassword = async (userId: string, newPassword: string): Promi
   }
 }
 
-// Función para verificar si existe un usuario por email
-export const checkUserExists = async (email: string): Promise<boolean> => {
+// Función para verificar si existe un usuario por número de identificación
+export const checkUserExists = async (idNumber: string): Promise<boolean> => {
   try {
-    const q = query(collection(db, "users"), where("email", "==", email))
+    const q = query(collection(db, "users"), where("idNumber", "==", idNumber))
     const querySnapshot = await getDocs(q)
     return !querySnapshot.empty
   } catch (error) {
     console.error("Error al verificar usuario:", error)
     return false
+  }
+}
+
+export const checkIdType = async (
+  idNumber: string,
+): Promise<{ type: "admin" | "student" | "none"; userData?: any }> => {
+  try {
+    console.log("[v0] Verificando tipo de ID:", idNumber)
+
+    const usersQuery = query(collection(db, "users"), where("idNumber", "==", idNumber))
+    const usersSnapshot = await getDocs(usersQuery)
+
+    console.log("[v0] Usuarios encontrados:", usersSnapshot.size)
+
+    if (!usersSnapshot.empty) {
+      const userData = usersSnapshot.docs[0].data()
+      console.log("[v0] Usuario admin encontrado:", userData)
+      return {
+        type: "admin",
+        userData: {
+          id: usersSnapshot.docs[0].id,
+          idNumber: userData.idNumber,
+          fullName: userData.fullName,
+          role: userData.role,
+          mesaAsignada: userData.mesaAsignada,
+        },
+      }
+    }
+
+    const studentsQuery = query(collection(db, "personas"), where("identificacion", "==", idNumber))
+    const studentsSnapshot = await getDocs(studentsQuery)
+
+    console.log("[v0] Estudiantes encontrados:", studentsSnapshot.size)
+
+    if (!studentsSnapshot.empty) {
+      const studentData = studentsSnapshot.docs[0].data()
+      console.log("[v0] Estudiante encontrado:", studentData)
+      return {
+        type: "student",
+        userData: {
+          id: studentsSnapshot.docs[0].id,
+          identificacion: studentData.identificacion,
+          nombre: studentData.nombre,
+          programa: studentData.programa,
+          puesto: studentData.puesto,
+          cuposExtras: studentData.cuposExtras || 0,
+          cuposConsumidos: studentData.cuposConsumidos || 0,
+        },
+      }
+    }
+
+    console.log("[v0] No se encontró ningún usuario con ID:", idNumber)
+    return { type: "none" }
+  } catch (error) {
+    console.error("[v0] Error al verificar tipo de ID:", error)
+    return { type: "none" }
   }
 }

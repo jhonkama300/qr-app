@@ -381,7 +381,6 @@ export function DatabaseManagement() {
     try {
       const batch = writeBatch(db)
 
-      // Reiniciar cuposConsumidos de todas las personas
       persons.forEach((person) => {
         if (person.id) {
           batch.update(doc(db, "personas", person.id), {
@@ -392,7 +391,26 @@ export function DatabaseManagement() {
 
       await batch.commit()
 
-      setSuccess(`✅ Todos los bufetes han sido reiniciados exitosamente. ${persons.length} registros actualizados.`)
+      const logsQuery = query(collection(db, "access_logs"), where("status", "==", "granted"))
+      const logsSnapshot = await getDocs(logsQuery)
+
+      const deleteBatch = writeBatch(db)
+      let deletedCount = 0
+
+      logsSnapshot.forEach((docSnapshot) => {
+        const data = docSnapshot.data()
+        // Solo eliminar logs que tienen mesaUsada (son de bufetes)
+        if (data.mesaUsada !== undefined && data.mesaUsada !== null) {
+          deleteBatch.delete(docSnapshot.ref)
+          deletedCount++
+        }
+      })
+
+      await deleteBatch.commit()
+
+      setSuccess(
+        `✅ Todos los bufetes han sido reiniciados exitosamente. ${persons.length} estudiantes actualizados, ${deletedCount} registros de comidas eliminados.`,
+      )
       setIsResetBufetesDialogOpen(false)
       loadPersons()
     } catch (error) {
@@ -409,7 +427,6 @@ export function DatabaseManagement() {
     setSuccess("")
 
     try {
-      // Obtener todos los access_logs de la mesa específica con status "granted"
       const logsQuery = query(
         collection(db, "access_logs"),
         where("mesaUsada", "==", mesaNumero),
@@ -417,28 +434,25 @@ export function DatabaseManagement() {
       )
       const logsSnapshot = await getDocs(logsQuery)
 
-      // Extraer identificaciones únicas de los estudiantes que consumieron en esta mesa
-      const identificacionesSet = new Set<string>()
-      logsSnapshot.forEach((doc) => {
-        const data = doc.data()
-        if (data.identificacion) {
-          identificacionesSet.add(data.identificacion)
-        }
-      })
-
-      const identificaciones = Array.from(identificacionesSet)
-
-      if (identificaciones.length === 0) {
+      if (logsSnapshot.empty) {
         setSuccess(`No hay consumos registrados para la Mesa ${mesaNumero}`)
         setIsResetBufetesDialogOpen(false)
         return
       }
 
-      // Obtener los documentos de personas con esas identificaciones
+      const consumosPorEstudiante = new Map<string, number>()
+      logsSnapshot.forEach((doc) => {
+        const data = doc.data()
+        if (data.identificacion) {
+          const count = consumosPorEstudiante.get(data.identificacion) || 0
+          consumosPorEstudiante.set(data.identificacion, count + 1)
+        }
+      })
+
       const batch = writeBatch(db)
       let updatedCount = 0
 
-      for (const identificacion of identificaciones) {
+      for (const [identificacion, consumosEnMesa] of consumosPorEstudiante.entries()) {
         const personQuery = query(collection(db, "personas"), where("identificacion", "==", identificacion))
         const personSnapshot = await getDocs(personQuery)
 
@@ -446,8 +460,8 @@ export function DatabaseManagement() {
           const personDoc = personSnapshot.docs[0]
           const currentCuposConsumidos = personDoc.data().cuposConsumidos || 0
 
-          // Decrementar en 1 el cupo consumido (ya que cada escaneo en esa mesa consumió 1 cupo)
-          const newCuposConsumidos = Math.max(0, currentCuposConsumidos - 1)
+          // Restar los consumos de esta mesa específica
+          const newCuposConsumidos = Math.max(0, currentCuposConsumidos - consumosEnMesa)
 
           batch.update(doc(db, "personas", personDoc.id), {
             cuposConsumidos: newCuposConsumidos,
@@ -458,8 +472,14 @@ export function DatabaseManagement() {
 
       await batch.commit()
 
+      const deleteBatch = writeBatch(db)
+      logsSnapshot.forEach((docSnapshot) => {
+        deleteBatch.delete(docSnapshot.ref)
+      })
+      await deleteBatch.commit()
+
       setSuccess(
-        `✅ Bufete de Mesa ${mesaNumero} reiniciado exitosamente. ${updatedCount} estudiante(s) actualizado(s).`,
+        `✅ Bufete de Mesa ${mesaNumero} reiniciado exitosamente. ${updatedCount} estudiante(s) actualizado(s), ${logsSnapshot.size} registro(s) de comidas eliminados.`,
       )
       setIsResetBufetesDialogOpen(false)
       loadPersons()

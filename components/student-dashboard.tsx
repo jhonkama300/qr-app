@@ -1,0 +1,322 @@
+"use client"
+
+import { useState, useEffect } from "react"
+import { useStudentAuth } from "@/components/student-auth-provider"
+import { getStudentInfo } from "@/lib/student-auth-service"
+import { collection, query, where, getDocs } from "firebase/firestore"
+import { db } from "@/lib/firebase"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import {
+  Loader2,
+  GraduationCap,
+  Award as IdCard,
+  BookOpen,
+  Armchair,
+  UtensilsCrossed,
+  LogOut,
+  RefreshCw,
+  CheckCircle2,
+  XCircle,
+} from "lucide-react"
+import { useRouter } from "next/navigation"
+
+interface AccessLog {
+  timestamp: string
+  status: "granted" | "denied" | "q10_success" | "q10_failed"
+  details?: string
+  mesaUsada?: number
+}
+
+export default function StudentDashboard() {
+  const { student, logout } = useStudentAuth()
+  const router = useRouter()
+  const [loading, setLoading] = useState(false)
+  const [refreshing, setRefreshing] = useState(false)
+  const [studentInfo, setStudentInfo] = useState(student)
+  const [accessLogs, setAccessLogs] = useState<AccessLog[]>([])
+  const [loadingLogs, setLoadingLogs] = useState(true)
+
+  useEffect(() => {
+    if (!student) {
+      router.push("/student/login")
+    } else {
+      loadAccessLogs()
+    }
+  }, [student, router])
+
+  const loadAccessLogs = async () => {
+    if (!student) return
+
+    try {
+      setLoadingLogs(true)
+      const q = query(collection(db, "access_logs"), where("identificacion", "==", student.identificacion))
+      const querySnapshot = await getDocs(q)
+
+      const logs: AccessLog[] = []
+      querySnapshot.forEach((doc) => {
+        const data = doc.data()
+        logs.push({
+          timestamp: data.timestamp,
+          status: data.status,
+          details: data.details,
+          mesaUsada: data.mesaUsada,
+        })
+      })
+
+      // Ordenar por fecha más reciente
+      logs.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+      setAccessLogs(logs.slice(0, 5)) // Mostrar solo los últimos 5 registros
+    } catch (error) {
+      console.error("Error al cargar registros de acceso:", error)
+    } finally {
+      setLoadingLogs(false)
+    }
+  }
+
+  const handleRefresh = async () => {
+    if (!student) return
+
+    setRefreshing(true)
+    try {
+      const updatedInfo = await getStudentInfo(student.identificacion)
+      if (updatedInfo) {
+        setStudentInfo(updatedInfo)
+        localStorage.setItem("currentStudent", JSON.stringify(updatedInfo))
+      }
+      await loadAccessLogs()
+    } catch (error) {
+      console.error("Error al actualizar información:", error)
+    } finally {
+      setRefreshing(false)
+    }
+  }
+
+  const handleLogout = () => {
+    logout()
+    router.push("/student/login")
+  }
+
+  if (!studentInfo) {
+    return (
+      <main className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-blue-100 to-blue-200">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-2 text-blue-600" />
+          <p className="text-blue-700">Cargando información...</p>
+        </div>
+      </main>
+    )
+  }
+
+  const cuposTotales = 2 + studentInfo.cuposExtras
+  const cuposDisponibles = cuposTotales - studentInfo.cuposConsumidos
+  const porcentajeUsado = (studentInfo.cuposConsumidos / cuposTotales) * 100
+
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case "granted":
+        return <CheckCircle2 className="w-4 h-4 text-green-600" />
+      case "denied":
+        return <XCircle className="w-4 h-4 text-red-600" />
+      case "q10_success":
+        return <CheckCircle2 className="w-4 h-4 text-blue-600" />
+      case "q10_failed":
+        return <XCircle className="w-4 h-4 text-orange-600" />
+      default:
+        return null
+    }
+  }
+
+  const getStatusText = (status: string) => {
+    switch (status) {
+      case "granted":
+        return "Acceso Concedido"
+      case "denied":
+        return "Acceso Denegado"
+      case "q10_success":
+        return "Validación Q10 Exitosa"
+      case "q10_failed":
+        return "Validación Q10 Fallida"
+      default:
+        return status
+    }
+  }
+
+  return (
+    <main className="min-h-screen bg-gradient-to-br from-blue-50 via-blue-100 to-blue-200 p-3 sm:p-4">
+      <div className="max-w-4xl mx-auto space-y-4">
+        {/* Header */}
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center shadow-lg">
+              <GraduationCap className="w-6 h-6 text-white" />
+            </div>
+            <div>
+              <h1 className="text-xl font-bold text-blue-900">Portal de Estudiantes</h1>
+              <p className="text-sm text-blue-700">Bienvenido, {studentInfo.nombre.split(" ")[0]}</p>
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleRefresh}
+              disabled={refreshing}
+              className="bg-white/80 hover:bg-white"
+            >
+              <RefreshCw className={`w-4 h-4 ${refreshing ? "animate-spin" : ""}`} />
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleLogout}
+              className="bg-white/80 hover:bg-white text-red-600 hover:text-red-700"
+            >
+              <LogOut className="w-4 h-4" />
+            </Button>
+          </div>
+        </div>
+
+        {/* Información Personal */}
+        <Card className="bg-white/95 backdrop-blur-sm shadow-xl">
+          <CardHeader>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <IdCard className="w-5 h-5 text-blue-600" />
+              Información Personal
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <p className="text-xs text-muted-foreground">Nombre Completo</p>
+                <p className="font-medium text-sm">{studentInfo.nombre}</p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-xs text-muted-foreground">Identificación</p>
+                <p className="font-medium text-sm">{studentInfo.identificacion}</p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-xs text-muted-foreground">Programa</p>
+                <p className="font-medium text-sm flex items-center gap-2">
+                  <BookOpen className="w-4 h-4 text-blue-600" />
+                  {studentInfo.programa}
+                </p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-xs text-muted-foreground">Silla Asignada</p>
+                <p className="font-medium text-sm flex items-center gap-2">
+                  <Armchair className="w-4 h-4 text-blue-600" />
+                  {studentInfo.puesto}
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Cupos de Comida */}
+        <Card className="bg-white/95 backdrop-blur-sm shadow-xl">
+          <CardHeader>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <UtensilsCrossed className="w-5 h-5 text-blue-600" />
+              Cupos de Comida
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              <div className="text-center p-3 bg-blue-50 rounded-lg">
+                <p className="text-2xl font-bold text-blue-600">{cuposTotales}</p>
+                <p className="text-xs text-muted-foreground">Total</p>
+              </div>
+              <div className="text-center p-3 bg-green-50 rounded-lg">
+                <p className="text-2xl font-bold text-green-600">{cuposDisponibles}</p>
+                <p className="text-xs text-muted-foreground">Disponibles</p>
+              </div>
+              <div className="text-center p-3 bg-orange-50 rounded-lg col-span-2 sm:col-span-1">
+                <p className="text-2xl font-bold text-orange-600">{studentInfo.cuposConsumidos}</p>
+                <p className="text-xs text-muted-foreground">Consumidos</p>
+              </div>
+            </div>
+
+            {/* Barra de progreso */}
+            <div className="space-y-2">
+              <div className="flex justify-between text-xs text-muted-foreground">
+                <span>Uso de cupos</span>
+                <span>{Math.round(porcentajeUsado)}%</span>
+              </div>
+              <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
+                <div
+                  className={`h-full transition-all duration-500 ${
+                    porcentajeUsado < 50 ? "bg-green-500" : porcentajeUsado < 80 ? "bg-yellow-500" : "bg-red-500"
+                  }`}
+                  style={{ width: `${Math.min(porcentajeUsado, 100)}%` }}
+                />
+              </div>
+            </div>
+
+            {cuposDisponibles === 0 && (
+              <Alert variant="destructive" className="bg-red-50 border-red-200">
+                <AlertDescription className="text-sm">
+                  Has consumido todos tus cupos de comida disponibles.
+                </AlertDescription>
+              </Alert>
+            )}
+
+            {cuposDisponibles > 0 && cuposDisponibles <= 2 && (
+              <Alert className="bg-yellow-50 border-yellow-200">
+                <AlertDescription className="text-sm text-yellow-800">
+                  Te quedan pocos cupos disponibles. Úsalos sabiamente.
+                </AlertDescription>
+              </Alert>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Historial de Acceso */}
+        <Card className="bg-white/95 backdrop-blur-sm shadow-xl">
+          <CardHeader>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <CheckCircle2 className="w-5 h-5 text-blue-600" />
+              Historial de Acceso
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {loadingLogs ? (
+              <div className="text-center py-8">
+                <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2 text-blue-600" />
+                <p className="text-sm text-muted-foreground">Cargando historial...</p>
+              </div>
+            ) : accessLogs.length === 0 ? (
+              <div className="text-center py-8">
+                <p className="text-sm text-muted-foreground">No hay registros de acceso aún</p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {accessLogs.map((log, index) => (
+                  <div key={index} className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg">
+                    <div className="mt-0.5">{getStatusIcon(log.status)}</div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between gap-2 mb-1">
+                        <p className="text-sm font-medium">{getStatusText(log.status)}</p>
+                        <p className="text-xs text-muted-foreground whitespace-nowrap">
+                          {new Date(log.timestamp).toLocaleDateString("es-ES", {
+                            day: "2-digit",
+                            month: "short",
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}
+                        </p>
+                      </div>
+                      {log.details && <p className="text-xs text-muted-foreground">{log.details}</p>}
+                      {log.mesaUsada && <p className="text-xs text-blue-600 mt-1">Mesa {log.mesaUsada}</p>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    </main>
+  )
+}

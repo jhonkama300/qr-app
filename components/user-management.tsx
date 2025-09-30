@@ -21,11 +21,12 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
-import { Loader2, Plus, Trash2, Shield, User, Mail, Scale, KeyRound } from "lucide-react"
+import { Loader2, Plus, Trash2, Shield, User, Award as IdCard, Scale, KeyRound } from "lucide-react"
 
 interface UserData {
   id: string
-  email: string
+  idNumber: string
+  fullName: string
   role: "administrador" | "operativo" | "bufete"
   mesaAsignada?: number
   createdAt: string
@@ -43,7 +44,8 @@ export function UserManagement() {
   const [mesasActivas, setMesasActivas] = useState<number[]>([])
 
   const [newUser, setNewUser] = useState({
-    email: "",
+    idNumber: "",
+    fullName: "",
     password: "",
     role: "operativo" as "administrador" | "operativo" | "bufete",
     mesaAsignada: 1,
@@ -84,7 +86,8 @@ export function UserManagement() {
         const data = doc.data()
         usersData.push({
           id: doc.id,
-          email: data.email,
+          idNumber: data.idNumber,
+          fullName: data.fullName,
           role: data.role,
           mesaAsignada: data.mesaAsignada,
           createdAt: data.createdAt,
@@ -115,13 +118,14 @@ export function UserManagement() {
       }
 
       await createUser(
-        newUser.email,
+        newUser.idNumber,
+        newUser.fullName,
         newUser.password,
         newUser.role,
         newUser.role === "bufete" ? newUser.mesaAsignada : undefined,
       )
-      setSuccess(`Usuario ${newUser.email} creado exitosamente`)
-      setNewUser({ email: "", password: "", role: "operativo", mesaAsignada: 1 })
+      setSuccess(`Usuario ${newUser.fullName} creado exitosamente`)
+      setNewUser({ idNumber: "", fullName: "", password: "", role: "operativo", mesaAsignada: 1 })
       setIsDialogOpen(false)
       loadUsers()
     } catch (error: any) {
@@ -132,14 +136,14 @@ export function UserManagement() {
     }
   }
 
-  const handleDeleteUser = async (userId: string, email: string) => {
-    if (!confirm(`¿Estás seguro de eliminar al usuario ${email}?`)) {
+  const handleDeleteUser = async (userId: string, fullName: string) => {
+    if (!confirm(`¿Estás seguro de eliminar al usuario ${fullName}?`)) {
       return
     }
 
     try {
       await deleteDoc(doc(db, "users", userId))
-      setSuccess(`Usuario ${email} eliminado exitosamente`)
+      setSuccess(`Usuario ${fullName} eliminado exitosamente`)
       loadUsers()
     } catch (error) {
       console.error("Error al eliminar usuario:", error)
@@ -183,9 +187,9 @@ export function UserManagement() {
     }
   }
 
-  const handleResetPassword = async (userId: string, email: string) => {
+  const handleResetPassword = async (userId: string, fullName: string) => {
     if (
-      !confirm(`¿Estás seguro de restaurar la contraseña de ${email}? Se establecerá la contraseña predeterminada.`)
+      !confirm(`¿Estás seguro de restaurar la contraseña de ${fullName}? Se establecerá la contraseña predeterminada.`)
     ) {
       return
     }
@@ -193,7 +197,7 @@ export function UserManagement() {
     setResettingPassword(userId)
     try {
       await resetUserPassword(userId)
-      setSuccess(`Contraseña de ${email} restaurada exitosamente. Nueva contraseña: Uparsistem123`)
+      setSuccess(`Contraseña de ${fullName} restaurada exitosamente. Nueva contraseña: Uparsistem123`)
     } catch (error) {
       console.error("Error al restaurar contraseña:", error)
       setError("Error al restaurar la contraseña")
@@ -259,15 +263,32 @@ export function UserManagement() {
             <form onSubmit={handleCreateUser}>
               <div className="space-y-4 py-4">
                 <div className="space-y-2">
-                  <Label htmlFor="email">Correo Electrónico</Label>
+                  <Label htmlFor="idNumber">Número de Identificación</Label>
                   <div className="relative">
-                    <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                    <IdCard className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                     <Input
-                      id="email"
-                      type="email"
-                      placeholder="usuario@ejemplo.com"
-                      value={newUser.email}
-                      onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
+                      id="idNumber"
+                      type="text"
+                      placeholder="1234567890"
+                      value={newUser.idNumber}
+                      onChange={(e) => setNewUser({ ...newUser, idNumber: e.target.value })}
+                      className="pl-10"
+                      required
+                      disabled={creating}
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="fullName">Nombre Completo</Label>
+                  <div className="relative">
+                    <User className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                    <Input
+                      id="fullName"
+                      type="text"
+                      placeholder="Juan Pérez"
+                      value={newUser.fullName}
+                      onChange={(e) => setNewUser({ ...newUser, fullName: e.target.value })}
                       className="pl-10"
                       required
                       disabled={creating}
@@ -410,9 +431,11 @@ export function UserManagement() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">
-                        <p className="font-medium text-sm truncate">{user.email}</p>
+                        <p className="font-medium text-sm truncate">{user.fullName}</p>
                       </div>
                       <div className="flex items-center gap-2 text-xs text-muted-foreground mb-2">
+                        <span>ID: {user.idNumber}</span>
+                        <span>•</span>
                         <span>{new Date(user.createdAt).toLocaleDateString()}</span>
                       </div>
                       <div className="flex items-center gap-2">
@@ -497,7 +520,7 @@ export function UserManagement() {
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => handleResetPassword(user.id, user.email)}
+                        onClick={() => handleResetPassword(user.id, user.fullName)}
                         disabled={resettingPassword === user.id}
                         className="flex-1 h-8 text-xs"
                       >
@@ -511,7 +534,7 @@ export function UserManagement() {
                       <Button
                         variant="destructive"
                         size="sm"
-                        onClick={() => handleDeleteUser(user.id, user.email)}
+                        onClick={() => handleDeleteUser(user.id, user.fullName)}
                         className="h-8 px-3"
                       >
                         <Trash2 className="w-3 h-3" />
