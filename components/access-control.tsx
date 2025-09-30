@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { collection, getDocs, query, orderBy } from "firebase/firestore"
+import { collection, query, orderBy, onSnapshot } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -14,7 +14,6 @@ import {
   XCircle,
   Users,
   Search,
-  RefreshCw,
   User,
   Loader2,
   ChevronLeft,
@@ -26,6 +25,7 @@ import {
   Briefcase,
   GraduationCap,
   Plus,
+  Activity,
 } from "lucide-react"
 
 interface PersonData {
@@ -61,42 +61,64 @@ export function AccessControl() {
   const [itemsPerPage, setItemsPerPage] = useState(10)
 
   useEffect(() => {
-    loadData()
-  }, [])
-
-  const loadData = async () => {
     setLoading(true)
     setError(null)
-    try {
-      // Cargar todas las personas
-      const personsSnapshot = await getDocs(collection(db, "personas"))
-      const personsData: PersonData[] = []
-      personsSnapshot.forEach((doc) => {
-        personsData.push({
-          id: doc.id,
-          ...doc.data(),
-        } as PersonData)
-      })
-      setAllPersons(personsData)
 
-      // Cargar logs de acceso ordenados por timestamp descendente
+    try {
+      // Real-time listener for personas collection
+      const personsUnsubscribe = onSnapshot(
+        collection(db, "personas"),
+        (snapshot) => {
+          const personsData: PersonData[] = []
+          snapshot.forEach((doc) => {
+            personsData.push({
+              id: doc.id,
+              ...doc.data(),
+            } as PersonData)
+          })
+          setAllPersons(personsData)
+          console.log("[v0] Personas actualizadas en tiempo real:", personsData.length)
+        },
+        (err) => {
+          console.error("Error al escuchar personas:", err)
+          setError("Error al cargar las personas del sistema.")
+        },
+      )
+
+      // Real-time listener for access_logs collection
       const logsQuery = query(collection(db, "access_logs"), orderBy("timestamp", "desc"))
-      const logsSnapshot = await getDocs(logsQuery)
-      const logsData: AccessLog[] = []
-      logsSnapshot.forEach((doc) => {
-        logsData.push({
-          id: doc.id,
-          ...doc.data(),
-        } as AccessLog)
-      })
-      setAccessLogs(logsData)
+      const logsUnsubscribe = onSnapshot(
+        logsQuery,
+        (snapshot) => {
+          const logsData: AccessLog[] = []
+          snapshot.forEach((doc) => {
+            logsData.push({
+              id: doc.id,
+              ...doc.data(),
+            } as AccessLog)
+          })
+          setAccessLogs(logsData)
+          setLoading(false)
+          console.log("[v0] Logs de acceso actualizados en tiempo real:", logsData.length)
+        },
+        (err) => {
+          console.error("Error al escuchar logs:", err)
+          setError("Error al cargar los logs de acceso.")
+          setLoading(false)
+        },
+      )
+
+      // Cleanup function to unsubscribe from both listeners
+      return () => {
+        personsUnsubscribe()
+        logsUnsubscribe()
+      }
     } catch (err) {
-      console.error("Error al cargar datos:", err)
-      setError("Error al cargar los datos del sistema.")
-    } finally {
+      console.error("Error al configurar listeners:", err)
+      setError("Error al configurar actualizaciones en tiempo real.")
       setLoading(false)
     }
-  }
+  }, [])
 
   // Filtrar logs únicos por identificación (solo el más reciente de cada persona)
   const getUniqueAccessLogs = () => {
@@ -201,13 +223,14 @@ export function AccessControl() {
       <header className="flex flex-col space-y-3 sm:flex-row sm:items-center sm:justify-between sm:space-y-0">
         <div>
           <h1 className="text-xl sm:text-2xl font-bold">Control de Acceso</h1>
-          <p className="text-muted-foreground text-sm">Monitoreo de accesos al sistema</p>
+          <p className="text-muted-foreground text-sm">Monitoreo en tiempo real de accesos al sistema</p>
         </div>
-        <Button onClick={loadData} variant="outline" size="sm" className="w-full sm:w-auto bg-transparent">
-          <RefreshCw className="w-4 h-4 mr-2" />
-          <span className="sm:hidden">Actualizar</span>
-          <span className="hidden sm:inline">Actualizar</span>
-        </Button>
+        <div className="flex items-center gap-2">
+          <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+            <Activity className="w-3 h-3 mr-1" />
+            Actualización automática
+          </Badge>
+        </div>
       </header>
 
       {error && (

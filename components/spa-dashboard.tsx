@@ -45,6 +45,12 @@ export function SPADashboard({ initialView = "inicio" }: SPADashboardProps) {
   const [currentView, setCurrentView] = useState<ViewType>(initialView)
 
   useEffect(() => {
+    if (!loading && user && userRole === "operativo") {
+      setCurrentView("escanear")
+    }
+  }, [user, loading, userRole])
+
+  useEffect(() => {
     if (!loading && !user) {
       router.push("/")
     }
