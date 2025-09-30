@@ -61,10 +61,17 @@ export function DatabaseManagement() {
   const [searchTerm, setSearchTerm] = useState("")
 
   const [selectedPrograma, setSelectedPrograma] = useState<string>("")
+  const [selectedCuposExtras, setSelectedCuposExtras] = useState<string>("")
 
   // Estados para paginación
   const [currentPage, setCurrentPage] = useState(1)
   const [itemsPerPage, setItemsPerPage] = useState(10)
+
+  const totalPages = Math.ceil(filteredPersons.length / itemsPerPage)
+  const startIndex = (currentPage - 1) * itemsPerPage
+  const endIndex = startIndex + itemsPerPage
+  const currentPersons = filteredPersons.slice(startIndex, endIndex)
+  const uniquePrograms = Array.from(new Set(persons.map((person) => person.programa)))
 
   useEffect(() => {
     loadPersons()
@@ -89,25 +96,27 @@ export function DatabaseManagement() {
       filtered = filtered.filter((person) => person.programa === selectedPrograma)
     }
 
+    // Filtro por cupos extras
+    if (selectedCuposExtras && selectedCuposExtras !== "todos") {
+      if (selectedCuposExtras === "con-extras") {
+        filtered = filtered.filter((person) => (person.cuposExtras || 0) > 0)
+      } else if (selectedCuposExtras === "sin-extras") {
+        filtered = filtered.filter((person) => (person.cuposExtras || 0) === 0)
+      }
+    }
+
     setFilteredPersons(filtered)
     // Resetear a la primera página cuando se filtra
     setCurrentPage(1)
-  }, [searchTerm, selectedPrograma, persons])
-
-  // Calcular datos de paginación
-  const totalPages = Math.ceil(filteredPersons.length / itemsPerPage)
-  const startIndex = (currentPage - 1) * itemsPerPage
-  const endIndex = startIndex + itemsPerPage
-  const currentPersons = filteredPersons.slice(startIndex, endIndex)
-
-  const uniquePrograms = Array.from(new Set(persons.map((p) => p.programa).filter(Boolean))).sort()
+  }, [searchTerm, selectedPrograma, selectedCuposExtras, persons])
 
   const clearAllFilters = () => {
     setSearchTerm("")
     setSelectedPrograma("")
+    setSelectedCuposExtras("")
   }
 
-  const hasActiveFilters = searchTerm || selectedPrograma
+  const hasActiveFilters = searchTerm || selectedPrograma || selectedCuposExtras
 
   const loadPersons = async () => {
     try {
@@ -494,7 +503,7 @@ export function DatabaseManagement() {
             )}
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div className="space-y-2">
               <Label className="text-sm font-medium">Programa</Label>
               <Select value={selectedPrograma} onValueChange={setSelectedPrograma}>
@@ -512,6 +521,20 @@ export function DatabaseManagement() {
                       <span className="block text-sm">{programa}</span>
                     </SelectItem>
                   ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">Cupos Extras</Label>
+              <Select value={selectedCuposExtras} onValueChange={setSelectedCuposExtras}>
+                <SelectTrigger className="h-11">
+                  <SelectValue placeholder="Todos" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todos">Todos</SelectItem>
+                  <SelectItem value="con-extras">Con cupos extras</SelectItem>
+                  <SelectItem value="sin-extras">Sin cupos extras</SelectItem>
                 </SelectContent>
               </Select>
             </div>

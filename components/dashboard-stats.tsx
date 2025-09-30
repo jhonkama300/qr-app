@@ -282,7 +282,7 @@ export function DashboardStats() {
 
   if (loading) {
     return (
-      <div className="flex flex-1 flex-col gap-4 p-4">
+      <div className="flex flex-1 flex-col gap-4 md:gap-6 p-2 md:p-4 px-1">
         <div className="flex items-center justify-center min-h-[400px] text-foreground">
           <div className="text-center">
             <Loader2 className="h-8 w-8 animate-spin mx-auto mb-2" />
@@ -294,15 +294,15 @@ export function DashboardStats() {
   }
 
   return (
-    <div className="flex flex-1 flex-col gap-4 md:gap-6 p-2 md:p-4">
+    <div className="flex flex-1 flex-col gap-3 md:gap-6 p-2 md:p-4">
       <div className="flex flex-col items-start justify-between gap-2 md:gap-4">
         <div>
-          <h1 className="text-xl md:text-2xl font-bold">Dashboard Principal</h1>
-          <p className="text-sm md:text-base text-muted-foreground">
+          <h1 className="text-lg md:text-2xl font-bold">Dashboard Principal</h1>
+          <p className="text-xs md:text-base text-muted-foreground">
             Resumen general del sistema de control de acceso
             <span className="ml-2 inline-flex items-center gap-1 text-green-600">
               <Activity className="w-3 h-3" />
-              <span className="text-xs">Tiempo Real</span>
+              <span className="text-[10px] md:text-xs">Tiempo Real</span>
             </span>
           </p>
         </div>
@@ -314,129 +314,167 @@ export function DashboardStats() {
         </Alert>
       )}
 
-      <div className="grid gap-2 md:gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 text-center">
-        <Card className="p-2">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1">
-            <CardTitle className="text-xs font-medium text-blue-600">Graduandos Registrados</CardTitle>
-            <GraduationCap className="h-3 w-3 text-blue-600" />
+      <div className="grid gap-2 md:gap-3 grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+        <Card className="p-1.5 md:p-2">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-0.5 p-1.5 md:p-2">
+            <CardTitle className="text-[9px] sm:text-[10px] md:text-xs font-medium text-blue-600 leading-tight">
+              Graduandos Registrados
+            </CardTitle>
+            <GraduationCap className="h-3 w-3 md:h-4 md:w-4 text-blue-600 flex-shrink-0" />
           </CardHeader>
-          <CardContent className="p-2 pt-0">
-            <div className="text-lg font-bold text-blue-800">{graduandosRegistrados}</div>
-            <p className="text-xs text-muted-foreground">Pendientes por procesar</p>
+          <CardContent className="p-1.5 md:p-2 pt-0">
+            <div className="text-sm sm:text-base md:text-lg font-bold text-blue-800">{graduandosRegistrados}</div>
+            <p className="text-[8px] sm:text-[9px] md:text-xs text-muted-foreground leading-tight">
+              Pendientes por procesar
+            </p>
           </CardContent>
         </Card>
 
-        <Card className="p-2">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1">
-            <CardTitle className="text-xs font-medium text-green-600">Accesos Concedidos</CardTitle>
-            <CheckCircle className="h-3 w-3 text-green-600" />
+        <Card className="p-1.5 md:p-2">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-0.5 p-1.5 md:p-2">
+            <CardTitle className="text-[9px] sm:text-[10px] md:text-xs font-medium text-green-600 leading-tight">
+              Accesos Concedidos
+            </CardTitle>
+            <CheckCircle className="h-3 w-3 md:h-4 md:w-4 text-green-600 flex-shrink-0" />
           </CardHeader>
-          <CardContent className="p-2 pt-0">
-            <div className="text-lg font-bold text-green-800">{grantedAccessCount}</div>
-            <p className="text-xs text-muted-foreground">Personas con acceso permitido</p>
+          <CardContent className="p-1.5 md:p-2 pt-0">
+            <div className="text-sm sm:text-base md:text-lg font-bold text-green-800">{grantedAccessCount}</div>
+            <p className="text-[8px] sm:text-[9px] md:text-xs text-muted-foreground leading-tight">
+              Personas con acceso permitido
+            </p>
           </CardContent>
         </Card>
 
-        <Card className="p-2">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1">
-            <CardTitle className="text-xs font-medium text-red-600">Accesos Denegados</CardTitle>
-            <XCircle className="h-3 w-3 text-red-600" />
+        <Card className="p-1.5 md:p-2">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-0.5 p-1.5 md:p-2">
+            <CardTitle className="text-[9px] sm:text-[10px] md:text-xs font-medium text-red-600 leading-tight">
+              Accesos Denegados
+            </CardTitle>
+            <XCircle className="h-3 w-3 md:h-4 md:w-4 text-red-600 flex-shrink-0" />
           </CardHeader>
-          <CardContent className="p-2 pt-0">
-            <div className="text-lg font-bold text-red-800">{deniedAccessCount}</div>
-            <p className="text-xs text-muted-foreground">Personas con acceso denegado</p>
+          <CardContent className="p-1.5 md:p-2 pt-0">
+            <div className="text-sm sm:text-base md:text-lg font-bold text-red-800">{deniedAccessCount}</div>
+            <p className="text-[8px] sm:text-[9px] md:text-xs text-muted-foreground leading-tight">
+              Personas con acceso denegado
+            </p>
           </CardContent>
         </Card>
 
-        <Card className="p-2">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1">
-            <CardTitle className="text-xs font-medium text-orange-600">En Espera</CardTitle>
-            <Clock className="h-3 w-3 text-orange-600" />
+        <Card className="p-1.5 md:p-2">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-0.5 p-1.5 md:p-2">
+            <CardTitle className="text-[9px] sm:text-[10px] md:text-xs font-medium text-orange-600 leading-tight">
+              En Espera
+            </CardTitle>
+            <Clock className="h-3 w-3 md:h-4 md:w-4 text-orange-600 flex-shrink-0" />
           </CardHeader>
-          <CardContent className="p-2 pt-0">
-            <div className="text-lg font-bold text-orange-800">{waitingPersonsCount}</div>
-            <p className="text-xs text-muted-foreground">Personas sin procesar</p>
+          <CardContent className="p-1.5 md:p-2 pt-0">
+            <div className="text-sm sm:text-base md:text-lg font-bold text-orange-800">{waitingPersonsCount}</div>
+            <p className="text-[8px] sm:text-[9px] md:text-xs text-muted-foreground leading-tight">
+              Personas sin procesar
+            </p>
           </CardContent>
         </Card>
 
-        <Card className="p-2">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1">
-            <CardTitle className="text-xs font-medium text-blue-600">Mesas Activas</CardTitle>
-            <Utensils className="h-3 w-3 text-blue-600" />
+        <Card className="p-1.5 md:p-2">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-0.5 p-1.5 md:p-2">
+            <CardTitle className="text-[9px] sm:text-[10px] md:text-xs font-medium text-blue-600 leading-tight">
+              Mesas Activas
+            </CardTitle>
+            <Utensils className="h-3 w-3 md:h-4 md:w-4 text-blue-600 flex-shrink-0" />
           </CardHeader>
-          <CardContent className="p-2 pt-0">
-            <div className="text-lg font-bold text-blue-800">
+          <CardContent className="p-1.5 md:p-2 pt-0">
+            <div className="text-sm sm:text-base md:text-lg font-bold text-blue-800">
               {buffetStats.mesasActivas}/{buffetStats.totalMesas}
             </div>
-            <p className="text-xs text-muted-foreground">Mesas de bufete operativas</p>
+            <p className="text-[8px] sm:text-[9px] md:text-xs text-muted-foreground leading-tight">
+              Mesas de bufete operativas
+            </p>
           </CardContent>
         </Card>
 
-        <Card className="p-2">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1">
-            <CardTitle className="text-xs font-medium text-purple-600">Comidas Entregadas</CardTitle>
-            <ChefHat className="h-3 w-3 text-purple-600" />
+        <Card className="p-1.5 md:p-2">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-0.5 p-1.5 md:p-2">
+            <CardTitle className="text-[9px] sm:text-[10px] md:text-xs font-medium text-purple-600 leading-tight">
+              Comidas Entregadas
+            </CardTitle>
+            <ChefHat className="h-3 w-3 md:h-4 md:w-4 text-purple-600 flex-shrink-0" />
           </CardHeader>
-          <CardContent className="p-2 pt-0">
-            <div className="text-lg font-bold text-purple-800">{buffetStats.comidasEntregadas}</div>
-            <p className="text-xs text-muted-foreground">Total de entregas realizadas</p>
+          <CardContent className="p-1.5 md:p-2 pt-0">
+            <div className="text-sm sm:text-base md:text-lg font-bold text-purple-800">
+              {buffetStats.comidasEntregadas}
+            </div>
+            <p className="text-[8px] sm:text-[9px] md:text-xs text-muted-foreground leading-tight">
+              Total de entregas realizadas
+            </p>
           </CardContent>
         </Card>
       </div>
 
       <div className="grid gap-2 md:gap-3 grid-cols-1 sm:grid-cols-2">
-        <Card className="p-2">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1">
-            <CardTitle className="text-xs font-medium text-orange-600">Mesa Más Activa</CardTitle>
-            <Target className="h-3 w-3 text-orange-600" />
+        <Card className="p-1.5 md:p-2">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-0.5 p-1.5 md:p-2">
+            <CardTitle className="text-[9px] sm:text-[10px] md:text-xs font-medium text-orange-600 leading-tight">
+              Mesa Más Activa
+            </CardTitle>
+            <Target className="h-3 w-3 md:h-4 md:w-4 text-orange-600 flex-shrink-0" />
           </CardHeader>
-          <CardContent className="p-2 pt-0">
+          <CardContent className="p-1.5 md:p-2 pt-0">
             {buffetStats.mesaMasActiva ? (
               <>
-                <div className="text-lg font-bold text-orange-800">Mesa {buffetStats.mesaMasActiva.numero}</div>
-                <p className="text-xs text-muted-foreground">
+                <div className="text-sm sm:text-base md:text-lg font-bold text-orange-800">
+                  Mesa {buffetStats.mesaMasActiva.numero}
+                </div>
+                <p className="text-[8px] sm:text-[9px] md:text-xs text-muted-foreground leading-tight">
                   {buffetStats.mesaMasActiva.entregas} entregas realizadas
                 </p>
               </>
             ) : (
               <>
-                <div className="text-lg font-bold text-gray-500">N/A</div>
-                <p className="text-xs text-muted-foreground">Sin entregas registradas</p>
+                <div className="text-sm sm:text-base md:text-lg font-bold text-gray-500">N/A</div>
+                <p className="text-[8px] sm:text-[9px] md:text-xs text-muted-foreground leading-tight">
+                  Sin entregas registradas
+                </p>
               </>
             )}
           </CardContent>
         </Card>
 
-        <Card className="p-2">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1">
-            <CardTitle className="text-xs font-medium text-indigo-600">Promedio por Mesa</CardTitle>
-            <BarChart3 className="h-3 w-3 text-indigo-600" />
+        <Card className="p-1.5 md:p-2">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-0.5 p-1.5 md:p-2">
+            <CardTitle className="text-[9px] sm:text-[10px] md:text-xs font-medium text-indigo-600 leading-tight">
+              Promedio por Mesa
+            </CardTitle>
+            <BarChart3 className="h-3 w-3 md:h-4 md:w-4 text-indigo-600 flex-shrink-0" />
           </CardHeader>
-          <CardContent className="p-2 pt-0">
-            <div className="text-lg font-bold text-indigo-800">{buffetStats.promedioEntregasPorMesa}</div>
-            <p className="text-xs text-muted-foreground">Entregas promedio por mesa activa</p>
+          <CardContent className="p-1.5 md:p-2 pt-0">
+            <div className="text-sm sm:text-base md:text-lg font-bold text-indigo-800">
+              {buffetStats.promedioEntregasPorMesa}
+            </div>
+            <p className="text-[8px] sm:text-[9px] md:text-xs text-muted-foreground leading-tight">
+              Entregas promedio por mesa activa
+            </p>
           </CardContent>
         </Card>
       </div>
 
-      <div className="grid gap-3 md:gap-4 grid-cols-1 lg:grid-cols-2">
+      <div className="grid gap-2 md:gap-4 grid-cols-1 lg:grid-cols-2">
         <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base md:text-lg">
+          <CardHeader className="p-3 md:p-6 pb-2 md:pb-4">
+            <CardTitle className="flex items-center gap-2 text-sm md:text-lg">
               <BarChart3 className="w-4 h-4 md:w-5 md:h-5 text-blue-600" />
               Estado General
             </CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <div className="space-y-2">
+          <CardContent className="p-3 md:p-6 pt-0">
+            <div className="space-y-2 md:space-y-4">
+              <div className="space-y-1 md:space-y-2">
                 <div className="flex justify-between items-center">
                   <span className="text-xs md:text-sm text-green-600">Concedidos</span>
-                  <span className="font-medium text-green-600">{grantedAccessCount}</span>
+                  <span className="font-medium text-xs md:text-base text-green-600">{grantedAccessCount}</span>
                 </div>
-                <div className="w-full bg-gray-200 rounded-full h-2">
+                <div className="w-full bg-gray-200 rounded-full h-1.5 md:h-2">
                   <div
-                    className="bg-green-600 h-2 rounded-full"
+                    className="bg-green-600 h-1.5 md:h-2 rounded-full"
                     style={{
                       width: `${totalPersonsCount > 0 ? (grantedAccessCount / totalPersonsCount) * 100 : 0}%`,
                     }}
@@ -444,14 +482,14 @@ export function DashboardStats() {
                 </div>
               </div>
 
-              <div className="space-y-2">
+              <div className="space-y-1 md:space-y-2">
                 <div className="flex justify-between items-center">
                   <span className="text-xs md:text-sm text-red-600">Denegados</span>
-                  <span className="font-medium text-red-600">{deniedAccessCount}</span>
+                  <span className="font-medium text-xs md:text-base text-red-600">{deniedAccessCount}</span>
                 </div>
-                <div className="w-full bg-gray-200 rounded-full h-2">
+                <div className="w-full bg-gray-200 rounded-full h-1.5 md:h-2">
                   <div
-                    className="bg-red-600 h-2 rounded-full"
+                    className="bg-red-600 h-1.5 md:h-2 rounded-full"
                     style={{
                       width: `${totalPersonsCount > 0 ? (deniedAccessCount / totalPersonsCount) * 100 : 0}%`,
                     }}
@@ -459,14 +497,14 @@ export function DashboardStats() {
                 </div>
               </div>
 
-              <div className="space-y-2">
+              <div className="space-y-1 md:space-y-2">
                 <div className="flex justify-between items-center">
                   <span className="text-xs md:text-sm text-orange-600">En Espera</span>
-                  <span className="font-medium text-orange-600">{waitingPersonsCount}</span>
+                  <span className="font-medium text-xs md:text-base text-orange-600">{waitingPersonsCount}</span>
                 </div>
-                <div className="w-full bg-gray-200 rounded-full h-2">
+                <div className="w-full bg-gray-200 rounded-full h-1.5 md:h-2">
                   <div
-                    className="bg-orange-600 h-2 rounded-full"
+                    className="bg-orange-600 h-1.5 md:h-2 rounded-full"
                     style={{
                       width: `${totalPersonsCount > 0 ? (waitingPersonsCount / totalPersonsCount) * 100 : 0}%`,
                     }}
@@ -478,79 +516,58 @@ export function DashboardStats() {
         </Card>
 
         <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base md:text-lg">
+          <CardHeader className="p-3 md:p-6 pb-2 md:pb-4">
+            <CardTitle className="flex items-center gap-2 text-sm md:text-lg">
               <TrendingUp className="w-4 h-4 md:w-5 md:h-5 text-blue-600" />
               Usuario Más Activo
             </CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-3 md:p-6 pt-0">
             {topUser ? (
-              <div className="space-y-3">
+              <div className="space-y-2 md:space-y-3">
                 <div className="flex items-center gap-2">
-                  <UserCheck className="w-4 h-4 text-blue-600" />
-                  <span className="font-medium text-sm md:text-base">{topUser.userName}</span>
+                  <UserCheck className="w-3 h-3 md:w-4 md:h-4 text-blue-600 flex-shrink-0" />
+                  <span className="font-medium text-xs md:text-base truncate">{topUser.userName}</span>
                 </div>
-                <p className="text-xs md:text-sm text-muted-foreground">{topUser.userEmail}</p>
-                <div className="grid grid-cols-2 gap-3 mt-3">
-                  <div className="text-center p-2 bg-green-50 rounded-lg">
-                    <div className="text-lg md:text-xl font-bold text-green-800">{topUser.accedidos}</div>
-                    <p className="text-xs text-green-600">Accedidos</p>
+                <p className="text-[10px] md:text-sm text-muted-foreground truncate">{topUser.userEmail}</p>
+                <div className="grid grid-cols-2 gap-2 md:gap-3 mt-2">
+                  <div className="text-center p-1.5 md:p-2 bg-green-50 rounded-lg">
+                    <div className="text-base md:text-xl font-bold text-green-800">{topUser.accedidos}</div>
+                    <p className="text-[9px] md:text-xs text-green-600">Accedidos</p>
                   </div>
-                  <div className="text-center p-2 bg-red-50 rounded-lg">
-                    <div className="text-lg md:text-xl font-bold text-red-800">{topUser.denegados}</div>
-                    <p className="text-xs text-red-600">Denegados</p>
+                  <div className="text-center p-1.5 md:p-2 bg-red-50 rounded-lg">
+                    <div className="text-base md:text-xl font-bold text-red-800">{topUser.denegados}</div>
+                    <p className="text-[9px] md:text-xs text-red-600">Denegados</p>
                   </div>
                 </div>
-                <div className="text-center mt-2">
-                  <div className="text-sm text-muted-foreground">
+                <div className="text-center mt-1 md:mt-2">
+                  <div className="text-[10px] md:text-sm text-muted-foreground">
                     Total: <span className="font-semibold">{topUser.total}</span> registros
                   </div>
                 </div>
               </div>
             ) : (
-              <p className="text-muted-foreground text-sm">No hay datos de usuarios disponibles</p>
+              <p className="text-muted-foreground text-xs md:text-sm">No hay datos de usuarios disponibles</p>
             )}
           </CardContent>
         </Card>
       </div>
 
-      {entregasPorMesa.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base md:text-lg">Cantidad de Comidas Entregadas por Mesa</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-              {entregasPorMesa.map(({ mesa, entregas }) => (
-                <div key={mesa} className="flex items-center justify-between p-3 border rounded-lg">
-                  <div className="flex items-center gap-2">
-                    <ChefHat className="w-4 h-4 text-purple-600" />
-                    <span className="font-medium text-sm md:text-base">Mesa {mesa}</span>
-                  </div>
-                  <div className="text-right">
-                    <p className="font-bold text-sm md:text-base text-purple-800">{entregas}</p>
-                    <p className="text-xs text-muted-foreground">entregas</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
       {userStats.length > 0 && (
         <Card>
-          <CardHeader>
-            <CardTitle className="text-base md:text-lg">Historial de Registros por Usuario</CardTitle>
+          <CardHeader className="p-3 md:p-6 pb-2 md:pb-4">
+            <CardTitle className="text-sm md:text-lg">Historial de Registros por Usuario</CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
+          <CardContent className="p-3 md:p-6 pt-0">
+            <div className="space-y-1.5 md:space-y-3">
               {userStats.slice(0, 10).map((user, index) => (
-                <div key={user.userId} className="flex items-center justify-between p-2 md:p-3 border rounded-lg">
-                  <div className="flex items-center gap-2 md:gap-3 flex-1">
+                <div
+                  key={user.userId}
+                  className="flex items-center justify-between p-2 md:p-3 border rounded-lg gap-1.5 md:gap-2"
+                >
+                  <div className="flex items-center gap-1.5 md:gap-3 flex-1 min-w-0">
                     <div
-                      className={`flex items-center justify-center w-6 h-6 md:w-8 md:h-8 rounded-full text-xs md:text-sm ${
+                      className={`flex items-center justify-center w-5 h-5 md:w-8 md:h-8 rounded-full text-[10px] md:text-sm flex-shrink-0 ${
                         index === 0
                           ? "bg-yellow-100 text-yellow-800"
                           : index === 1
@@ -563,18 +580,24 @@ export function DashboardStats() {
                       {index + 1}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="font-medium text-sm md:text-base truncate">{user.userName}</p>
-                      <p className="text-xs md:text-sm text-muted-foreground truncate">{user.userEmail}</p>
+                      <p className="font-medium text-[10px] sm:text-xs md:text-base truncate">{user.userName}</p>
+                      <p className="text-[8px] sm:text-[10px] md:text-sm text-muted-foreground truncate">
+                        {user.userEmail}
+                      </p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2 md:gap-4 ml-2">
+                  <div className="flex items-center gap-1.5 md:gap-4 flex-shrink-0">
                     <div className="text-center">
-                      <p className="font-bold text-xs md:text-sm text-green-600">{user.accedidos}</p>
-                      <p className="text-[10px] md:text-xs text-muted-foreground">Accedidos</p>
+                      <p className="font-bold text-[10px] sm:text-xs md:text-sm text-green-600">{user.accedidos}</p>
+                      <p className="text-[8px] sm:text-[9px] md:text-xs text-muted-foreground whitespace-nowrap">
+                        Accedidos
+                      </p>
                     </div>
                     <div className="text-center">
-                      <p className="font-bold text-xs md:text-sm text-red-600">{user.denegados}</p>
-                      <p className="text-[10px] md:text-xs text-muted-foreground">Denegados</p>
+                      <p className="font-bold text-[10px] sm:text-xs md:text-sm text-red-600">{user.denegados}</p>
+                      <p className="text-[8px] sm:text-[9px] md:text-xs text-muted-foreground whitespace-nowrap">
+                        Denegados
+                      </p>
                     </div>
                   </div>
                 </div>

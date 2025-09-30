@@ -405,27 +405,6 @@ export function AccessControl() {
                         </div>
                       </div>
 
-                      <div className="flex items-start gap-2">
-                        <Plus className="w-4 h-4 text-muted-foreground mt-0.5 flex-shrink-0" />
-                        <div className="min-w-0 flex-1">
-                          <p className="text-sm font-medium">Cupos Disponibles</p>
-                          <div className="flex items-center gap-2 mt-1">
-                            <span className="text-sm text-muted-foreground">Base: 2 cupos</span>
-                            {person.cuposExtras > 0 && (
-                              <>
-                                <span className="text-sm text-muted-foreground">+</span>
-                                <span className="text-sm font-medium text-orange-600">
-                                  {person.cuposExtras} extra{person.cuposExtras > 1 ? "s" : ""}
-                                </span>
-                              </>
-                            )}
-                            <span className="text-sm font-semibold text-blue-600 ml-2">
-                              = {2 + (person.cuposExtras || 0)} total
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-
                       {isAccessLog && (
                         <div className="pt-2 border-t border-gray-200">
                           <div className="flex items-start gap-2 mb-2">
