@@ -41,7 +41,7 @@ interface ScanResultDisplay {
 export function BarcodeScanner() {
   const { getStudentById, markStudentAccess, checkIfAlreadyScanned } = useStudentStoreContext()
   const { processQ10Url, isProcessingQ10, q10Message } = useQ10Validation()
-  const { user } = useAuth()
+  const { user, fullName } = useAuth()
 
   const [isClient, setIsClient] = useState(false)
   const [hasPermission, setHasPermission] = useState<boolean | null>(null)
@@ -128,12 +128,12 @@ export function BarcodeScanner() {
       setIsScanning(true)
       let currentScanResult: ScanResultDisplay
 
-      // Información del usuario que autoriza el acceso
       const userInfo = user
         ? {
             userId: user.id,
-            userName: user.email || "Usuario",
+            userName: fullName || user.email || "Usuario",
             userEmail: user.email || undefined,
+            userRole: user.role || "Usuario",
           }
         : undefined
 
@@ -236,7 +236,7 @@ export function BarcodeScanner() {
         setIsScanning(false)
       }, 5000)
     },
-    [getStudentById, markStudentAccess, processQ10Url, user, checkIfAlreadyScanned, isScanning],
+    [getStudentById, markStudentAccess, processQ10Url, user, checkIfAlreadyScanned, isScanning, fullName],
   )
 
   useEffect(() => {

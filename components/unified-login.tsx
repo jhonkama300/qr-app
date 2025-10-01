@@ -211,7 +211,7 @@ export function UnifiedLogin() {
     <>
       <div className="relative min-h-screen flex items-center justify-center p-4 overflow-hidden">
         <video autoPlay loop muted playsInline className="absolute inset-0 w-full h-full object-cover">
-          <source src="/videos/login.mp4" type="video/mp4" />
+          <source src="/videos/background.mp4" type="video/mp4" />
         </video>
 
         <div className="absolute inset-0 bg-black/40" />

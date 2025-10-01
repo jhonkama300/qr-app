@@ -38,6 +38,7 @@ interface AccessLog {
   grantedByUserId?: string
   grantedByUserName?: string
   grantedByUserEmail?: string
+  grantedByUserRole?: string // Agregado campo de rol
   mesaUsada?: number
 }
 
@@ -45,6 +46,7 @@ interface UserStats {
   userId: string
   userName: string
   userEmail: string
+  userRole: string // Agregado campo de rol
   accedidos: number
   denegados: number
   total: number
@@ -210,6 +212,12 @@ export function DashboardStats() {
     const userStatsMap = new Map<string, UserStats>()
 
     accessLogs.forEach((log) => {
+      console.log("[v0] Procesando log en getUserStats:", {
+        grantedByUserId: log.grantedByUserId,
+        grantedByUserName: log.grantedByUserName,
+        grantedByUserRole: log.grantedByUserRole,
+      })
+
       if (log.grantedByUserId && log.grantedByUserName) {
         const existing = userStatsMap.get(log.grantedByUserId)
         const isGranted = log.status === "granted" || log.status === "q10_success"
@@ -224,6 +232,7 @@ export function DashboardStats() {
             userId: log.grantedByUserId,
             userName: log.grantedByUserName,
             userEmail: log.grantedByUserEmail || "",
+            userRole: log.grantedByUserRole || "Usuario",
             accedidos: isGranted ? 1 : 0,
             denegados: isDenied ? 1 : 0,
             total: 1,
@@ -232,7 +241,9 @@ export function DashboardStats() {
       }
     })
 
-    return Array.from(userStatsMap.values()).sort((a, b) => b.total - a.total)
+    const stats = Array.from(userStatsMap.values()).sort((a, b) => b.total - a.total)
+    console.log("[v0] Estadísticas de usuarios calculadas:", stats)
+    return stats
   }
 
   const getUniqueAccessLogs = () => {
@@ -441,25 +452,6 @@ export function DashboardStats() {
         </Card>
 
         <Card className="p-1.5 md:p-2">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-0.5 p-1.5 md:p-2">
-            <CardTitle className="text-[9px] sm:text-[10px] md:text-xs font-medium text-indigo-600 leading-tight">
-              Promedio por Mesa
-            </CardTitle>
-            <BarChart3 className="h-3 w-3 md:h-4 md:w-4 text-indigo-600 flex-shrink-0" />
-          </CardHeader>
-          <CardContent className="p-1.5 md:p-2 pt-0">
-            <div className="text-sm sm:text-base md:text-lg font-bold text-indigo-800">
-              {buffetStats.promedioEntregasPorMesa}
-            </div>
-            <p className="text-[8px] sm:text-[9px] md:text-xs text-muted-foreground leading-tight">
-              Entregas promedio por mesa activa
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="grid gap-2 md:gap-4 grid-cols-1 lg:grid-cols-2">
-        <Card>
           <CardHeader className="p-3 md:p-6 pb-2 md:pb-4">
             <CardTitle className="flex items-center gap-2 text-sm md:text-lg">
               <BarChart3 className="w-4 h-4 md:w-5 md:h-5 text-blue-600" />
@@ -515,7 +507,9 @@ export function DashboardStats() {
             </div>
           </CardContent>
         </Card>
+      </div>
 
+      <div className="grid gap-2 md:gap-4 grid-cols-1 lg:grid-cols-2">
         <Card>
           <CardHeader className="p-3 md:p-6 pb-2 md:pb-4">
             <CardTitle className="flex items-center gap-2 text-sm md:text-lg">
@@ -530,7 +524,9 @@ export function DashboardStats() {
                   <UserCheck className="w-3 h-3 md:w-4 md:h-4 text-blue-600 flex-shrink-0" />
                   <span className="font-medium text-xs md:text-base truncate">{topUser.userName}</span>
                 </div>
-                <p className="text-[10px] md:text-sm text-muted-foreground truncate">{topUser.userEmail}</p>
+                <p className="text-[10px] md:text-sm text-muted-foreground truncate">
+                  Rol: <span className="font-medium">{topUser.userRole}</span>
+                </p>
                 <div className="grid grid-cols-2 gap-2 md:gap-3 mt-2">
                   <div className="text-center p-1.5 md:p-2 bg-green-50 rounded-lg">
                     <div className="text-base md:text-xl font-bold text-green-800">{topUser.accedidos}</div>
@@ -552,9 +548,7 @@ export function DashboardStats() {
             )}
           </CardContent>
         </Card>
-      </div>
 
-      {userStats.length > 0 && (
         <Card>
           <CardHeader className="p-3 md:p-6 pb-2 md:pb-4">
             <CardTitle className="text-sm md:text-lg">Historial de Registros por Usuario</CardTitle>
@@ -583,7 +577,7 @@ export function DashboardStats() {
                     <div className="flex-1 min-w-0">
                       <p className="font-medium text-[10px] sm:text-xs md:text-base truncate">{user.userName}</p>
                       <p className="text-[8px] sm:text-[10px] md:text-sm text-muted-foreground truncate">
-                        {user.userEmail}
+                        Rol: {user.userRole}
                       </p>
                     </div>
                   </div>
@@ -606,7 +600,7 @@ export function DashboardStats() {
             </div>
           </CardContent>
         </Card>
-      )}
+      </div>
     </div>
   )
 }

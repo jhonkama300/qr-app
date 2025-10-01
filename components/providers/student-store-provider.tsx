@@ -25,6 +25,7 @@ export interface AccessLog {
   grantedByUserId?: string // ID del usuario que otorgó el acceso
   grantedByUserName?: string // Nombre del usuario que otorgó el acceso
   grantedByUserEmail?: string // Email del usuario que otorgó el acceso
+  grantedByUserRole?: string // Agregado campo de rol del usuario que otorga el acceso
   mesaUsada?: number // Agregado campo para la mesa donde se escaneó
 }
 
@@ -32,6 +33,7 @@ interface UserInfo {
   userId?: string
   userName?: string
   userEmail?: string
+  userRole?: string // Agregado campo de rol
   mesaAsignada?: number // Agregado campo para mesa del usuario
 }
 
@@ -205,6 +207,8 @@ export function StudentStoreProvider({ children }: { children: React.ReactNode }
       userInfo?: UserInfo,
     ) => {
       try {
+        console.log("[v0] UserInfo recibido en markStudentAccess:", userInfo)
+
         const shouldConsumeCupo = userInfo?.mesaAsignada !== undefined && userInfo?.mesaAsignada !== null
 
         if (granted && shouldConsumeCupo) {
@@ -229,15 +233,16 @@ export function StudentStoreProvider({ children }: { children: React.ReactNode }
           grantedByUserId: userInfo?.userId || "unknown",
           grantedByUserName: userInfo?.userName || "Usuario desconocido",
           grantedByUserEmail: userInfo?.userEmail || "sin-email@sistema.com",
+          grantedByUserRole: userInfo?.userRole || "Usuario",
         }
 
         if (userInfo?.mesaAsignada !== undefined && userInfo?.mesaAsignada !== null) {
           log.mesaUsada = userInfo.mesaAsignada
         }
 
-        console.log("[v0] Guardando log de acceso:", log)
+        console.log("[v0] Log completo a guardar en Firebase:", log)
         await addDoc(collection(db, "access_logs"), log)
-        console.log("Registro de acceso guardado exitosamente")
+        console.log("[v0] Registro de acceso guardado exitosamente en Firebase")
       } catch (error) {
         console.error("Error al registrar acceso:", error)
         throw error
@@ -264,6 +269,7 @@ export function StudentStoreProvider({ children }: { children: React.ReactNode }
           grantedByUserId: userInfo?.userId || "unknown",
           grantedByUserName: userInfo?.userName || "Usuario desconocido",
           grantedByUserEmail: userInfo?.userEmail || "sin-email@sistema.com",
+          grantedByUserRole: userInfo?.userRole || "Usuario",
         }
 
         if (userInfo?.mesaAsignada !== undefined && userInfo?.mesaAsignada !== null) {

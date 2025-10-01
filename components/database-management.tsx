@@ -30,9 +30,16 @@ import {
   RotateCcw,
   Utensils,
   CheckCircle2,
+  Search,
+  X,
+  Users,
+  BookOpen,
+  Plus,
+  UtensilsCrossed,
 } from "lucide-react"
 import * as XLSX from "xlsx"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 interface PersonData {
   id?: string
@@ -77,6 +84,11 @@ export function DatabaseManagement() {
   const endIndex = startIndex + itemsPerPage
   const currentPersons = filteredPersons.slice(startIndex, endIndex)
   const uniquePrograms = Array.from(new Set(persons.map((person) => person.programa)))
+
+  const totalRegistros = persons.length
+  const programasUnicos = Array.from(new Set(persons.map((p) => p.programa))).length
+  const totalCuposExtras = persons.reduce((sum, p) => sum + (p.cuposExtras || 0), 0)
+  const bufeteDisponible = totalRegistros * 2 + totalCuposExtras
 
   useEffect(() => {
     loadPersons()
@@ -270,10 +282,10 @@ export function DatabaseManagement() {
       await batch.commit()
 
       const totalCuposExtrasImportados = previewData.reduce((sum, p) => sum + p.cuposExtras, 0)
-      const programasUnicos = new Set(previewData.map((p) => p.programa)).size
+      const programasUnicosImportados = new Set(previewData.map((p) => p.programa)).size
 
       setSuccess(
-        `✅ Importación exitosa: ${previewData.length} registros • ${programasUnicos} programas únicos • ${totalCuposExtrasImportados} cupos extras totales`,
+        `✅ Importación exitosa: ${previewData.length} registros • ${programasUnicosImportados} programas únicos • ${totalCuposExtrasImportados} cupos extras totales`,
       )
 
       setPreviewData([])
@@ -577,6 +589,315 @@ export function DatabaseManagement() {
         </div>
       </div>
 
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-lg">
+            <Search className="w-4 h-4" />
+            Filtros
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {/* Campo de búsqueda */}
+          <div className="space-y-2">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Buscar por nombre, identificación..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-9 pr-9"
+              />
+              {searchTerm && (
+                <button
+                  onClick={clearSearch}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Filtro por Programa */}
+          <div className="space-y-2">
+            <Label className="text-sm font-medium">Programa</Label>
+            <Select value={selectedPrograma} onValueChange={setSelectedPrograma}>
+              <SelectTrigger>
+                <SelectValue placeholder="Todos los programas" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">Todos los programas</SelectItem>
+                {uniquePrograms.map((programa) => (
+                  <SelectItem key={programa} value={programa}>
+                    {programa}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Filtro por Cupos Extras */}
+          <div className="space-y-2">
+            <Label className="text-sm font-medium">Cupos Extras</Label>
+            <Select value={selectedCuposExtras} onValueChange={setSelectedCuposExtras}>
+              <SelectTrigger>
+                <SelectValue placeholder="Todos" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">Todos</SelectItem>
+                <SelectItem value="con-extras">Con cupos extras</SelectItem>
+                <SelectItem value="sin-extras">Sin cupos extras</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Acciones */}
+          <div className="space-y-2">
+            <Label className="text-sm font-medium">Acciones</Label>
+            <Button
+              variant="outline"
+              onClick={clearAllFilters}
+              disabled={!hasActiveFilters}
+              className="w-full bg-transparent"
+            >
+              <X className="mr-2 h-4 w-4" />
+              Limpiar Filtros
+            </Button>
+          </div>
+
+          {/* Selector de items por página */}
+          <div className="flex items-center gap-2">
+            <Label className="text-sm font-medium whitespace-nowrap">Mostrar:</Label>
+            <Select value={itemsPerPage.toString()} onValueChange={(value) => setItemsPerPage(Number(value))}>
+              <SelectTrigger className="w-[100px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="10">10</SelectItem>
+                <SelectItem value="25">25</SelectItem>
+                <SelectItem value="50">50</SelectItem>
+                <SelectItem value="100">100</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </CardContent>
+      </Card>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <Card>
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <CardDescription className="text-sm font-medium">Total Registros</CardDescription>
+              <Users className="h-4 w-4 text-muted-foreground" />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{totalRegistros}</div>
+            <p className="text-xs text-muted-foreground mt-1">Estudiantes</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <CardDescription className="text-sm font-medium">Programas</CardDescription>
+              <BookOpen className="h-4 w-4 text-muted-foreground" />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{programasUnicos}</div>
+            <p className="text-xs text-muted-foreground mt-1">Únicos</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <CardDescription className="text-sm font-medium">Cupos Extras</CardDescription>
+              <Plus className="h-4 w-4 text-muted-foreground" />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{totalCuposExtras}</div>
+            <p className="text-xs text-muted-foreground mt-1">Adicionales</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <CardDescription className="text-sm font-medium">Bufete Disponible</CardDescription>
+              <UtensilsCrossed className="h-4 w-4 text-muted-foreground" />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{bufeteDisponible}</div>
+            <p className="text-xs text-muted-foreground mt-1">
+              {totalRegistros * 2} base + {totalCuposExtras} extras
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-lg">
+            <Database className="w-4 h-4" />
+            Registros ({filteredPersons.length})
+          </CardTitle>
+          <CardDescription className="text-sm">
+            {searchTerm ? `Resultados para "${searchTerm}"` : "Registros en el sistema"}
+            {filteredPersons.length > 0 && (
+              <span className="block sm:inline sm:ml-2">
+                Página {currentPage} de {totalPages} • {startIndex + 1}-{Math.min(endIndex, filteredPersons.length)} de{" "}
+                {filteredPersons.length}
+              </span>
+            )}
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {currentPersons.length === 0 ? (
+            <div className="text-center py-8">
+              <Database className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
+              {searchTerm ? (
+                <>
+                  <p className="text-muted-foreground">No se encontraron resultados</p>
+                  <p className="text-sm text-muted-foreground">Intenta con otros términos</p>
+                </>
+              ) : (
+                <>
+                  <p className="text-muted-foreground">No hay registros</p>
+                  <p className="text-sm text-muted-foreground">Importa un archivo Excel</p>
+                </>
+              )}
+            </div>
+          ) : (
+            <>
+              <div className="space-y-3">
+                {currentPersons.map((person) => (
+                  <div key={person.id} className="p-3 sm:p-4 border rounded-lg bg-muted/20 space-y-2">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-xs font-medium bg-blue-100 text-blue-700 px-2 py-1 rounded">
+                          #{person.puesto}
+                        </span>
+                        {person.cuposExtras > 0 && (
+                          <span className="text-xs bg-orange-100 text-orange-700 px-2 py-1 rounded font-medium">
+                            +{person.cuposExtras} extra{person.cuposExtras !== 1 ? "s" : ""}
+                          </span>
+                        )}
+                      </div>
+                      <span className="text-xs text-muted-foreground font-mono">{person.identificacion}</span>
+                    </div>
+
+                    <div>
+                      <p className="font-medium text-sm sm:text-base">{person.nombre}</p>
+                      <p className="text-xs sm:text-sm text-muted-foreground break-words">{person.programa}</p>
+                    </div>
+
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-4 text-xs">
+                      <span className="font-medium text-green-600">
+                        🎫 {2 + (Number(person.cuposExtras) || 0)} cupos total
+                      </span>
+                      <span className="text-muted-foreground">
+                        (
+                        {(Number(person.cuposExtras) || 0) > 0
+                          ? `2 base + ${Number(person.cuposExtras) || 0} extra${(Number(person.cuposExtras) || 0) !== 1 ? "s" : ""}`
+                          : "2 base"}
+                        )
+                      </span>
+                      {person.fechaImportacion && (
+                        <span className="text-muted-foreground">
+                          📅 {new Date(person.fechaImportacion).toLocaleDateString()}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {totalPages > 1 && (
+                <div className="flex flex-col gap-3 mt-6 pt-4 border-t">
+                  <div className="text-xs text-center text-muted-foreground">
+                    {startIndex + 1} - {Math.min(endIndex, filteredPersons.length)} de {filteredPersons.length}{" "}
+                    registros
+                  </div>
+
+                  <div className="flex items-center justify-center gap-1">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={goToFirstPage}
+                      disabled={currentPage === 1}
+                      className="h-8 w-8 p-0 bg-transparent"
+                    >
+                      <ChevronsLeft className="h-3 w-3" />
+                    </Button>
+
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={goToPreviousPage}
+                      disabled={currentPage === 1}
+                      className="h-8 w-8 p-0 bg-transparent"
+                    >
+                      <ChevronLeft className="h-3 w-3" />
+                    </Button>
+
+                    <div className="flex items-center gap-1">
+                      {Array.from({ length: Math.min(3, totalPages) }, (_, i) => {
+                        let pageNumber
+                        if (totalPages <= 3) {
+                          pageNumber = i + 1
+                        } else if (currentPage <= 2) {
+                          pageNumber = i + 1
+                        } else if (currentPage >= totalPages - 1) {
+                          pageNumber = totalPages - 2 + i
+                        } else {
+                          pageNumber = currentPage - 1 + i
+                        }
+
+                        return (
+                          <Button
+                            key={pageNumber}
+                            variant={currentPage === pageNumber ? "default" : "outline"}
+                            size="sm"
+                            onClick={() => setCurrentPage(pageNumber)}
+                            className="h-8 w-8 p-0 text-xs"
+                          >
+                            {pageNumber}
+                          </Button>
+                        )
+                      })}
+                    </div>
+
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={goToNextPage}
+                      disabled={currentPage === totalPages}
+                      className="h-8 w-8 p-0 bg-transparent"
+                    >
+                      <ChevronRight className="h-3 w-3" />
+                    </Button>
+
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={goToLastPage}
+                      disabled={currentPage === totalPages}
+                      className="h-8 w-8 p-0 bg-transparent"
+                    >
+                      <ChevronsRight className="h-3 w-3" />
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </CardContent>
+      </Card>
+
       <Dialog open={isImportDialogOpen} onOpenChange={setIsImportDialogOpen}>
         <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
@@ -751,165 +1072,6 @@ export function DatabaseManagement() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="flex items-center gap-2 text-lg">
-            <Database className="w-4 h-4" />
-            Registros ({filteredPersons.length})
-          </CardTitle>
-          <CardDescription className="text-sm">
-            {searchTerm ? `Resultados para "${searchTerm}"` : "Registros en el sistema"}
-            {filteredPersons.length > 0 && (
-              <span className="block sm:inline sm:ml-2">
-                Página {currentPage} de {totalPages} • {startIndex + 1}-{Math.min(endIndex, filteredPersons.length)} de{" "}
-                {filteredPersons.length}
-              </span>
-            )}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {currentPersons.length === 0 ? (
-            <div className="text-center py-8">
-              <Database className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
-              {searchTerm ? (
-                <>
-                  <p className="text-muted-foreground">No se encontraron resultados</p>
-                  <p className="text-sm text-muted-foreground">Intenta con otros términos</p>
-                </>
-              ) : (
-                <>
-                  <p className="text-muted-foreground">No hay registros</p>
-                  <p className="text-sm text-muted-foreground">Importa un archivo Excel</p>
-                </>
-              )}
-            </div>
-          ) : (
-            <>
-              <div className="space-y-3">
-                {currentPersons.map((person) => (
-                  <div key={person.id} className="p-3 sm:p-4 border rounded-lg bg-muted/20 space-y-2">
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-xs font-medium bg-blue-100 text-blue-700 px-2 py-1 rounded">
-                          #{person.puesto}
-                        </span>
-                        {person.cuposExtras > 0 && (
-                          <span className="text-xs bg-orange-100 text-orange-700 px-2 py-1 rounded font-medium">
-                            +{person.cuposExtras} extra{person.cuposExtras !== 1 ? "s" : ""}
-                          </span>
-                        )}
-                      </div>
-                      <span className="text-xs text-muted-foreground font-mono">{person.identificacion}</span>
-                    </div>
-
-                    <div>
-                      <p className="font-medium text-sm sm:text-base">{person.nombre}</p>
-                      <p className="text-xs sm:text-sm text-muted-foreground break-words">{person.programa}</p>
-                    </div>
-
-                    <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-4 text-xs">
-                      <span className="font-medium text-green-600">
-                        🎫 {2 + (Number(person.cuposExtras) || 0)} cupos total
-                      </span>
-                      <span className="text-muted-foreground">
-                        (
-                        {(Number(person.cuposExtras) || 0) > 0
-                          ? `2 base + ${Number(person.cuposExtras) || 0} extra${(Number(person.cuposExtras) || 0) !== 1 ? "s" : ""}`
-                          : "2 base"}
-                        )
-                      </span>
-                      {person.fechaImportacion && (
-                        <span className="text-muted-foreground">
-                          📅 {new Date(person.fechaImportacion).toLocaleDateString()}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              {totalPages > 1 && (
-                <div className="flex flex-col gap-3 mt-6 pt-4 border-t">
-                  <div className="text-xs text-center text-muted-foreground">
-                    {startIndex + 1} - {Math.min(endIndex, filteredPersons.length)} de {filteredPersons.length}{" "}
-                    registros
-                  </div>
-
-                  <div className="flex items-center justify-center gap-1">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={goToFirstPage}
-                      disabled={currentPage === 1}
-                      className="h-8 w-8 p-0 bg-transparent"
-                    >
-                      <ChevronsLeft className="h-3 w-3" />
-                    </Button>
-
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={goToPreviousPage}
-                      disabled={currentPage === 1}
-                      className="h-8 w-8 p-0 bg-transparent"
-                    >
-                      <ChevronLeft className="h-3 w-3" />
-                    </Button>
-
-                    <div className="flex items-center gap-1">
-                      {Array.from({ length: Math.min(3, totalPages) }, (_, i) => {
-                        let pageNumber
-                        if (totalPages <= 3) {
-                          pageNumber = i + 1
-                        } else if (currentPage <= 2) {
-                          pageNumber = i + 1
-                        } else if (currentPage >= totalPages - 1) {
-                          pageNumber = totalPages - 2 + i
-                        } else {
-                          pageNumber = currentPage - 1 + i
-                        }
-
-                        return (
-                          <Button
-                            key={pageNumber}
-                            variant={currentPage === pageNumber ? "default" : "outline"}
-                            size="sm"
-                            onClick={() => setCurrentPage(pageNumber)}
-                            className="h-8 w-8 p-0 text-xs"
-                          >
-                            {pageNumber}
-                          </Button>
-                        )
-                      })}
-                    </div>
-
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={goToNextPage}
-                      disabled={currentPage === totalPages}
-                      className="h-8 w-8 p-0 bg-transparent"
-                    >
-                      <ChevronRight className="h-3 w-3" />
-                    </Button>
-
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={goToLastPage}
-                      disabled={currentPage === totalPages}
-                      className="h-8 w-8 p-0 bg-transparent"
-                    >
-                      <ChevronsRight className="h-3 w-3" />
-                    </Button>
-                  </div>
-                </div>
-              )}
-            </>
-          )}
-        </CardContent>
-      </Card>
     </main>
   )
 }
