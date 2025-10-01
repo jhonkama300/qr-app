@@ -162,9 +162,9 @@ export function BuffeteScanner() {
       }
 
       const userInfo = {
-        userId: user.uid || user.id || "unknown",
-        userName: fullName || user.email || user.name || "Usuario Bufete",
-        userEmail: user.email || "sin-email@bufete.com",
+        userId: user.id,
+        userName: fullName || user.fullName || "Usuario Bufete",
+        userEmail: user.idNumber + "@sistema.com",
         userRole: user.role || "bufete",
         mesaAsignada: user.mesaAsignada,
       }

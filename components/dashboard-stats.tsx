@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { collection, getDocs, query, orderBy, onSnapshot } from "firebase/firestore"
+import { collection, getDocs, query, orderBy, onSnapshot, doc, getDoc } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
@@ -11,12 +11,10 @@ import {
   Clock,
   Loader2,
   UserCheck,
-  BarChart3,
   TrendingUp,
   Utensils,
   Activity,
   ChefHat,
-  Target,
   GraduationCap,
 } from "lucide-react"
 
@@ -68,6 +66,13 @@ interface BuffetStats {
   promedioEntregasPorMesa: number
 }
 
+interface UserData {
+  id: string
+  fullName: string
+  role: string
+  idNumber: string
+}
+
 export function DashboardStats() {
   const [allPersons, setAllPersons] = useState<PersonData[]>([])
   const [accessLogs, setAccessLogs] = useState<AccessLog[]>([])
@@ -83,6 +88,8 @@ export function DashboardStats() {
     promedioEntregasPorMesa: 0,
   })
   const [realTimeUpdates, setRealTimeUpdates] = useState(0)
+  const [usersCache, setUsersCache] = useState<Map<string, UserData>>(new Map())
+  const [userStats, setUserStats] = useState<UserStats[]>([])
 
   useEffect(() => {
     loadInitialData()
@@ -208,17 +215,54 @@ export function DashboardStats() {
     })
   }
 
-  const getUserStats = (): UserStats[] => {
+  const fetchUserData = async (userId: string): Promise<UserData | null> => {
+    try {
+      if (usersCache.has(userId)) {
+        return usersCache.get(userId)!
+      }
+
+      const userDoc = await getDoc(doc(db, "users", userId))
+      if (userDoc.exists()) {
+        const userData: UserData = {
+          id: userDoc.id,
+          ...userDoc.data(),
+        } as UserData
+
+        setUsersCache((prev) => new Map(prev).set(userId, userData))
+        console.log("[v0] Usuario cargado desde Firestore:", userData)
+        return userData
+      }
+      return null
+    } catch (error) {
+      console.error("[v0] Error al cargar usuario:", error)
+      return null
+    }
+  }
+
+  const getUserStats = async (): Promise<UserStats[]> => {
     const userStatsMap = new Map<string, UserStats>()
 
-    accessLogs.forEach((log) => {
+    for (const log of accessLogs) {
       console.log("[v0] Procesando log en getUserStats:", {
         grantedByUserId: log.grantedByUserId,
         grantedByUserName: log.grantedByUserName,
         grantedByUserRole: log.grantedByUserRole,
       })
 
-      if (log.grantedByUserId && log.grantedByUserName) {
+      if (log.grantedByUserId) {
+        let userName = log.grantedByUserName || "Usuario desconocido"
+        let userRole = log.grantedByUserRole || "Usuario"
+
+        if (!log.grantedByUserName || !log.grantedByUserRole) {
+          console.log("[v0] Datos de usuario faltantes en log, consultando Firestore...")
+          const userData = await fetchUserData(log.grantedByUserId)
+          if (userData) {
+            userName = userData.fullName || userName
+            userRole = userData.role || userRole
+            console.log("[v0] Datos actualizados desde Firestore:", { userName, userRole })
+          }
+        }
+
         const existing = userStatsMap.get(log.grantedByUserId)
         const isGranted = log.status === "granted" || log.status === "q10_success"
         const isDenied = log.status === "denied" || log.status === "q10_failed"
@@ -230,21 +274,31 @@ export function DashboardStats() {
         } else {
           userStatsMap.set(log.grantedByUserId, {
             userId: log.grantedByUserId,
-            userName: log.grantedByUserName,
+            userName: userName,
             userEmail: log.grantedByUserEmail || "",
-            userRole: log.grantedByUserRole || "Usuario",
+            userRole: userRole,
             accedidos: isGranted ? 1 : 0,
             denegados: isDenied ? 1 : 0,
             total: 1,
           })
         }
       }
-    })
+    }
 
     const stats = Array.from(userStatsMap.values()).sort((a, b) => b.total - a.total)
     console.log("[v0] Estadísticas de usuarios calculadas:", stats)
     return stats
   }
+
+  useEffect(() => {
+    const loadUserStats = async () => {
+      const stats = await getUserStats()
+      setUserStats(stats)
+    }
+    if (accessLogs.length > 0) {
+      loadUserStats()
+    }
+  }, [accessLogs, realTimeUpdates])
 
   const getUniqueAccessLogs = () => {
     const uniqueLogs = new Map<string, AccessLog>()
@@ -277,7 +331,6 @@ export function DashboardStats() {
   }
 
   const uniqueAccessLogs = getUniqueAccessLogs()
-  const userStats = getUserStats()
   const topUser = userStats[0]
 
   const grantedAccessCount = uniqueAccessLogs.filter(
@@ -418,93 +471,6 @@ export function DashboardStats() {
             <p className="text-[8px] sm:text-[9px] md:text-xs text-muted-foreground leading-tight">
               Total de entregas realizadas
             </p>
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="grid gap-2 md:gap-3 grid-cols-1 sm:grid-cols-2">
-        <Card className="p-1.5 md:p-2">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-0.5 p-1.5 md:p-2">
-            <CardTitle className="text-[9px] sm:text-[10px] md:text-xs font-medium text-orange-600 leading-tight">
-              Mesa Más Activa
-            </CardTitle>
-            <Target className="h-3 w-3 md:h-4 md:w-4 text-orange-600 flex-shrink-0" />
-          </CardHeader>
-          <CardContent className="p-1.5 md:p-2 pt-0">
-            {buffetStats.mesaMasActiva ? (
-              <>
-                <div className="text-sm sm:text-base md:text-lg font-bold text-orange-800">
-                  Mesa {buffetStats.mesaMasActiva.numero}
-                </div>
-                <p className="text-[8px] sm:text-[9px] md:text-xs text-muted-foreground leading-tight">
-                  {buffetStats.mesaMasActiva.entregas} entregas realizadas
-                </p>
-              </>
-            ) : (
-              <>
-                <div className="text-sm sm:text-base md:text-lg font-bold text-gray-500">N/A</div>
-                <p className="text-[8px] sm:text-[9px] md:text-xs text-muted-foreground leading-tight">
-                  Sin entregas registradas
-                </p>
-              </>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card className="p-1.5 md:p-2">
-          <CardHeader className="p-3 md:p-6 pb-2 md:pb-4">
-            <CardTitle className="flex items-center gap-2 text-sm md:text-lg">
-              <BarChart3 className="w-4 h-4 md:w-5 md:h-5 text-blue-600" />
-              Estado General
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-3 md:p-6 pt-0">
-            <div className="space-y-2 md:space-y-4">
-              <div className="space-y-1 md:space-y-2">
-                <div className="flex justify-between items-center">
-                  <span className="text-xs md:text-sm text-green-600">Concedidos</span>
-                  <span className="font-medium text-xs md:text-base text-green-600">{grantedAccessCount}</span>
-                </div>
-                <div className="w-full bg-gray-200 rounded-full h-1.5 md:h-2">
-                  <div
-                    className="bg-green-600 h-1.5 md:h-2 rounded-full"
-                    style={{
-                      width: `${totalPersonsCount > 0 ? (grantedAccessCount / totalPersonsCount) * 100 : 0}%`,
-                    }}
-                  ></div>
-                </div>
-              </div>
-
-              <div className="space-y-1 md:space-y-2">
-                <div className="flex justify-between items-center">
-                  <span className="text-xs md:text-sm text-red-600">Denegados</span>
-                  <span className="font-medium text-xs md:text-base text-red-600">{deniedAccessCount}</span>
-                </div>
-                <div className="w-full bg-gray-200 rounded-full h-1.5 md:h-2">
-                  <div
-                    className="bg-red-600 h-1.5 md:h-2 rounded-full"
-                    style={{
-                      width: `${totalPersonsCount > 0 ? (deniedAccessCount / totalPersonsCount) * 100 : 0}%`,
-                    }}
-                  ></div>
-                </div>
-              </div>
-
-              <div className="space-y-1 md:space-y-2">
-                <div className="flex justify-between items-center">
-                  <span className="text-xs md:text-sm text-orange-600">En Espera</span>
-                  <span className="font-medium text-xs md:text-base text-orange-600">{waitingPersonsCount}</span>
-                </div>
-                <div className="w-full bg-gray-200 rounded-full h-1.5 md:h-2">
-                  <div
-                    className="bg-orange-600 h-1.5 md:h-2 rounded-full"
-                    style={{
-                      width: `${totalPersonsCount > 0 ? (waitingPersonsCount / totalPersonsCount) * 100 : 0}%`,
-                    }}
-                  ></div>
-                </div>
-              </div>
-            </div>
           </CardContent>
         </Card>
       </div>

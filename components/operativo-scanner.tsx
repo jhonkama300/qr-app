@@ -137,11 +137,13 @@ export function OperativoScanner() {
       const userInfo = user
         ? {
             userId: user.id,
-            userName: fullName || user.email || "Usuario",
-            userEmail: user.email || undefined,
-            userRole: user.role || "Usuario",
+            userName: fullName || user.fullName || "Usuario Operativo",
+            userEmail: user.idNumber + "@sistema.com",
+            userRole: user.role || "operativo",
           }
         : undefined
+
+      console.log("[v0] UserInfo creado en operativo-scanner:", userInfo)
 
       if (
         scannedContent.startsWith("https://site2.q10.com/CertificadosAcademicos/") ||
