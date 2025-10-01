@@ -10,34 +10,29 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
+  DialogFooter,
 } from "@/components/ui/dialog"
 import {
   Loader2,
-  Upload,
   Database,
-  Trash2,
-  FileSpreadsheet,
-  Users,
-  CheckCircle,
-  Search,
-  X,
   ChevronLeft,
   ChevronRight,
   ChevronsLeft,
   ChevronsRight,
+  Upload,
+  Trash2,
   RotateCcw,
-  UtensilsCrossed,
+  Utensils,
+  CheckCircle2,
 } from "lucide-react"
 import * as XLSX from "xlsx"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 
 interface PersonData {
   id?: string
@@ -73,6 +68,9 @@ export function DatabaseManagement() {
   const [isResetBufetesDialogOpen, setIsResetBufetesDialogOpen] = useState(false)
   const [resetting, setResetting] = useState(false)
   const [mesas, setMesas] = useState<Array<{ id: string; numero: number; nombre: string; activa: boolean }>>([])
+
+  const [isImportDialogOpen, setIsImportDialogOpen] = useState(false)
+  const [selectedFileName, setSelectedFileName] = useState<string>("")
 
   const totalPages = Math.ceil(filteredPersons.length / itemsPerPage)
   const startIndex = (currentPage - 1) * itemsPerPage
@@ -152,9 +150,10 @@ export function DatabaseManagement() {
   }
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const selectedFile = e.target.files?.[0]
+    const selectedFile = e.target?.files?.[0]
     if (selectedFile) {
       setFile(selectedFile)
+      setSelectedFileName(selectedFile.name)
       processExcelFile(selectedFile)
     }
   }
@@ -279,11 +278,12 @@ export function DatabaseManagement() {
 
       setPreviewData([])
       setFile(null)
-      setIsDialogOpen(false)
+      setSelectedFileName("")
+      setIsImportDialogOpen(false)
       loadPersons()
 
       // Limpiar el input file
-      const fileInput = document.getElementById("excel-file") as HTMLInputElement
+      const fileInput = document.getElementById("excel-file-input") as HTMLInputElement
       if (fileInput) fileInput.value = ""
     } catch (error) {
       console.error("Error al importar datos:", error)
@@ -294,9 +294,11 @@ export function DatabaseManagement() {
   }
 
   const handleClearDatabase = async () => {
-    if (!confirm("¿Estás seguro de eliminar TODA la base de datos? Esta acción no se puede deshacer.")) {
-      return
-    }
+    const confirmed = window.confirm(
+      "¿Estás seguro de eliminar TODA la base de datos? Esta acción no se puede deshacer.",
+    )
+
+    if (!confirmed) return
 
     try {
       const batch = writeBatch(db)
@@ -306,49 +308,44 @@ export function DatabaseManagement() {
         }
       })
       await batch.commit()
-      setSuccess("Base de datos limpiada exitosamente")
+      window.alert("Base de datos limpiada exitosamente")
       loadPersons()
     } catch (error) {
       console.error("Error al limpiar base de datos:", error)
-      setError("Error al limpiar la base de datos")
+      window.alert("Error al limpiar la base de datos")
     }
   }
 
   const handleResetMetrics = async () => {
-    if (
-      !confirm(
-        "¿Estás seguro de reiniciar todas las métricas? Esto eliminará todos los registros de acceso (access_logs). Esta acción no se puede deshacer.",
-      )
-    ) {
-      return
-    }
+    const confirmed = window.confirm(
+      "¿Estás seguro de reiniciar todas las métricas? Esto eliminará todos los registros de acceso (access_logs). Esta acción no se puede deshacer.",
+    )
+
+    if (!confirmed) return
 
     setImporting(true)
     setError("")
     setSuccess("")
 
     try {
-      // Obtener todos los documentos de access_logs
       const accessLogsSnapshot = await getDocs(collection(db, "access_logs"))
 
       if (accessLogsSnapshot.empty) {
-        setSuccess("No hay métricas para reiniciar")
+        window.alert("No hay métricas para reiniciar")
         return
       }
 
-      // Crear batch para eliminar todos los access_logs
       const batch = writeBatch(db)
       accessLogsSnapshot.forEach((doc) => {
         batch.delete(doc.ref)
       })
 
-      // Ejecutar el batch
       await batch.commit()
 
-      setSuccess(`✅ Métricas reiniciadas exitosamente: ${accessLogsSnapshot.size} registros de acceso eliminados`)
+      window.alert(`Métricas reiniciadas exitosamente: ${accessLogsSnapshot.size} registros de acceso eliminados`)
     } catch (error) {
       console.error("Error al reiniciar métricas:", error)
-      setError("Error al reiniciar las métricas")
+      window.alert("Error al reiniciar las métricas")
     } finally {
       setImporting(false)
     }
@@ -374,6 +371,12 @@ export function DatabaseManagement() {
   }
 
   const handleResetAllBufetes = async () => {
+    const confirmed = window.confirm(
+      "¿Estás seguro de reiniciar todos los bufetes? Esto restaurará las comidas consumidas para todos los estudiantes.",
+    )
+
+    if (!confirmed) return
+
     setResetting(true)
     setError("")
     setSuccess("")
@@ -399,7 +402,6 @@ export function DatabaseManagement() {
 
       logsSnapshot.forEach((docSnapshot) => {
         const data = docSnapshot.data()
-        // Solo eliminar logs que tienen mesaUsada (son de bufetes)
         if (data.mesaUsada !== undefined && data.mesaUsada !== null) {
           deleteBatch.delete(docSnapshot.ref)
           deletedCount++
@@ -408,20 +410,26 @@ export function DatabaseManagement() {
 
       await deleteBatch.commit()
 
-      setSuccess(
-        `✅ Todos los bufetes han sido reiniciados exitosamente. ${persons.length} estudiantes actualizados, ${deletedCount} registros de comidas eliminados.`,
+      window.alert(
+        `Todos los bufetes han sido reiniciados exitosamente. ${persons.length} estudiantes actualizados, ${deletedCount} registros de comidas eliminados.`,
       )
       setIsResetBufetesDialogOpen(false)
       loadPersons()
     } catch (error) {
       console.error("Error al reiniciar bufetes:", error)
-      setError("Error al reiniciar los bufetes. Intenta nuevamente")
+      window.alert("Error al reiniciar los bufetes. Intenta nuevamente")
     } finally {
       setResetting(false)
     }
   }
 
   const handleResetBufeteByMesa = async (mesaNumero: number) => {
+    const confirmed = window.confirm(
+      `¿Estás seguro de reiniciar el bufete de la Mesa ${mesaNumero}? Esto restaurará las comidas consumidas en esta mesa.`,
+    )
+
+    if (!confirmed) return
+
     setResetting(true)
     setError("")
     setSuccess("")
@@ -435,7 +443,7 @@ export function DatabaseManagement() {
       const logsSnapshot = await getDocs(logsQuery)
 
       if (logsSnapshot.empty) {
-        setSuccess(`No hay consumos registrados para la Mesa ${mesaNumero}`)
+        window.alert(`No hay consumos registrados para la Mesa ${mesaNumero}`)
         setIsResetBufetesDialogOpen(false)
         return
       }
@@ -460,7 +468,6 @@ export function DatabaseManagement() {
           const personDoc = personSnapshot.docs[0]
           const currentCuposConsumidos = personDoc.data().cuposConsumidos || 0
 
-          // Restar los consumos de esta mesa específica
           const newCuposConsumidos = Math.max(0, currentCuposConsumidos - consumosEnMesa)
 
           batch.update(doc(db, "personas", personDoc.id), {
@@ -478,14 +485,14 @@ export function DatabaseManagement() {
       })
       await deleteBatch.commit()
 
-      setSuccess(
-        `✅ Bufete de Mesa ${mesaNumero} reiniciado exitosamente. ${updatedCount} estudiante(s) actualizado(s), ${logsSnapshot.size} registro(s) de comidas eliminados.`,
+      window.alert(
+        `Bufete de Mesa ${mesaNumero} reiniciado exitosamente. ${updatedCount} estudiante(s) actualizado(s), ${logsSnapshot.size} registro(s) de comidas eliminados.`,
       )
       setIsResetBufetesDialogOpen(false)
       loadPersons()
     } catch (error) {
       console.error("Error al reiniciar bufete por mesa:", error)
-      setError("Error al reiniciar el bufete. Intenta nuevamente")
+      window.alert("Error al reiniciar el bufete. Intenta nuevamente")
     } finally {
       setResetting(false)
     }
@@ -512,231 +519,6 @@ export function DatabaseManagement() {
 
   return (
     <main className="flex flex-1 flex-col gap-4 p-3 sm:p-4 lg:p-6">
-      <header className="space-y-3">
-        <div className="flex flex-col gap-3">
-          <div>
-            <h1 className="text-xl sm:text-2xl font-bold text-balance">Base de Datos</h1>
-            <p className="text-sm text-muted-foreground text-pretty">
-              Gestiona la base de datos de personas del sistema
-            </p>
-          </div>
-
-          <div className="flex flex-col sm:flex-row gap-2">
-            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-              <DialogTrigger asChild>
-                <Button className="w-full sm:w-auto justify-center">
-                  <Upload className="w-4 h-4 mr-2" />
-                  Importar Excel
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="mx-4 sm:mx-0 sm:max-w-2xl max-h-[90vh] overflow-y-auto">
-                <DialogHeader>
-                  <DialogTitle className="text-lg">Importar Base de Datos desde Excel</DialogTitle>
-                  <DialogDescription className="text-sm">
-                    Selecciona un archivo Excel (.xlsx) con las columnas: Puesto, Identificación, Nombre, Programa,
-                    Cupos Extras
-                  </DialogDescription>
-                </DialogHeader>
-
-                <div className="space-y-4 py-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="excel-file" className="text-sm font-medium">
-                      Archivo Excel
-                    </Label>
-                    <Input
-                      id="excel-file"
-                      type="file"
-                      accept=".xlsx,.xls"
-                      onChange={handleFileChange}
-                      disabled={importing}
-                      className="h-11"
-                    />
-                  </div>
-
-                  {previewData.length > 0 && (
-                    <div className="space-y-2">
-                      <Label className="text-sm font-medium">Vista Previa ({previewData.length} registros)</Label>
-                      <div className="max-h-48 sm:max-h-60 overflow-auto border rounded-lg">
-                        <div className="block sm:hidden">
-                          {previewData.slice(0, 5).map((person, index) => (
-                            <div key={index} className="p-3 border-b last:border-b-0 space-y-1">
-                              <div className="flex items-center gap-2">
-                                <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded font-medium">
-                                  {person.puesto}
-                                </span>
-                                {person.cuposExtras > 0 && (
-                                  <span className="text-xs bg-orange-100 text-orange-700 px-2 py-1 rounded font-medium">
-                                    +{person.cuposExtras}
-                                  </span>
-                                )}
-                              </div>
-                              <p className="font-medium text-sm">{person.nombre}</p>
-                              <p className="text-xs text-muted-foreground">{person.identificacion}</p>
-                              <p className="text-xs text-muted-foreground">{person.programa}</p>
-                            </div>
-                          ))}
-                          {previewData.length > 5 && (
-                            <div className="p-2 text-center text-muted-foreground text-xs">
-                              ... y {previewData.length - 5} registros más
-                            </div>
-                          )}
-                        </div>
-
-                        <table className="hidden sm:table w-full text-sm">
-                          <thead className="bg-muted">
-                            <tr>
-                              <th className="p-2 text-left text-xs font-medium">Puesto</th>
-                              <th className="p-2 text-left text-xs font-medium">Identificación</th>
-                              <th className="p-2 text-left text-xs font-medium">Nombre</th>
-                              <th className="p-2 text-left text-xs font-medium">Programa</th>
-                              <th className="p-2 text-left text-xs font-medium">Cupos</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {previewData.slice(0, 10).map((person, index) => (
-                              <tr key={index} className="border-t">
-                                <td className="p-2 text-xs">{person.puesto}</td>
-                                <td className="p-2 text-xs">{person.identificacion}</td>
-                                <td className="p-2 text-xs">{person.nombre}</td>
-                                <td className="p-2 text-xs">{person.programa}</td>
-                                <td className="p-2 text-xs">{person.cuposExtras}</td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                        {previewData.length > 10 && (
-                          <div className="p-2 text-center text-muted-foreground text-xs">
-                            ... y {previewData.length - 10} registros más
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                <DialogFooter>
-                  <Button
-                    onClick={handleImportData}
-                    disabled={importing || previewData.length === 0}
-                    className="w-full h-11"
-                  >
-                    {importing ? (
-                      <>
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        Importando...
-                      </>
-                    ) : (
-                      <>
-                        <CheckCircle className="w-4 h-4 mr-2" />
-                        Importar {previewData.length} Registros
-                      </>
-                    )}
-                  </Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
-
-            <Button variant="destructive" onClick={handleClearDatabase} className="w-full sm:w-auto justify-center">
-              <Trash2 className="w-4 h-4 mr-2" />
-              Limpiar BD
-            </Button>
-
-            <Button
-              variant="outline"
-              onClick={handleResetMetrics}
-              disabled={importing}
-              className="w-full sm:w-auto justify-center border-orange-200 text-orange-700 hover:bg-orange-50 bg-transparent"
-            >
-              {importing ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <RotateCcw className="w-4 h-4 mr-2" />}
-              Reiniciar Métricas
-            </Button>
-
-            <Dialog open={isResetBufetesDialogOpen} onOpenChange={setIsResetBufetesDialogOpen}>
-              <DialogTrigger asChild>
-                <Button
-                  variant="outline"
-                  className="w-full sm:w-auto justify-center border-green-200 text-green-700 hover:bg-green-50 bg-transparent"
-                >
-                  <UtensilsCrossed className="w-4 h-4 mr-2" />
-                  Reiniciar Bufetes
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="mx-4 sm:mx-0 sm:max-w-md">
-                <DialogHeader>
-                  <DialogTitle className="text-lg">Reiniciar Bufetes</DialogTitle>
-                  <DialogDescription className="text-sm">
-                    Restaura las comidas consumidas para permitir nuevas entregas
-                  </DialogDescription>
-                </DialogHeader>
-
-                <div className="space-y-4 py-4">
-                  <div className="space-y-3">
-                    <Button
-                      onClick={handleResetAllBufetes}
-                      disabled={resetting}
-                      className="w-full h-11 justify-start bg-transparent"
-                      variant="outline"
-                    >
-                      {resetting ? (
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      ) : (
-                        <RotateCcw className="w-4 h-4 mr-2" />
-                      )}
-                      Reiniciar Todos los Bufetes
-                    </Button>
-
-                    <div className="relative">
-                      <div className="absolute inset-0 flex items-center">
-                        <span className="w-full border-t" />
-                      </div>
-                      <div className="relative flex justify-center text-xs uppercase">
-                        <span className="bg-background px-2 text-muted-foreground">O por mesa</span>
-                      </div>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label className="text-sm font-medium">Reiniciar por Mesa</Label>
-                      <div className="grid grid-cols-2 gap-2">
-                        {mesas.map((mesa) => (
-                          <Button
-                            key={mesa.id}
-                            onClick={() => handleResetBufeteByMesa(mesa.numero)}
-                            disabled={resetting || !mesa.activa}
-                            variant="outline"
-                            className="h-11 justify-start"
-                          >
-                            {resetting ? (
-                              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                            ) : (
-                              <UtensilsCrossed className="w-4 h-4 mr-2" />
-                            )}
-                            Mesa {mesa.numero}
-                          </Button>
-                        ))}
-                      </div>
-                      {mesas.some((m) => !m.activa) && (
-                        <p className="text-xs text-muted-foreground">* Las mesas inactivas no se pueden reiniciar</p>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                <DialogFooter>
-                  <Button
-                    variant="ghost"
-                    onClick={() => setIsResetBufetesDialogOpen(false)}
-                    disabled={resetting}
-                    className="w-full"
-                  >
-                    Cancelar
-                  </Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
-          </div>
-        </div>
-      </header>
-
       {error && (
         <Alert variant="destructive" className="mx-1">
           <AlertDescription className="text-sm">{error}</AlertDescription>
@@ -749,183 +531,226 @@ export function DatabaseManagement() {
         </Alert>
       )}
 
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="flex items-center gap-2 text-lg">
-            <Search className="w-4 h-4" />
-            Filtros
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-            <Input
-              placeholder="Buscar por nombre, identificación..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10 pr-10 h-11"
-            />
-            {searchTerm && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setSearchTerm("")}
-                className="absolute right-1 top-1/2 transform -translate-y-1/2 h-8 w-8 p-0"
-              >
-                <X className="h-4 w-4" />
-              </Button>
-            )}
-          </div>
+      <div className="space-y-2">
+        <h1 className="text-2xl font-bold">Base de Datos</h1>
+        <p className="text-sm text-muted-foreground">Gestiona la base de datos de personas del sistema</p>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div className="space-y-2">
-              <Label className="text-sm font-medium">Programa</Label>
-              <Select value={selectedPrograma} onValueChange={setSelectedPrograma}>
-                <SelectTrigger className="h-11">
-                  <SelectValue placeholder="Todos los programas" />
-                </SelectTrigger>
-                <SelectContent className="max-h-60 w-[var(--radix-select-trigger-width)] min-w-[300px] max-w-[90vw]">
-                  <SelectItem value="todos">Todos los programas</SelectItem>
-                  {uniquePrograms.map((programa) => (
-                    <SelectItem
-                      key={programa}
-                      value={programa}
-                      className="whitespace-normal break-words py-3 px-3 leading-relaxed min-h-[2.5rem] cursor-pointer"
-                    >
-                      <span className="block text-sm">{programa}</span>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+        <div className="flex flex-wrap gap-3 pt-2">
+          <Button
+            onClick={() => setIsImportDialogOpen(true)}
+            disabled={importing}
+            className="bg-black hover:bg-black/90 text-white"
+          >
+            <Upload className="mr-2 h-4 w-4" />
+            Importar Excel
+          </Button>
 
-            <div className="space-y-2">
-              <Label className="text-sm font-medium">Cupos Extras</Label>
-              <Select value={selectedCuposExtras} onValueChange={setSelectedCuposExtras}>
-                <SelectTrigger className="h-11">
-                  <SelectValue placeholder="Todos" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="todos">Todos</SelectItem>
-                  <SelectItem value="con-extras">Con cupos extras</SelectItem>
-                  <SelectItem value="sin-extras">Sin cupos extras</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+          <Button
+            onClick={handleClearDatabase}
+            disabled={importing}
+            variant="destructive"
+            className="bg-red-600 hover:bg-red-700"
+          >
+            <Trash2 className="mr-2 h-4 w-4" />
+            Limpiar BD
+          </Button>
 
-            <div className="space-y-2">
-              <Label className="text-sm font-medium">Acciones</Label>
-              <Button
-                variant="outline"
-                onClick={clearAllFilters}
-                disabled={!hasActiveFilters}
-                className="w-full h-11 justify-center bg-transparent"
-              >
-                <X className="w-4 h-4 mr-2" />
-                Limpiar Filtros
-              </Button>
-            </div>
-          </div>
+          <Button
+            onClick={handleResetMetrics}
+            disabled={importing}
+            variant="outline"
+            className="border-red-300 text-red-600 hover:bg-red-50 bg-transparent"
+          >
+            <RotateCcw className="mr-2 h-4 w-4" />
+            Reiniciar Métricas
+          </Button>
 
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div className="flex items-center gap-2">
-              <Label htmlFor="items-per-page" className="text-sm whitespace-nowrap">
-                Mostrar:
-              </Label>
-              <Select
-                value={itemsPerPage.toString()}
-                onValueChange={(value) => {
-                  setItemsPerPage(Number(value))
-                  setCurrentPage(1)
-                }}
-              >
-                <SelectTrigger className="w-20 h-9">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="10">10</SelectItem>
-                  <SelectItem value="20">20</SelectItem>
-                  <SelectItem value="50">50</SelectItem>
-                  <SelectItem value="100">100</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            {hasActiveFilters && (
-              <p className="text-sm text-muted-foreground">
-                {filteredPersons.length} de {persons.length} registros
-              </p>
-            )}
-          </div>
-        </CardContent>
-      </Card>
-
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-xs sm:text-sm font-medium">Total Registros</CardTitle>
-            <Users className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-lg sm:text-2xl font-bold">{filteredPersons.length}</div>
-            {hasActiveFilters && <p className="text-xs text-muted-foreground">de {persons.length} total</p>}
-            <p className="text-xs text-muted-foreground mt-1">Estudiantes</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-xs sm:text-sm font-medium">Programas</CardTitle>
-            <FileSpreadsheet className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-lg sm:text-2xl font-bold">{new Set(filteredPersons.map((p) => p.programa)).size}</div>
-            {hasActiveFilters && (
-              <p className="text-xs text-muted-foreground">de {new Set(persons.map((p) => p.programa)).size} total</p>
-            )}
-            <p className="text-xs text-muted-foreground mt-1">Únicos</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-xs sm:text-sm font-medium">Cupos Extras</CardTitle>
-            <Database className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-lg sm:text-2xl font-bold">
-              {filteredPersons.reduce((sum, p) => sum + (Number(p.cuposExtras) || 0), 0)}
-            </div>
-            {hasActiveFilters && (
-              <p className="text-xs text-muted-foreground">
-                de {persons.reduce((sum, p) => sum + (Number(p.cuposExtras) || 0), 0)} total
-              </p>
-            )}
-            <p className="text-xs text-muted-foreground mt-1">Adicionales</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-xs sm:text-sm font-medium">Bufete Disponible</CardTitle>
-            <CheckCircle className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-lg sm:text-2xl font-bold">
-              {filteredPersons.reduce((sum, p) => sum + 2 + (Number(p.cuposExtras) || 0), 0)}
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              {filteredPersons.length * 2} base +{" "}
-              {filteredPersons.reduce((sum, p) => sum + (Number(p.cuposExtras) || 0), 0)} extras
-            </p>
-            {hasActiveFilters && (
-              <p className="text-xs text-muted-foreground">
-                de {persons.reduce((sum, p) => sum + 2 + (Number(p.cuposExtras) || 0), 0)} total
-              </p>
-            )}
-          </CardContent>
-        </Card>
+          <Button
+            onClick={() => setIsResetBufetesDialogOpen(true)}
+            disabled={resetting}
+            variant="outline"
+            className="border-teal-300 text-teal-600 hover:bg-teal-50"
+          >
+            <Utensils className="mr-2 h-4 w-4" />
+            Reiniciar Bufetes
+          </Button>
+        </div>
       </div>
+
+      <Dialog open={isImportDialogOpen} onOpenChange={setIsImportDialogOpen}>
+        <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Importar Base de Datos desde Excel</DialogTitle>
+            <DialogDescription>
+              Selecciona un archivo Excel (.xlsx) con las columnas: Puesto, Identificación, Nombre, Programa, Cupos
+              Extras
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="excel-file-input" className="text-sm font-medium">
+                Archivo Excel
+              </Label>
+              <div className="flex items-center gap-3">
+                <Input
+                  id="excel-file-input"
+                  type="file"
+                  accept=".xlsx,.xls"
+                  onChange={handleFileChange}
+                  disabled={importing}
+                  className="hidden"
+                />
+                <Button
+                  variant="outline"
+                  onClick={() => document.getElementById("excel-file-input")?.click()}
+                  disabled={importing}
+                  className="shrink-0"
+                >
+                  Seleccionar archivo
+                </Button>
+                <span className="text-sm text-muted-foreground truncate">
+                  {selectedFileName || "Ningún archivo seleccionado"}
+                </span>
+              </div>
+            </div>
+
+            {previewData.length > 0 && (
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">
+                  Vista Previa ({previewData.length} registro{previewData.length !== 1 ? "s" : ""})
+                </Label>
+                <div className="border rounded-lg overflow-hidden">
+                  <div className="max-h-[300px] overflow-y-auto">
+                    <Table>
+                      <TableHeader className="sticky top-0 bg-muted">
+                        <TableRow>
+                          <TableHead className="w-[80px]">Puesto</TableHead>
+                          <TableHead className="w-[120px]">Identificación</TableHead>
+                          <TableHead>Nombre</TableHead>
+                          <TableHead>Programa</TableHead>
+                          <TableHead className="w-[80px] text-center">Cupos</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {previewData.slice(0, 10).map((person, index) => (
+                          <TableRow key={index}>
+                            <TableCell className="font-medium">{person.puesto}</TableCell>
+                            <TableCell>{person.identificacion}</TableCell>
+                            <TableCell>{person.nombre}</TableCell>
+                            <TableCell className="text-sm">{person.programa}</TableCell>
+                            <TableCell className="text-center">{person.cuposExtras}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                  {previewData.length > 10 && (
+                    <div className="px-4 py-2 bg-muted/50 text-xs text-muted-foreground text-center border-t">
+                      Mostrando 10 de {previewData.length} registros
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {error && (
+              <Alert variant="destructive">
+                <AlertDescription className="text-sm whitespace-pre-line">{error}</AlertDescription>
+              </Alert>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button
+              onClick={handleImportData}
+              disabled={importing || previewData.length === 0}
+              className="w-full h-12 text-base"
+              variant={previewData.length > 0 ? "default" : "secondary"}
+            >
+              {importing ? (
+                <>
+                  <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                  Importando...
+                </>
+              ) : (
+                <>
+                  <CheckCircle2 className="mr-2 h-5 w-5" />
+                  Importar {previewData.length} Registro{previewData.length !== 1 ? "s" : ""}
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isResetBufetesDialogOpen} onOpenChange={setIsResetBufetesDialogOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Reiniciar Bufetes</DialogTitle>
+            <DialogDescription>Restaura las comidas consumidas para permitir nuevas entregas</DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            <Button
+              onClick={handleResetAllBufetes}
+              disabled={resetting}
+              className="w-full h-12 text-base"
+              variant="default"
+            >
+              {resetting ? (
+                <>
+                  <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                  Reseteando...
+                </>
+              ) : (
+                <>
+                  <RotateCcw className="mr-2 h-5 w-5" />
+                  Reiniciar Todos los Bufetes
+                </>
+              )}
+            </Button>
+
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <span className="w-full border-t" />
+              </div>
+              <div className="relative flex justify-center text-xs uppercase">
+                <span className="bg-background px-2 text-muted-foreground">O POR MESA</span>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">Reiniciar por Mesa</Label>
+              <div className="grid grid-cols-2 gap-2">
+                {mesas.map((mesa) => (
+                  <Button
+                    key={mesa.id}
+                    onClick={() => handleResetBufeteByMesa(mesa.numero)}
+                    disabled={resetting || !mesa.activa}
+                    variant="outline"
+                    className="h-11 justify-start"
+                  >
+                    <Utensils className="mr-2 h-4 w-4" />
+                    Mesa {mesa.numero}
+                  </Button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setIsResetBufetesDialogOpen(false)}
+              disabled={resetting}
+              className="w-full"
+            >
+              Cancelar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Card>
         <CardHeader className="pb-3">

@@ -3,7 +3,7 @@
 import type React from "react"
 
 import { useState, useEffect } from "react"
-import { createUser, resetUserPassword } from "@/lib/auth-service"
+import { createUser, resetUserPassword, changePassword } from "@/lib/auth-service"
 import { collection, getDocs, deleteDoc, doc, updateDoc, query } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { Button } from "@/components/ui/button"
@@ -21,7 +21,17 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
-import { Loader2, Plus, Trash2, Shield, User, Award as IdCard, Scale, KeyRound } from "lucide-react"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+import { Loader2, Plus, Trash2, Shield, User, Award as IdCard, Scale, KeyRound, Edit } from "lucide-react"
 
 interface UserData {
   id: string
@@ -40,6 +50,25 @@ export function UserManagement() {
   const [error, setError] = useState("")
   const [success, setSuccess] = useState("")
   const [isDialogOpen, setIsDialogOpen] = useState(false)
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
+  const [editingUser, setEditingUser] = useState<UserData | null>(null)
+  const [editForm, setEditForm] = useState({
+    idNumber: "",
+    fullName: "",
+    password: "",
+  })
+
+  const [confirmDialog, setConfirmDialog] = useState<{
+    open: boolean
+    title: string
+    description: string
+    onConfirm: () => void
+  }>({
+    open: false,
+    title: "",
+    description: "",
+    onConfirm: () => {},
+  })
 
   const [mesasActivas, setMesasActivas] = useState<number[]>([])
 
@@ -137,18 +166,21 @@ export function UserManagement() {
   }
 
   const handleDeleteUser = async (userId: string, fullName: string) => {
-    if (!confirm(`¿Estás seguro de eliminar al usuario ${fullName}?`)) {
-      return
-    }
-
-    try {
-      await deleteDoc(doc(db, "users", userId))
-      setSuccess(`Usuario ${fullName} eliminado exitosamente`)
-      loadUsers()
-    } catch (error) {
-      console.error("Error al eliminar usuario:", error)
-      setError("Error al eliminar el usuario")
-    }
+    setConfirmDialog({
+      open: true,
+      title: "¿Eliminar usuario?",
+      description: `¿Estás seguro de eliminar al usuario ${fullName}? Esta acción no se puede deshacer.`,
+      onConfirm: async () => {
+        try {
+          await deleteDoc(doc(db, "users", userId))
+          setSuccess(`Usuario ${fullName} eliminado exitosamente`)
+          loadUsers()
+        } catch (error) {
+          console.error("Error al eliminar usuario:", error)
+          setError("Error al eliminar el usuario")
+        }
+      },
+    })
   }
 
   const handleRoleChange = async (userId: string, newRole: "administrador" | "operativo" | "bufete") => {
@@ -188,21 +220,64 @@ export function UserManagement() {
   }
 
   const handleResetPassword = async (userId: string, fullName: string) => {
-    if (
-      !confirm(`¿Estás seguro de restaurar la contraseña de ${fullName}? Se establecerá la contraseña predeterminada.`)
-    ) {
-      return
-    }
+    setConfirmDialog({
+      open: true,
+      title: "¿Restaurar contraseña?",
+      description: `¿Estás seguro de restaurar la contraseña de ${fullName}? Se establecerá la contraseña predeterminada: Uparsistem123`,
+      onConfirm: async () => {
+        setResettingPassword(userId)
+        try {
+          await resetUserPassword(userId)
+          setSuccess(`Contraseña de ${fullName} restaurada exitosamente. Nueva contraseña: Uparsistem123`)
+        } catch (error) {
+          console.error("Error al restaurar contraseña:", error)
+          setError("Error al restaurar la contraseña")
+        } finally {
+          setResettingPassword(null)
+        }
+      },
+    })
+  }
 
-    setResettingPassword(userId)
+  const handleOpenEditDialog = (user: UserData) => {
+    setEditingUser(user)
+    setEditForm({
+      idNumber: user.idNumber,
+      fullName: user.fullName,
+      password: "",
+    })
+    setIsEditDialogOpen(true)
+  }
+
+  const handleEditUser = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!editingUser) return
+
+    setCreating(true)
+    setError("")
+    setSuccess("")
+
     try {
-      await resetUserPassword(userId)
-      setSuccess(`Contraseña de ${fullName} restaurada exitosamente. Nueva contraseña: Uparsistem123`)
-    } catch (error) {
-      console.error("Error al restaurar contraseña:", error)
-      setError("Error al restaurar la contraseña")
+      const updateData: any = {
+        idNumber: editForm.idNumber,
+        fullName: editForm.fullName,
+      }
+
+      if (editForm.password.trim()) {
+        await changePassword(editingUser.id, editForm.password)
+      }
+
+      await updateDoc(doc(db, "users", editingUser.id), updateData)
+
+      setSuccess(`Usuario ${editForm.fullName} actualizado exitosamente`)
+      setIsEditDialogOpen(false)
+      setEditingUser(null)
+      loadUsers()
+    } catch (error: any) {
+      console.error("Error al editar usuario:", error)
+      setError(error.message || "Error al editar el usuario")
     } finally {
-      setResettingPassword(null)
+      setCreating(false)
     }
   }
 
@@ -241,6 +316,18 @@ export function UserManagement() {
 
   return (
     <main className="flex flex-1 flex-col gap-4 p-4">
+      {error && (
+        <Alert variant="destructive">
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
+
+      {success && (
+        <Alert className="border-green-200 bg-green-50 text-green-800">
+          <AlertDescription>{success}</AlertDescription>
+        </Alert>
+      )}
+
       <header className="flex items-center justify-between gap-4">
         <div className="min-w-0 flex-1">
           <h1 className="text-xl font-bold">Gestión de Usuarios</h1>
@@ -396,18 +483,6 @@ export function UserManagement() {
         </Dialog>
       </header>
 
-      {error && (
-        <Alert variant="destructive">
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
-      )}
-
-      {success && (
-        <Alert className="border-green-200 bg-green-50 text-green-800">
-          <AlertDescription>{success}</AlertDescription>
-        </Alert>
-      )}
-
       {users.length === 0 ? (
         <Card>
           <CardContent className="py-12">
@@ -424,7 +499,6 @@ export function UserManagement() {
             <Card key={user.id}>
               <CardContent className="p-4">
                 <div className="space-y-3">
-                  {/* User info section */}
                   <div className="flex items-start gap-3">
                     <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center shrink-0">
                       {getRoleIcon(user.role)}
@@ -455,9 +529,7 @@ export function UserManagement() {
                     </div>
                   </div>
 
-                  {/* Actions section - individual buttons */}
                   <div className="flex flex-col gap-2 pt-2 border-t">
-                    {/* Role and Mesa controls */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                       <div className="space-y-1">
                         <Label className="text-xs text-muted-foreground">Rol</Label>
@@ -515,8 +587,16 @@ export function UserManagement() {
                       )}
                     </div>
 
-                    {/* Action buttons */}
                     <div className="flex gap-2 pt-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleOpenEditDialog(user)}
+                        className="flex-1 h-8 text-xs"
+                      >
+                        <Edit className="w-3 h-3 mr-1" />
+                        Editar
+                      </Button>
                       <Button
                         variant="outline"
                         size="sm"
@@ -547,6 +627,101 @@ export function UserManagement() {
           ))}
         </div>
       )}
+
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent className="w-[95vw] max-w-md mx-auto">
+          <DialogHeader>
+            <DialogTitle>Editar Usuario</DialogTitle>
+            <DialogDescription>Modifica los datos del usuario</DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleEditUser}>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-idNumber">Número de Identificación</Label>
+                <div className="relative">
+                  <IdCard className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <Input
+                    id="edit-idNumber"
+                    type="text"
+                    placeholder="1234567890"
+                    value={editForm.idNumber}
+                    onChange={(e) => setEditForm({ ...editForm, idNumber: e.target.value })}
+                    className="pl-10"
+                    required
+                    disabled={creating}
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="edit-fullName">Nombre Completo</Label>
+                <div className="relative">
+                  <User className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <Input
+                    id="edit-fullName"
+                    type="text"
+                    placeholder="Juan Pérez"
+                    value={editForm.fullName}
+                    onChange={(e) => setEditForm({ ...editForm, fullName: e.target.value })}
+                    className="pl-10"
+                    required
+                    disabled={creating}
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="edit-password">Nueva Contraseña (opcional)</Label>
+                <Input
+                  id="edit-password"
+                  type="password"
+                  placeholder="Dejar vacío para mantener la actual"
+                  value={editForm.password}
+                  onChange={(e) => setEditForm({ ...editForm, password: e.target.value })}
+                  disabled={creating}
+                  minLength={6}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Deja este campo vacío si no deseas cambiar la contraseña
+                </p>
+              </div>
+            </div>
+
+            <DialogFooter>
+              <Button type="submit" disabled={creating} className="w-full">
+                {creating ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Guardando...
+                  </>
+                ) : (
+                  "Guardar Cambios"
+                )}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog open={confirmDialog.open} onOpenChange={(open) => setConfirmDialog({ ...confirmDialog, open })}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{confirmDialog.title}</AlertDialogTitle>
+            <AlertDialogDescription>{confirmDialog.description}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                confirmDialog.onConfirm()
+                setConfirmDialog({ ...confirmDialog, open: false })
+              }}
+            >
+              Confirmar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </main>
   )
 }

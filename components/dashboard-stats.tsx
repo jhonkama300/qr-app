@@ -172,7 +172,7 @@ export function DashboardStats() {
 
     const entregasPorMesa = new Map<number, number>()
     entregasComida.forEach((log) => {
-      if (log.mesaUsada) {
+      if (log.mesaUsada !== undefined) {
         entregasPorMesa.set(log.mesaUsada, (entregasPorMesa.get(log.mesaUsada) || 0) + 1)
       }
     })
@@ -202,6 +202,7 @@ export function DashboardStats() {
       comidasEntregadas,
       ingresosPorComida,
       mesaMasActiva,
+      entregasPorMesa: Array.from(entregasPorMesa.entries()),
     })
   }
 
@@ -254,7 +255,7 @@ export function DashboardStats() {
     )
 
     entregasComida.forEach((log) => {
-      if (log.mesaUsada) {
+      if (log.mesaUsada !== undefined) {
         entregasPorMesa.set(log.mesaUsada, (entregasPorMesa.get(log.mesaUsada) || 0) + 1)
       }
     })
