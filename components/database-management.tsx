@@ -85,9 +85,9 @@ export function DatabaseManagement() {
   const currentPersons = filteredPersons.slice(startIndex, endIndex)
   const uniquePrograms = Array.from(new Set(persons.map((person) => person.programa)))
 
-  const totalRegistros = persons.length
-  const programasUnicos = Array.from(new Set(persons.map((p) => p.programa))).length
-  const totalCuposExtras = persons.reduce((sum, p) => sum + (p.cuposExtras || 0), 0)
+  const totalRegistros = filteredPersons.length
+  const programasUnicos = Array.from(new Set(filteredPersons.map((p) => p.programa))).length
+  const totalCuposExtras = filteredPersons.reduce((sum, p) => sum + (p.cuposExtras || 0), 0)
   const bufeteDisponible = totalRegistros * 2 + totalCuposExtras
 
   useEffect(() => {
