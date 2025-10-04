@@ -8,7 +8,7 @@ export interface User {
   id: string
   idNumber: string
   fullName: string
-  role: "administrador" | "operativo" | "bufete"
+  roles: ("administrador" | "operativo" | "bufete")[] // Changed from single role to array of roles
   mesaAsignada?: number
   createdAt: string
   hasDefaultPassword?: boolean
@@ -41,11 +41,21 @@ export const validateLogin = async (idNumber: string, password: string): Promise
 
     const hasDefaultPassword = hashedPassword === DEFAULT_PASSWORD_HASH
 
+    let roles: ("administrador" | "operativo" | "bufete")[]
+    if (Array.isArray(userData.roles)) {
+      roles = userData.roles
+    } else if (userData.role) {
+      // Backward compatibility: convert old single role to array
+      roles = [userData.role]
+    } else {
+      roles = ["operativo"] // Default role
+    }
+
     return {
       id: userDoc.id,
       idNumber: userData.idNumber,
       fullName: userData.fullName,
-      role: userData.role,
+      roles: roles,
       mesaAsignada: userData.mesaAsignada,
       createdAt: userData.createdAt,
       hasDefaultPassword,
@@ -61,7 +71,7 @@ export const createUser = async (
   idNumber: string,
   fullName: string,
   password: string,
-  role: "administrador" | "operativo" | "bufete",
+  roles: ("administrador" | "operativo" | "bufete")[],
   mesaAsignada?: number,
 ): Promise<boolean> => {
   try {
@@ -79,11 +89,11 @@ export const createUser = async (
       idNumber,
       fullName,
       password: hashedPassword,
-      role,
+      roles: roles, // Store as array
       createdAt: new Date().toISOString(),
     }
 
-    if (role === "bufete" && mesaAsignada) {
+    if (roles.includes("bufete") && mesaAsignada) {
       userData.mesaAsignada = mesaAsignada
     }
 
@@ -147,13 +157,23 @@ export const checkIdType = async (
     if (!usersSnapshot.empty) {
       const userData = usersSnapshot.docs[0].data()
       console.log("[v0] Usuario admin encontrado:", userData)
+
+      let roles: ("administrador" | "operativo" | "bufete")[]
+      if (Array.isArray(userData.roles)) {
+        roles = userData.roles
+      } else if (userData.role) {
+        roles = [userData.role]
+      } else {
+        roles = ["operativo"]
+      }
+
       return {
         type: "admin",
         userData: {
           id: usersSnapshot.docs[0].id,
           idNumber: userData.idNumber,
           fullName: userData.fullName,
-          role: userData.role,
+          roles: roles,
           mesaAsignada: userData.mesaAsignada,
         },
       }

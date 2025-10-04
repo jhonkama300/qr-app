@@ -38,7 +38,7 @@ interface ScanResult {
 }
 
 export function BuffeteScanner() {
-  const { user, fullName } = useAuth()
+  const { user, fullName, activeRole } = useAuth()
   const { getStudentById, markStudentAccess, validateMesaAccess } = useStudentStoreContext()
 
   const [isClient, setIsClient] = useState(false)
@@ -165,7 +165,7 @@ export function BuffeteScanner() {
         userId: user.id,
         userName: fullName || user.fullName || "Usuario Bufete",
         userEmail: user.idNumber + "@sistema.com",
-        userRole: user.role || "bufete",
+        userRole: activeRole || "bufete",
         mesaAsignada: user.mesaAsignada,
       }
 
@@ -297,7 +297,7 @@ export function BuffeteScanner() {
       })
   }
 
-  if (user?.role !== "bufete") {
+  if (activeRole !== "bufete") {
     return (
       <div className="flex items-center justify-center p-8">
         <Alert variant="destructive">

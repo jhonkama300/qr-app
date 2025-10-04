@@ -40,7 +40,7 @@ interface ScanResultDisplay {
 export function BarcodeScanner() {
   const { getStudentById, markStudentAccess, checkIfAlreadyScanned } = useStudentStoreContext()
   const { processQ10Url, isProcessingQ10, q10Message } = useQ10Validation()
-  const { user, fullName } = useAuth()
+  const { user, fullName, activeRole } = useAuth()
 
   const [isClient, setIsClient] = useState(false)
   const [hasPermission, setHasPermission] = useState<boolean | null>(null)
@@ -122,7 +122,7 @@ export function BarcodeScanner() {
             userId: user.id,
             userName: fullName || user.email || "Usuario",
             userEmail: user.email || undefined,
-            userRole: user.role || "Usuario",
+            userRole: activeRole || "Usuario",
           }
         : undefined
 
@@ -230,7 +230,7 @@ export function BarcodeScanner() {
         setIsScanning(false)
       }, 5000)
     },
-    [getStudentById, markStudentAccess, processQ10Url, user, checkIfAlreadyScanned, isScanning, fullName],
+    [getStudentById, markStudentAccess, processQ10Url, user, checkIfAlreadyScanned, isScanning, fullName, activeRole],
   )
 
   useEffect(() => {

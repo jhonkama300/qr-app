@@ -20,6 +20,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { useAuth } from "@/components/auth-provider"
 import { useRouter } from "next/navigation"
 import type { ViewType } from "@/components/spa-dashboard"
+import { RoleSwitcher } from "@/components/role-switcher"
 
 interface AppSidebarProps {
   currentView?: ViewType
@@ -92,7 +93,7 @@ const items = [
 ]
 
 export function AppSidebar({ currentView = "inicio", onViewChange }: AppSidebarProps) {
-  const { user, userRole, isAdmin, isBufete, logout, fullName } = useAuth()
+  const { user, activeRole, isAdmin, isBufete, logout, fullName } = useAuth()
   const router = useRouter()
   const { setOpenMobile, isMobile } = useSidebar()
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
@@ -131,7 +132,7 @@ export function AppSidebar({ currentView = "inicio", onViewChange }: AppSidebarP
   }
 
   const userName = user?.email?.split("@")[0] || "Usuario"
-  const isOperativo = userRole === "operativo"
+  const isOperativo = activeRole === "operativo"
 
   const visibleItems = items.filter((item) => {
     if (item.adminOnly && !isAdmin) return false
@@ -162,6 +163,9 @@ export function AppSidebar({ currentView = "inicio", onViewChange }: AppSidebarP
                   </span>
                 </div>
               </SidebarMenuButton>
+            </SidebarMenuItem>
+            <SidebarMenuItem className="mt-2">
+              <RoleSwitcher />
             </SidebarMenuItem>
           </SidebarMenu>
         </SidebarHeader>
@@ -200,7 +204,9 @@ export function AppSidebar({ currentView = "inicio", onViewChange }: AppSidebarP
                         <div className="flex flex-col flex-1">
                           <span className="font-medium text-base">{item.title}</span>
                           {item.view === "escanear" && item.getDescription && (
-                            <span className="text-xs text-muted-foreground">{item.getDescription(userRole || "")}</span>
+                            <span className="text-xs text-muted-foreground">
+                              {item.getDescription(activeRole || "")}
+                            </span>
                           )}
                         </div>
                         {item.adminOnly && isAdmin && (
@@ -249,7 +255,7 @@ export function AppSidebar({ currentView = "inicio", onViewChange }: AppSidebarP
                         {isOperativo && " (Operativo)"}
                       </span>
                       <span className="truncate text-xs">
-                        ID: {user?.idNumber} • {userRole}
+                        ID: {user?.idNumber} • {activeRole}
                       </span>
                     </div>
                     <ChevronUp className="ml-auto size-4" />
@@ -273,7 +279,7 @@ export function AppSidebar({ currentView = "inicio", onViewChange }: AppSidebarP
                         {isOperativo && " (Operativo)"}
                       </span>
                       <span className="truncate text-xs">
-                        ID: {user?.idNumber} • {userRole}
+                        ID: {user?.idNumber} • {activeRole}
                       </span>
                     </div>
                   </DropdownMenuItem>

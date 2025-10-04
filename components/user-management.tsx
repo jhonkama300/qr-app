@@ -11,7 +11,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Checkbox } from "@/components/ui/checkbox"
 import {
   Dialog,
   DialogContent,
@@ -32,12 +32,13 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { Loader2, Plus, Trash2, Shield, User, Award as IdCard, Scale, KeyRound, Edit } from "lucide-react"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 interface UserData {
   id: string
   idNumber: string
   fullName: string
-  role: "administrador" | "operativo" | "bufete"
+  roles: ("administrador" | "operativo" | "bufete")[]
   mesaAsignada?: number
   createdAt: string
 }
@@ -76,7 +77,11 @@ export function UserManagement() {
     idNumber: "",
     fullName: "",
     password: "",
-    role: "operativo" as "administrador" | "operativo" | "bufete",
+    roles: {
+      administrador: false,
+      operativo: true,
+      bufete: false,
+    },
     mesaAsignada: 1,
   })
 
@@ -113,11 +118,21 @@ export function UserManagement() {
       const usersData: UserData[] = []
       querySnapshot.forEach((doc) => {
         const data = doc.data()
+
+        let roles: ("administrador" | "operativo" | "bufete")[]
+        if (Array.isArray(data.roles)) {
+          roles = data.roles
+        } else if (data.role) {
+          roles = [data.role]
+        } else {
+          roles = ["operativo"]
+        }
+
         usersData.push({
           id: doc.id,
           idNumber: data.idNumber,
           fullName: data.fullName,
-          role: data.role,
+          roles: roles,
           mesaAsignada: data.mesaAsignada,
           createdAt: data.createdAt,
         })
@@ -138,7 +153,18 @@ export function UserManagement() {
     setSuccess("")
 
     try {
-      if (newUser.role === "bufete" && !mesasActivas.includes(newUser.mesaAsignada)) {
+      const selectedRoles: ("administrador" | "operativo" | "bufete")[] = []
+      if (newUser.roles.administrador) selectedRoles.push("administrador")
+      if (newUser.roles.operativo) selectedRoles.push("operativo")
+      if (newUser.roles.bufete) selectedRoles.push("bufete")
+
+      if (selectedRoles.length === 0) {
+        setError("Debes seleccionar al menos un rol")
+        setCreating(false)
+        return
+      }
+
+      if (newUser.roles.bufete && !mesasActivas.includes(newUser.mesaAsignada)) {
         setError(
           `No se puede asignar la Mesa ${newUser.mesaAsignada} porque está inactiva. Por favor, selecciona una mesa activa.`,
         )
@@ -150,11 +176,17 @@ export function UserManagement() {
         newUser.idNumber,
         newUser.fullName,
         newUser.password,
-        newUser.role,
-        newUser.role === "bufete" ? newUser.mesaAsignada : undefined,
+        selectedRoles,
+        newUser.roles.bufete ? newUser.mesaAsignada : undefined,
       )
       setSuccess(`Usuario ${newUser.fullName} creado exitosamente`)
-      setNewUser({ idNumber: "", fullName: "", password: "", role: "operativo", mesaAsignada: 1 })
+      setNewUser({
+        idNumber: "",
+        fullName: "",
+        password: "",
+        roles: { administrador: false, operativo: true, bufete: false },
+        mesaAsignada: 1,
+      })
       setIsDialogOpen(false)
       loadUsers()
     } catch (error: any) {
@@ -183,21 +215,44 @@ export function UserManagement() {
     })
   }
 
-  const handleRoleChange = async (userId: string, newRole: "administrador" | "operativo" | "bufete") => {
+  const handleRoleToggle = async (
+    userId: string,
+    role: "administrador" | "operativo" | "bufete",
+    currentRoles: ("administrador" | "operativo" | "bufete")[],
+  ) => {
     try {
-      const updateData: any = { role: newRole }
-      if (newRole === "bufete") {
-        updateData.mesaAsignada = 1
+      let newRoles: ("administrador" | "operativo" | "bufete")[]
+
+      if (currentRoles.includes(role)) {
+        // Remove role
+        newRoles = currentRoles.filter((r) => r !== role)
+        if (newRoles.length === 0) {
+          setError("El usuario debe tener al menos un rol")
+          return
+        }
       } else {
+        // Add role
+        newRoles = [...currentRoles, role]
+      }
+
+      const updateData: any = { roles: newRoles }
+
+      // If removing bufete role, clear mesa assignment
+      if (role === "bufete" && currentRoles.includes("bufete") && !newRoles.includes("bufete")) {
         updateData.mesaAsignada = null
       }
 
+      // If adding bufete role and no mesa assigned, set default
+      if (role === "bufete" && !currentRoles.includes("bufete") && newRoles.includes("bufete")) {
+        updateData.mesaAsignada = mesasActivas[0] || 1
+      }
+
       await updateDoc(doc(db, "users", userId), updateData)
-      setSuccess("Rol actualizado exitosamente")
+      setSuccess("Roles actualizados exitosamente")
       loadUsers()
     } catch (error) {
-      console.error("Error al actualizar rol:", error)
-      setError("Error al actualizar el rol")
+      console.error("Error al actualizar roles:", error)
+      setError("Error al actualizar los roles")
     }
   }
 
@@ -398,41 +453,54 @@ export function UserManagement() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="role">Tipo de Usuario</Label>
-                  <Select
-                    value={newUser.role}
-                    onValueChange={(value: "administrador" | "operativo" | "bufete") =>
-                      setNewUser({ ...newUser, role: value })
-                    }
-                    disabled={creating}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecciona el tipo de usuario" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="operativo">
-                        <div className="flex items-center gap-2">
-                          <User className="w-4 h-4" />
-                          Operativo
-                        </div>
-                      </SelectItem>
-                      <SelectItem value="administrador">
-                        <div className="flex items-center gap-2">
-                          <Shield className="w-4 h-4" />
-                          Administrador
-                        </div>
-                      </SelectItem>
-                      <SelectItem value="bufete">
-                        <div className="flex items-center gap-2">
-                          <Scale className="w-4 h-4" />
-                          Bufete
-                        </div>
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <Label>Roles del Usuario (selecciona uno o más)</Label>
+                  <div className="space-y-2 border rounded-lg p-3">
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        id="role-operativo"
+                        checked={newUser.roles.operativo}
+                        onCheckedChange={(checked) =>
+                          setNewUser({ ...newUser, roles: { ...newUser.roles, operativo: checked as boolean } })
+                        }
+                        disabled={creating}
+                      />
+                      <label htmlFor="role-operativo" className="flex items-center gap-2 text-sm cursor-pointer">
+                        <User className="w-4 h-4" />
+                        Operativo
+                      </label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        id="role-administrador"
+                        checked={newUser.roles.administrador}
+                        onCheckedChange={(checked) =>
+                          setNewUser({ ...newUser, roles: { ...newUser.roles, administrador: checked as boolean } })
+                        }
+                        disabled={creating}
+                      />
+                      <label htmlFor="role-administrador" className="flex items-center gap-2 text-sm cursor-pointer">
+                        <Shield className="w-4 h-4" />
+                        Administrador
+                      </label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        id="role-bufete"
+                        checked={newUser.roles.bufete}
+                        onCheckedChange={(checked) =>
+                          setNewUser({ ...newUser, roles: { ...newUser.roles, bufete: checked as boolean } })
+                        }
+                        disabled={creating}
+                      />
+                      <label htmlFor="role-bufete" className="flex items-center gap-2 text-sm cursor-pointer">
+                        <Scale className="w-4 h-4" />
+                        Bufete
+                      </label>
+                    </div>
+                  </div>
                 </div>
 
-                {newUser.role === "bufete" && (
+                {newUser.roles.bufete && (
                   <div className="space-y-2">
                     <Label htmlFor="mesa">Mesa Asignada</Label>
                     <Select
@@ -501,7 +569,7 @@ export function UserManagement() {
                 <div className="space-y-3">
                   <div className="flex items-start gap-3">
                     <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center shrink-0">
-                      {getRoleIcon(user.role)}
+                      {getRoleIcon(user.roles[0])}
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">
@@ -512,15 +580,16 @@ export function UserManagement() {
                         <span>•</span>
                         <span>{new Date(user.createdAt).toLocaleDateString()}</span>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${getRoleBadge(user.role)}`}>
-                          {user.role === "administrador"
-                            ? "Administrador"
-                            : user.role === "bufete"
-                              ? "Bufete"
-                              : "Operativo"}
-                        </span>
-                        {user.role === "bufete" && user.mesaAsignada && (
+                      <div className="flex items-center gap-2 flex-wrap">
+                        {user.roles.map((role) => (
+                          <span
+                            key={role}
+                            className={`px-2 py-1 rounded-full text-xs font-medium ${getRoleBadge(role)}`}
+                          >
+                            {role === "administrador" ? "Administrador" : role === "bufete" ? "Bufete" : "Operativo"}
+                          </span>
+                        ))}
+                        {user.roles.includes("bufete") && user.mesaAsignada && (
                           <span className="px-2 py-1 bg-green-100 text-green-700 rounded-full text-xs font-medium">
                             Mesa {user.mesaAsignada}
                           </span>
@@ -530,62 +599,74 @@ export function UserManagement() {
                   </div>
 
                   <div className="flex flex-col gap-2 pt-2 border-t">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <div className="space-y-2">
+                      <Label className="text-xs text-muted-foreground">Roles</Label>
+                      <div className="space-y-2 border rounded-lg p-2">
+                        <div className="flex items-center space-x-2">
+                          <Checkbox
+                            id={`${user.id}-operativo`}
+                            checked={user.roles.includes("operativo")}
+                            onCheckedChange={() => handleRoleToggle(user.id, "operativo", user.roles)}
+                          />
+                          <label
+                            htmlFor={`${user.id}-operativo`}
+                            className="flex items-center gap-2 text-xs cursor-pointer"
+                          >
+                            <User className="w-3 h-3" />
+                            Operativo
+                          </label>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <Checkbox
+                            id={`${user.id}-administrador`}
+                            checked={user.roles.includes("administrador")}
+                            onCheckedChange={() => handleRoleToggle(user.id, "administrador", user.roles)}
+                          />
+                          <label
+                            htmlFor={`${user.id}-administrador`}
+                            className="flex items-center gap-2 text-xs cursor-pointer"
+                          >
+                            <Shield className="w-3 h-3" />
+                            Administrador
+                          </label>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <Checkbox
+                            id={`${user.id}-bufete`}
+                            checked={user.roles.includes("bufete")}
+                            onCheckedChange={() => handleRoleToggle(user.id, "bufete", user.roles)}
+                          />
+                          <label
+                            htmlFor={`${user.id}-bufete`}
+                            className="flex items-center gap-2 text-xs cursor-pointer"
+                          >
+                            <Scale className="w-3 h-3" />
+                            Bufete
+                          </label>
+                        </div>
+                      </div>
+                    </div>
+
+                    {user.roles.includes("bufete") && (
                       <div className="space-y-1">
-                        <Label className="text-xs text-muted-foreground">Rol</Label>
+                        <Label className="text-xs text-muted-foreground">Mesa</Label>
                         <Select
-                          value={user.role}
-                          onValueChange={(value: "administrador" | "operativo" | "bufete") =>
-                            handleRoleChange(user.id, value)
-                          }
+                          value={user.mesaAsignada?.toString() || ""}
+                          onValueChange={(value) => handleMesaChange(user.id, Number.parseInt(value))}
                         >
                           <SelectTrigger className="h-8 text-xs">
-                            <SelectValue />
+                            <SelectValue placeholder="Seleccionar mesa" />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="operativo">
-                              <div className="flex items-center gap-2">
-                                <User className="w-3 h-3" />
-                                Operativo
-                              </div>
-                            </SelectItem>
-                            <SelectItem value="administrador">
-                              <div className="flex items-center gap-2">
-                                <Shield className="w-3 h-3" />
-                                Administrador
-                              </div>
-                            </SelectItem>
-                            <SelectItem value="bufete">
-                              <div className="flex items-center gap-2">
-                                <Scale className="w-3 h-3" />
-                                Bufete
-                              </div>
-                            </SelectItem>
+                            {mesasActivas.map((mesa) => (
+                              <SelectItem key={mesa} value={mesa.toString()}>
+                                Mesa {mesa}
+                              </SelectItem>
+                            ))}
                           </SelectContent>
                         </Select>
                       </div>
-
-                      {user.role === "bufete" && (
-                        <div className="space-y-1">
-                          <Label className="text-xs text-muted-foreground">Mesa</Label>
-                          <Select
-                            value={user.mesaAsignada?.toString() || ""}
-                            onValueChange={(value) => handleMesaChange(user.id, Number.parseInt(value))}
-                          >
-                            <SelectTrigger className="h-8 text-xs">
-                              <SelectValue placeholder="Seleccionar mesa" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {mesasActivas.map((mesa) => (
-                                <SelectItem key={mesa} value={mesa.toString()}>
-                                  Mesa {mesa}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      )}
-                    </div>
+                    )}
 
                     <div className="flex gap-2 pt-2">
                       <Button
@@ -617,7 +698,7 @@ export function UserManagement() {
                         onClick={() => handleDeleteUser(user.id, user.fullName)}
                         className="h-8 px-3"
                       >
-                        <Trash2 className="w-3 h-3" />
+                        <Trash2 className="w-3.5 h-3.5" />
                       </Button>
                     </div>
                   </div>

@@ -47,7 +47,7 @@ interface ScanResultDisplay {
 }
 
 export function OperativoScanner() {
-  const { user, fullName } = useAuth()
+  const { user, fullName, activeRole } = useAuth()
   const { getStudentById, markStudentAccess, checkIfAlreadyScanned } = useStudentStoreContext()
   const { processQ10Url, isProcessingQ10, q10Message } = useQ10Validation()
 
@@ -139,7 +139,7 @@ export function OperativoScanner() {
             userId: user.id,
             userName: fullName || user.fullName || "Usuario Operativo",
             userEmail: user.idNumber + "@sistema.com",
-            userRole: user.role || "operativo",
+            userRole: activeRole || "operativo",
           }
         : undefined
 
@@ -368,7 +368,7 @@ export function OperativoScanner() {
     setIsScanning(false)
   }
 
-  if (user?.role !== "operativo") {
+  if (activeRole !== "operativo") {
     return (
       <div className="flex items-center justify-center p-8">
         <Alert variant="destructive">

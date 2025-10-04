@@ -117,11 +117,12 @@ export function UnifiedLogin() {
       login(user)
 
       let accessMessage = ""
-      if (user.role === "administrador") {
+      const primaryRole = user.roles[0] // Use first role as primary
+      if (primaryRole === "administrador") {
         accessMessage = "Acceso Administrador"
-      } else if (user.role === "operativo") {
+      } else if (primaryRole === "operativo") {
         accessMessage = "Acceso Operativo"
-      } else if (user.role === "bufete") {
+      } else if (primaryRole === "bufete") {
         accessMessage = "Acceso Bufete"
       }
 
@@ -169,11 +170,12 @@ export function UnifiedLogin() {
         login(updatedUser)
 
         let accessMessage = ""
-        if (updatedUser.role === "administrador") {
+        const primaryRole = updatedUser.roles[0]
+        if (primaryRole === "administrador") {
           accessMessage = "Acceso Administrador"
-        } else if (updatedUser.role === "operativo") {
+        } else if (primaryRole === "operativo") {
           accessMessage = "Acceso Operativo"
-        } else if (updatedUser.role === "bufete") {
+        } else if (primaryRole === "bufete") {
           accessMessage = "Acceso Bufete"
         }
 
@@ -211,7 +213,7 @@ export function UnifiedLogin() {
     <>
       <div className="relative min-h-screen flex items-center justify-center p-4 overflow-hidden">
         <video autoPlay loop muted playsInline className="absolute inset-0 w-full h-full object-cover">
-          <source src="/videos/videologin.mp4" type="video/mp4" />
+          <source src="/videos/background.mp4" type="video/mp4" />
         </video>
 
         <div className="absolute inset-0 bg-black/40" />

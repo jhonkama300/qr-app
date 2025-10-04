@@ -52,8 +52,14 @@ export default function LoginForm() {
   }
 
   return (
-    <main className="min-h-screen flex items-center justify-center bg-gradient-to-br from-green-50 via-green-100 to-green-200 p-3 sm:p-4 overflow-hidden">
-      <Card className="w-full max-w-[95vw] sm:max-w-md border-0 shadow-2xl sm:border sm:shadow-xl bg-white/95 backdrop-blur-sm">
+    <main className="relative min-h-screen flex items-center justify-center p-3 sm:p-4 overflow-hidden">
+      <video autoPlay loop muted playsInline className="absolute inset-0 w-full h-full object-cover">
+        <source src="/videos/background.mp4" type="video/mp4" />
+      </video>
+
+      <div className="absolute inset-0 bg-black/40" />
+
+      <Card className="relative z-10 w-full max-w-[95vw] sm:max-w-md border-0 shadow-2xl sm:border sm:shadow-xl bg-white/95 backdrop-blur-sm">
         <CardHeader className="space-y-2 sm:space-y-3 px-4 sm:px-6 pt-4 sm:pt-6 pb-3 sm:pb-4 text-center">
           <div className="flex justify-center mb-1 sm:mb-2">
             <div className="relative w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-gradient-to-br from-green-400 to-green-600 p-2 shadow-lg">

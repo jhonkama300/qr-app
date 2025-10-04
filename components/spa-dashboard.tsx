@@ -17,6 +17,9 @@ import { useRouter } from "next/navigation"
 import { useEffect } from "react"
 import { collection, query, where, onSnapshot } from "firebase/firestore"
 import { db } from "@/lib/firebase"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
+import { Switch } from "@/components/ui/switch"
 
 // Importar todos los componentes de las vistas
 import { DashboardStats } from "@/components/dashboard-stats"
@@ -47,6 +50,16 @@ export function SPADashboard({ initialView = "inicio" }: SPADashboardProps) {
   const [currentView, setCurrentView] = useState<ViewType>(initialView)
   const [estudiantesAtendidos, setEstudiantesAtendidos] = useState(0)
   const [mesaActiva, setMesaActiva] = useState(true)
+  const [totalComidasEntregadas, setTotalComidasEntregadas] = useState(0)
+  const [mesasActivas, setMesasActivas] = useState(0)
+  const [totalMesas] = useState(10)
+  const [bufetesEstado, setBuffetesEstado] = useState<
+    Array<{
+      numero: number
+      activa: boolean
+      atendidos: number
+    }>
+  >([])
 
   useEffect(() => {
     if (!loading && user && userRole === "operativo") {
@@ -103,6 +116,94 @@ export function SPADashboard({ initialView = "inicio" }: SPADashboardProps) {
     return () => unsubscribe()
   }, [isBufete, mesaAsignada])
 
+  useEffect(() => {
+    if (!isBufete) {
+      return
+    }
+
+    console.log("[v0] Setting up real-time listener for total meals delivered")
+
+    const logsQuery = query(collection(db, "access_logs"), where("status", "==", "granted"))
+
+    const unsubscribe = onSnapshot(logsQuery, (snapshot) => {
+      const count = snapshot.size
+      console.log("[v0] Total meals delivered count updated:", count)
+      setTotalComidasEntregadas(count)
+    })
+
+    return () => unsubscribe()
+  }, [isBufete])
+
+  useEffect(() => {
+    if (!isBufete) {
+      return
+    }
+
+    console.log("[v0] Setting up real-time listener for active mesas")
+
+    const mesasConfigQuery = query(collection(db, "mesas_config"))
+
+    const unsubscribe = onSnapshot(mesasConfigQuery, (snapshot) => {
+      const activeMesas = snapshot.docs.filter((doc) => {
+        const data = doc.data()
+        return data.activa === true
+      }).length
+      console.log("[v0] Active mesas count updated:", activeMesas)
+      setMesasActivas(activeMesas)
+    })
+
+    return () => unsubscribe()
+  }, [isBufete])
+
+  useEffect(() => {
+    if (!isBufete) {
+      return
+    }
+
+    console.log("[v0] Setting up real-time listener for all bufetes status")
+
+    const mesasConfigQuery = query(collection(db, "mesas_config"))
+    const accessLogsQuery = query(collection(db, "access_logs"), where("status", "==", "granted"))
+
+    // Listener para configuración de mesas
+    const unsubscribeMesas = onSnapshot(mesasConfigQuery, (mesasSnapshot) => {
+      // Listener para logs de acceso
+      const unsubscribeLogs = onSnapshot(accessLogsQuery, (logsSnapshot) => {
+        const bufetesData: Array<{
+          numero: number
+          activa: boolean
+          atendidos: number
+        }> = []
+
+        // Procesar cada bufete del 1 al 10
+        for (let i = 1; i <= 10; i++) {
+          // Buscar configuración del bufete
+          const mesaDoc = mesasSnapshot.docs.find((doc) => doc.data().numero === i)
+          const activa = mesaDoc?.data().activa ?? true
+
+          // Contar estudiantes atendidos por este bufete
+          const atendidos = logsSnapshot.docs.filter((doc) => {
+            const data = doc.data()
+            return data.mesaUsada === i
+          }).length
+
+          bufetesData.push({
+            numero: i,
+            activa,
+            atendidos,
+          })
+        }
+
+        console.log("[v0] Bufetes status updated:", bufetesData)
+        setBuffetesEstado(bufetesData)
+      })
+
+      return () => unsubscribeLogs()
+    })
+
+    return () => unsubscribeMesas()
+  }, [isBufete])
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -150,7 +251,7 @@ export function SPADashboard({ initialView = "inicio" }: SPADashboardProps) {
       case "inicio":
         if (!isAdmin) {
           return (
-            <div className="flex flex-1 flex-col items-center justify-center p-4">
+            <div className="flex min-h-[calc(100vh-4rem)] flex-col items-center justify-center p-4">
               <div className="text-center">
                 <h2 className="text-xl font-semibold mb-2">Acceso Restringido</h2>
                 <p className="text-muted-foreground">No tienes permisos para ver esta sección.</p>
@@ -181,7 +282,7 @@ export function SPADashboard({ initialView = "inicio" }: SPADashboardProps) {
       case "control-acceso":
         if (!isAdmin && userRole !== "operativo") {
           return (
-            <div className="flex flex-1 flex-col items-center justify-center p-4">
+            <div className="flex min-h-[calc(100vh-4rem)] flex-col items-center justify-center p-4">
               <div className="text-center">
                 <h2 className="text-xl font-semibold mb-2">Acceso Restringido</h2>
                 <p className="text-muted-foreground">
@@ -198,7 +299,7 @@ export function SPADashboard({ initialView = "inicio" }: SPADashboardProps) {
           return <DashboardStats />
         }
         return (
-          <div className="flex flex-1 flex-col gap-4 p-4">
+          <div className="flex flex-col gap-4 p-4">
             <div className="grid auto-rows-min gap-4 md:grid-cols-3">
               <div className="aspect-video rounded-xl bg-muted/50 p-4">
                 <h3 className="font-semibold mb-2">Bufete Asignado</h3>
@@ -215,6 +316,71 @@ export function SPADashboard({ initialView = "inicio" }: SPADashboardProps) {
                 <div className="text-2xl font-bold">{estudiantesAtendidos}</div>
               </div>
             </div>
+            <div className="grid auto-rows-min gap-4 md:grid-cols-3">
+              <div className="aspect-video rounded-xl bg-blue-50 border border-blue-200 p-4">
+                <h3 className="font-semibold mb-2 text-blue-900">Bufetes Activos</h3>
+                <div className="text-2xl font-bold text-blue-600">
+                  {mesasActivas}/{totalMesas}
+                </div>
+                <p className="text-xs text-blue-700 mt-1">Bufetes habilitados actualmente</p>
+              </div>
+              <div className="aspect-video rounded-xl bg-green-50 border border-green-200 p-4">
+                <h3 className="font-semibold mb-2 text-green-900">Total Comidas Entregadas</h3>
+                <div className="text-2xl font-bold text-green-600">{totalComidasEntregadas}</div>
+                <p className="text-xs text-green-700 mt-1">En todos los bufetes</p>
+              </div>
+              <div className="aspect-video rounded-xl bg-purple-50 border border-purple-200 p-4">
+                <h3 className="font-semibold mb-2 text-purple-900">Mesas Disponibles</h3>
+                <div className="text-2xl font-bold text-purple-600">{mesasActivas}</div>
+                <p className="text-xs text-purple-700 mt-1">Bufetes listos para atender</p>
+              </div>
+            </div>
+
+            <Card>
+              <CardHeader className="pb-3 sm:pb-4">
+                <CardTitle className="text-lg sm:text-xl">Estado de los Bufetes</CardTitle>
+                <CardDescription className="text-sm">
+                  Habilita o deshabilita bufetes individualmente. Solo los bufetes activos pueden atender estudiantes.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-5">
+                  {bufetesEstado.map((bufete) => (
+                    <Card
+                      key={bufete.numero}
+                      className={`transition-all ${
+                        bufete.activa ? "border-green-200 bg-green-50" : "border-gray-200 bg-gray-50"
+                      }`}
+                    >
+                      <CardHeader className="pb-2 p-3">
+                        <div className="flex items-center justify-between">
+                          <CardTitle className="text-sm sm:text-base">Bufete {bufete.numero}</CardTitle>
+                          <Switch
+                            checked={bufete.activa}
+                            disabled={true}
+                            className="scale-75 sm:scale-90"
+                            aria-label={`Estado Bufete ${bufete.numero}`}
+                          />
+                        </div>
+                      </CardHeader>
+                      <CardContent className="pt-0 p-3 space-y-1">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs text-muted-foreground">Estado:</span>
+                          <Badge variant={bufete.activa ? "default" : "secondary"} className="text-xs px-1.5 py-0.5">
+                            {bufete.activa ? "Activo" : "Inactivo"}
+                          </Badge>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs text-muted-foreground">Atendidos:</span>
+                          <span className="text-sm font-semibold">{bufete.atendidos}</span>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+
             <div className="min-h-[100vh] flex-1 rounded-xl bg-muted/50 p-4">
               <h3 className="font-semibold mb-4">Instrucciones para Bufete {mesaAsignada}</h3>
               <div className="space-y-2 text-sm text-muted-foreground">
@@ -277,7 +443,7 @@ export function SPADashboard({ initialView = "inicio" }: SPADashboardProps) {
             </BreadcrumbList>
           </Breadcrumb>
         </header>
-        <div className="flex flex-1 flex-col gap-2 md:gap-4 p-2 md:p-4 mobile-optimized">{renderCurrentView()}</div>
+        {renderCurrentView()}
       </SidebarInset>
     </SidebarProvider>
   )
