@@ -1,7 +1,5 @@
 "use client"
 
-import type React from "react"
-
 import { useState, useRef, useEffect, useCallback } from "react"
 import Webcam from "react-webcam"
 import { BrowserMultiFormatReader, BarcodeFormat, DecodeHintType } from "@zxing/library"
@@ -12,6 +10,7 @@ import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useAuth } from "@/components/auth-provider"
 import { useStudentStoreContext } from "@/components/providers/student-store-provider"
 import {
@@ -26,7 +25,8 @@ import {
   RefreshCw,
   Utensils,
   Hash,
-  RefreshCcwIcon,
+  RotateCw,
+  QrCode,
 } from "lucide-react"
 
 interface ScanResult {
@@ -51,11 +51,12 @@ export function BuffeteScanner() {
   const [scanResult, setScanResult] = useState<ScanResult | null>(null)
   const [showResult, setShowResult] = useState(false)
   const [manualId, setManualId] = useState("")
-  const [showManualInput, setShowManualInput] = useState(false)
+  const [activeTab, setActiveTab] = useState<"qr" | "manual">("qr")
 
   const webcamRef = useRef<Webcam>(null)
   const codeReader = useRef<BrowserMultiFormatReader | null>(null)
   const scannerActive = useRef(false)
+  const manualInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     setIsClient(true)
@@ -114,6 +115,12 @@ export function BuffeteScanner() {
       })
   }, [handleDevices, isClient])
 
+  useEffect(() => {
+    if (activeTab === "manual" && manualInputRef.current) {
+      manualInputRef.current.focus()
+    }
+  }, [activeTab])
+
   const processStudentAccess = async (identificacion: string) => {
     try {
       setProcessing(true)
@@ -131,7 +138,6 @@ export function BuffeteScanner() {
         return
       }
 
-      // Validar acceso por mesa
       const validation = await validateMesaAccess(identificacion, user.mesaAsignada)
 
       if (!validation.valid) {
@@ -146,7 +152,6 @@ export function BuffeteScanner() {
         return
       }
 
-      // Obtener datos del estudiante
       const student = await getStudentById(identificacion)
 
       if (!student) {
@@ -169,9 +174,6 @@ export function BuffeteScanner() {
         mesaAsignada: user.mesaAsignada,
       }
 
-      console.log("[v0] Datos del usuario para registro:", userInfo)
-
-      // Marcar acceso exitoso
       await markStudentAccess(identificacion, true, `Comida entregada en Mesa ${user.mesaAsignada}`, "manual", userInfo)
 
       setScanResult({
@@ -198,10 +200,7 @@ export function BuffeteScanner() {
   }
 
   useEffect(() => {
-    if (!isClient || !hasPermission || !selectedDeviceId || processing || isScanning || !codeReader.current) {
-      if (!isClient || !hasPermission || !selectedDeviceId || processing || isScanning) {
-        console.log("[v0] Reseteando lector (condiciones no cumplidas)...")
-      }
+    if (!isClient || !hasPermission || !selectedDeviceId || processing || isScanning || !codeReader.current || activeTab !== "qr") {
       return
     }
 
@@ -247,14 +246,13 @@ export function BuffeteScanner() {
         scannerActive.current = false
       }
     }
-  }, [isClient, hasPermission, selectedDeviceId, processing, isScanning])
+  }, [isClient, hasPermission, selectedDeviceId, processing, isScanning, activeTab])
 
-  const handleManualSubmit = async (e: React.FormEvent) => {
+  const handleManualSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     if (manualId.trim()) {
-      await processStudentAccess(manualId.trim())
+      processStudentAccess(manualId.trim())
       setManualId("")
-      setShowManualInput(false)
     }
   }
 
@@ -263,7 +261,6 @@ export function BuffeteScanner() {
     setShowResult(false)
     setError("")
     setManualId("")
-    setShowManualInput(false)
     setIsScanning(false)
   }
 
@@ -310,69 +307,80 @@ export function BuffeteScanner() {
 
   if (!isClient) {
     return (
-      <div className="flex flex-col items-center justify-center p-8 text-center bg-card rounded-lg border border-border shadow-sm">
+      <div className="flex flex-col items-center justify-center p-8 text-center bg-card rounded-lg border shadow-sm">
         <Loader2 className="text-primary mb-4 size-16 animate-spin" />
         <p className="text-muted-foreground text-lg">Cargando escáner...</p>
       </div>
     )
   }
 
-  if (hasPermission === false) {
+  if (hasPermission === false && activeTab === "qr") {
     return (
-      <div className="flex flex-col items-center justify-center p-8 text-center bg-card rounded-lg border border-border shadow-sm">
+      <div className="flex flex-col items-center justify-center p-8 text-center bg-card rounded-lg border shadow-sm">
         <CameraOff className="text-destructive mb-6 size-20" />
-        <h3 className="text-2xl font-bold mb-3 text-foreground">Acceso a la cámara denegado</h3>
+        <h3 className="text-2xl font-bold mb-3">Acceso a la cámara denegado</h3>
         <p className="text-muted-foreground mb-8 text-base">
           {error || "Se requiere acceso a la cámara para escanear códigos QR."}
         </p>
-        <Button
-          onClick={requestCameraPermission}
-          className="bg-primary text-primary-foreground h-12 px-6 text-base rounded-md"
-        >
-          <Camera className="mr-2 size-5" />
-          Permitir acceso a la cámara
-        </Button>
+        <div className="flex gap-2">
+          <Button onClick={requestCameraPermission} className="h-12 px-6 text-base">
+            <Camera className="mr-2 size-5" />
+            Permitir acceso
+          </Button>
+          <Button onClick={() => setActiveTab("manual")} variant="outline" className="h-12 px-6 text-base">
+            <Hash className="mr-2 size-5" />
+            Ingresar ID
+          </Button>
+        </div>
       </div>
     )
   }
 
   return (
-    <div className="flex flex-1 flex-col gap-4 p-4">
-      <div className="flex flex-col items-center gap-4">
+    <div className="flex flex-1 flex-col gap-4 p-3 md:p-4">
+      <div className="flex flex-col items-center gap-3">
         <div className="text-center">
-          <h1 className="text-2xl font-bold">Entrega de Comida</h1>
-          <p className="text-muted-foreground">
-            Mesa {user.mesaAsignada} - Escanea QR o ingresa identificación para entregar comida
-          </p>
+          <h1 className="text-xl md:text-2xl font-bold">Entrega de Comida</h1>
+          <p className="text-sm md:text-base text-muted-foreground">Bufete {user.mesaAsignada} - Escanea QR o ingresa ID</p>
         </div>
 
-        <div className="flex gap-2 mb-4">
-          <Badge variant="outline" className="bg-green-50 text-green-700">
-            <Utensils className="w-4 h-4 mr-1" />
-            Mesa {user.mesaAsignada}
-          </Badge>
-          <Badge variant="outline">Escaneo Continuo</Badge>
-        </div>
+        <Badge variant="outline" className="bg-green-50 text-green-700">
+          <Utensils className="w-3 h-3 md:w-4 md:h-4 mr-1" />
+          Bufete {user.mesaAsignada}
+        </Badge>
 
-        <Card className="w-full max-w-md">
-          <CardHeader className="text-center">
-            <CardTitle className="flex items-center justify-center gap-2">
-              <Camera className="w-5 h-5" />
-              Escáner para Bufete
-            </CardTitle>
-            <CardDescription>Escanea QR automáticamente o ingresa identificación manualmente</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {error && (
-              <Alert variant="destructive">
-                <AlertTriangle className="h-4 w-4" />
-                <AlertDescription>{error}</AlertDescription>
-              </Alert>
-            )}
+        <Card className="w-full max-w-2xl bg-white shadow-lg">
+          <CardContent className="p-4 md:p-6">
+            <h2 className="text-lg md:text-xl font-semibold text-center mb-4 text-gray-800">
+              Escanea QR o ingresa identificación
+            </h2>
+            <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "qr" | "manual")} className="w-full">
+              <TabsList className="grid w-full grid-cols-2 mb-4 bg-gray-100">
+                <TabsTrigger 
+                  value="qr" 
+                  className="text-sm md:text-base data-[state=active]:bg-green-500 data-[state=active]:text-white"
+                >
+                  <QrCode className="w-4 h-4 mr-2" />
+                  Escanear QR
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="manual" 
+                  className="text-sm md:text-base data-[state=active]:bg-green-500 data-[state=active]:text-white"
+                >
+                  <Hash className="w-4 h-4 mr-2" />
+                  Ingreso Manual
+                </TabsTrigger>
+              </TabsList>
 
-            {!showManualInput && (
-              <>
-                <div className="relative w-full pt-[100%] overflow-hidden rounded-lg bg-card shadow-lg border border-border">
+              <TabsContent value="qr" className="space-y-4 mt-0">
+                {error && activeTab === "qr" && (
+                  <Alert variant="destructive">
+                    <AlertTriangle className="h-4 w-4" />
+                    <AlertDescription>{error}</AlertDescription>
+                  </Alert>
+                )}
+
+                <div className="relative w-full pt-[100%] overflow-hidden rounded-lg bg-card shadow-lg border">
                   {selectedDeviceId && (
                     <Webcam
                       ref={webcamRef}
@@ -382,9 +390,6 @@ export function BuffeteScanner() {
                         facingMode: "environment",
                       }}
                       className="absolute inset-0 w-full h-full object-cover"
-                      onUserMedia={() => {
-                        console.log("[v0] Camera stream ready")
-                      }}
                     />
                   )}
                   <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[90%] h-[50%] border-4 border-primary rounded-lg shadow-[0_0_0_9999px_rgba(0,0,0,0.5)]">
@@ -393,68 +398,89 @@ export function BuffeteScanner() {
                   {devices.length > 1 && (
                     <button
                       onClick={switchCamera}
-                      className="absolute top-4 right-4 bg-secondary/70 text-foreground p-3 rounded-full hover:bg-secondary transition-colors shadow-md"
+                      className="absolute top-4 right-4 bg-secondary/70 p-2 md:p-3 rounded-full hover:bg-secondary transition-colors shadow-md"
                       aria-label="Cambiar cámara"
                     >
-                      <RefreshCcwIcon className="size-6" />
+                      <RotateCw className="size-5 md:size-6" />
                     </button>
                   )}
                 </div>
 
-                <div className="text-center">
+                <div className="text-center p-3 bg-muted rounded-lg">
                   <p className="text-sm text-muted-foreground">
-                    {processing || isScanning ? "Procesando..." : "Escaneando automáticamente... Apunta al código QR"}
+                    {processing || isScanning ? (
+                      <span className="flex items-center justify-center gap-2">
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Procesando...
+                      </span>
+                    ) : (
+                      "Apunta la cámara al código QR del estudiante"
+                    )}
                   </p>
                 </div>
-              </>
-            )}
+              </TabsContent>
 
-            {showManualInput && (
-              <form onSubmit={handleManualSubmit} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="manual-id">Número de Identificación</Label>
-                  <Input
-                    id="manual-id"
-                    type="text"
-                    placeholder="Ingresa la identificación"
-                    value={manualId}
-                    onChange={(e) => setManualId(e.target.value)}
-                    disabled={processing}
-                    required
-                  />
-                </div>
-                <div className="flex gap-2">
-                  <Button type="submit" disabled={processing || !manualId.trim()} className="flex-1">
+              <TabsContent value="manual" className="space-y-4 mt-0">
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="manual-id" className="text-base">
+                      Número de Identificación
+                    </Label>
+                    <Input
+                      ref={manualInputRef}
+                      id="manual-id"
+                      type="text"
+                      placeholder="Ej: 1065123456"
+                      value={manualId}
+                      onChange={(e) => setManualId(e.target.value)}
+                      onKeyPress={(e) => {
+                        if (e.key === "Enter" && manualId.trim() && !processing) {
+                          processStudentAccess(manualId.trim())
+                          setManualId("")
+                        }
+                      }}
+                      disabled={processing}
+                      className="text-lg h-12"
+                    />
+                    <p className="text-xs text-muted-foreground">Ingresa el número de cédula del estudiante</p>
+                  </div>
+
+                  <Button
+                    onClick={() => {
+                      if (manualId.trim()) {
+                        processStudentAccess(manualId.trim())
+                        setManualId("")
+                      }
+                    }}
+                    disabled={processing || !manualId.trim()}
+                    className="w-full h-12 text-base bg-gradient-to-r from-lime-500 to-green-500 hover:from-lime-600 hover:to-green-600 text-white"
+                    size="lg"
+                  >
                     {processing ? (
                       <>
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        <Loader2 className="w-5 h-5 mr-2 animate-spin" />
                         Procesando...
                       </>
                     ) : (
                       <>
-                        <Search className="w-4 h-4 mr-2" />
-                        Procesar
+                        <Search className="w-5 h-5 mr-2" />
+                        Continuar
                       </>
                     )}
                   </Button>
-                  <Button type="button" variant="outline" onClick={() => setShowManualInput(false)}>
-                    Cancelar
-                  </Button>
                 </div>
-              </form>
-            )}
 
-            {!showManualInput && (
-              <Button variant="outline" onClick={() => setShowManualInput(true)} className="w-full">
-                <Hash className="w-4 h-4 mr-2" />
-                Ingresar ID Manualmente
-              </Button>
-            )}
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                  <p className="text-xs text-blue-900">
+                    <strong>Tip:</strong> El estudiante debe mostrar su documento de identidad para verificar el número.
+                  </p>
+                </div>
+              </TabsContent>
+            </Tabs>
           </CardContent>
         </Card>
       </div>
 
-      {/* Dialog de resultados */}
       <Dialog open={showResult} onOpenChange={setShowResult}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
@@ -462,7 +488,7 @@ export function BuffeteScanner() {
               {scanResult?.status === "success" && <CheckCircle className="w-5 h-5 text-green-600" />}
               {scanResult?.status === "no_cupos" && <XCircle className="w-5 h-5 text-red-600" />}
               {scanResult?.status === "error" && <AlertTriangle className="w-5 h-5 text-red-600" />}
-              Resultado del Escaneo
+              Resultado del Proceso
             </DialogTitle>
           </DialogHeader>
 
@@ -494,8 +520,8 @@ export function BuffeteScanner() {
                         <p className="text-sm">{scanResult.student.programa}</p>
                       </div>
                       <div>
-                        <span className="font-medium text-sm">Mesa:</span>
-                        <p className="text-sm">Mesa {user.mesaAsignada}</p>
+                        <span className="font-medium text-sm">Bufete:</span>
+                        <p className="text-sm">Bufete {user.mesaAsignada}</p>
                       </div>
                       <div className="text-xs text-green-700 bg-green-100 p-2 rounded">{scanResult.message}</div>
                     </CardContent>
@@ -526,7 +552,7 @@ export function BuffeteScanner() {
           <div className="flex gap-2">
             <Button onClick={resetScanner} className="flex-1">
               <RefreshCw className="w-4 h-4 mr-2" />
-              Procesar Otro
+              Procesar Otro Estudiante
             </Button>
             <Button variant="outline" onClick={() => setShowResult(false)}>
               Cerrar

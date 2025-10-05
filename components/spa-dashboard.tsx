@@ -293,46 +293,39 @@ export function SPADashboard({ initialView = "inicio" }: SPADashboardProps) {
           )
         }
         return <AccessControl />
-      case "bufetes-gestion":
+       case "bufetes-gestion":
         if (!isBufete) {
           setCurrentView("inicio")
           return <DashboardStats />
         }
         return (
-          <div className="flex flex-col gap-4 p-4">
-            <div className="grid auto-rows-min gap-4 md:grid-cols-3">
-              <div className="aspect-video rounded-xl bg-muted/50 p-4">
-                <h3 className="font-semibold mb-2">Bufete Asignado</h3>
-                <div className="text-2xl font-bold text-primary">Bufete {mesaAsignada || "No asignado"}</div>
+          <div className="flex flex-col gap-3 p-3 md:p-4">
+            <div className="grid gap-3 grid-cols-2 md:grid-cols-3">
+              <div className="rounded-lg bg-muted/50 p-3">
+                <h3 className="text-xs font-semibold mb-1 text-muted-foreground">Bufete Asignado</h3>
+                <div className="text-xl md:text-2xl font-bold text-primary">Bufete {mesaAsignada || "N/A"}</div>
               </div>
-              <div className="aspect-video rounded-xl bg-muted/50 p-4">
-                <h3 className="font-semibold mb-2">Estado</h3>
-                <div className={`text-lg font-medium ${mesaActiva ? "text-green-600" : "text-red-600"}`}>
+              <div className="rounded-lg bg-muted/50 p-3">
+                <h3 className="text-xs font-semibold mb-1 text-muted-foreground">Estado</h3>
+                <div className={`text-lg md:text-xl font-bold ${mesaActiva ? "text-green-600" : "text-red-600"}`}>
                   {mesaActiva ? "Activo" : "Inactivo"}
                 </div>
               </div>
-              <div className="aspect-video rounded-xl bg-muted/50 p-4">
-                <h3 className="font-semibold mb-2">Estudiantes Atendidos</h3>
-                <div className="text-2xl font-bold">{estudiantesAtendidos}</div>
+              <div className="rounded-lg bg-muted/50 p-3 col-span-2 md:col-span-1">
+                <h3 className="text-xs font-semibold mb-1 text-muted-foreground">Graduados Atendidos</h3>
+                <div className="text-xl md:text-2xl font-bold">{estudiantesAtendidos}</div>
               </div>
             </div>
-            <div className="grid auto-rows-min gap-4 md:grid-cols-3">
-              <div className="aspect-video rounded-xl bg-blue-50 border border-blue-200 p-4">
-                <h3 className="font-semibold mb-2 text-blue-900">Bufetes Activos</h3>
-                <div className="text-2xl font-bold text-blue-600">
+            <div className="grid gap-3 grid-cols-2">
+              <div className="rounded-lg bg-blue-50 border border-blue-200 p-3">
+                <h3 className="text-xs font-semibold mb-1 text-blue-900">Bufetes Activos</h3>
+                <div className="text-lg md:text-xl font-bold text-blue-600">
                   {mesasActivas}/{totalMesas}
                 </div>
-                <p className="text-xs text-blue-700 mt-1">Bufetes habilitados actualmente</p>
               </div>
-              <div className="aspect-video rounded-xl bg-green-50 border border-green-200 p-4">
-                <h3 className="font-semibold mb-2 text-green-900">Total Comidas Entregadas</h3>
-                <div className="text-2xl font-bold text-green-600">{totalComidasEntregadas}</div>
-                <p className="text-xs text-green-700 mt-1">En todos los bufetes</p>
-              </div>
-              <div className="aspect-video rounded-xl bg-purple-50 border border-purple-200 p-4">
-                <h3 className="font-semibold mb-2 text-purple-900">Mesas Disponibles</h3>
-                <div className="text-2xl font-bold text-purple-600">{mesasActivas}</div>
-                <p className="text-xs text-purple-700 mt-1">Bufetes listos para atender</p>
+              <div className="rounded-lg bg-green-50 border border-green-200 p-3">
+                <h3 className="text-xs font-semibold mb-1 text-green-900">Total Comidas</h3>
+                <div className="text-lg md:text-xl font-bold text-green-600">{totalComidasEntregadas}</div>
               </div>
             </div>
 
