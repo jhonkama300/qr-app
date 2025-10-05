@@ -698,7 +698,7 @@ export function UserManagement() {
                         onClick={() => handleDeleteUser(user.id, user.fullName)}
                         className="h-8 px-3"
                       >
-                        <Trash2 className="w-3.5 h-3.5" />
+                        <Trash2 className="w-3.5 h-3.5 text-white" />
                       </Button>
                     </div>
                   </div>

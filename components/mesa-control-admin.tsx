@@ -347,7 +347,7 @@ export function MesaControlAdmin() {
               }}
               variant="destructive"
               size="sm"
-              className="w-full sm:w-auto h-9 text-sm font-medium"
+              className="w-full sm:w-auto h-9 text-sm font-medium text-white"
               aria-label="Desactivar todos los bufetes"
             >
               Desactivar Todos los Bufetes

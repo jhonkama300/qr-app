@@ -561,7 +561,7 @@ export function DatabaseManagement() {
             onClick={handleClearDatabase}
             disabled={importing}
             variant="destructive"
-            className="bg-red-600 hover:bg-red-700"
+            className="bg-red-600 hover:bg-red-700 text-white"
           >
             <Trash2 className="mr-2 h-4 w-4" />
             Limpiar BD
