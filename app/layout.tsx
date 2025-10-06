@@ -10,9 +10,12 @@ import { SessionProvider } from "@/components/session-provider"
 const inter = Inter({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
-  title: "Control de Acceso",
+  title: "Control de Acceso Uparsistem",
   description: "Sistema de control de acceso con QR",
-  generator: "v0.dev",
+  icons: {
+    icon: "/images/logoupar.ico",
+    shortcut: "/favicon-16x16.png",
+  },
 }
 
 export const viewport: Viewport = {
