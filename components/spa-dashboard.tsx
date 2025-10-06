@@ -48,6 +48,8 @@ export function SPADashboard({ initialView = "inicio" }: SPADashboardProps) {
   const { user, loading, userRole, isAdmin, isBufete, mesaAsignada } = useAuth()
   const router = useRouter()
   const [currentView, setCurrentView] = useState<ViewType>(initialView)
+  const [scannerKey, setScannerKey] = useState(0)
+
   const [estudiantesAtendidos, setEstudiantesAtendidos] = useState(0)
   const [mesaActiva, setMesaActiva] = useState(true)
   const [totalComidasEntregadas, setTotalComidasEntregadas] = useState(0)
@@ -246,6 +248,18 @@ export function SPADashboard({ initialView = "inicio" }: SPADashboardProps) {
     }
   }
 
+  const handleViewChange = (newView: ViewType) => {
+    console.log("[v0] Changing view from", currentView, "to", newView)
+
+    // Si estamos saliendo de una vista con escáner, incrementar la key
+    if (currentView === "escanear" && newView !== "escanear") {
+      console.log("[v0] Leaving scanner view, forcing unmount")
+      setScannerKey((prev) => prev + 1)
+    }
+
+    setCurrentView(newView)
+  }
+
   const renderCurrentView = () => {
     switch (currentView) {
       case "inicio":
@@ -262,20 +276,19 @@ export function SPADashboard({ initialView = "inicio" }: SPADashboardProps) {
         return <DashboardStats />
       case "escanear":
         if (userRole === "bufete") {
-          return <BuffeteScanner />
+          return <BuffeteScanner key={`bufete-${scannerKey}`} />
         } else if (userRole === "operativo") {
-          return <OperativoScanner />
+          return <OperativoScanner key={`operativo-${scannerKey}`} />
         } else if (userRole === "administrador") {
-          // Administradores pueden usar cualquier escáner, por defecto el general
           return (
             <div className="flex flex-1 flex-col items-center justify-center p-4">
-              <BarcodeScanner />
+              <BarcodeScanner key={`admin-${scannerKey}`} />
             </div>
           )
         } else {
           return (
             <div className="flex flex-1 flex-col items-center justify-center p-4">
-              <BarcodeScanner />
+              <BarcodeScanner key={`general-${scannerKey}`} />
             </div>
           )
         }
@@ -293,7 +306,7 @@ export function SPADashboard({ initialView = "inicio" }: SPADashboardProps) {
           )
         }
         return <AccessControl />
-       case "bufetes-gestion":
+      case "bufetes-gestion":
         if (!isBufete) {
           setCurrentView("inicio")
           return <DashboardStats />
@@ -411,7 +424,7 @@ export function SPADashboard({ initialView = "inicio" }: SPADashboardProps) {
 
   return (
     <SidebarProvider>
-      <AppSidebar currentView={currentView} onViewChange={setCurrentView} />
+      <AppSidebar currentView={currentView} onViewChange={handleViewChange} />
       <SidebarInset>
         <header className="flex h-14 md:h-16 shrink-0 items-center gap-2 border-b px-2 md:px-4">
           <SidebarTrigger className="-ml-1" />
@@ -423,7 +436,7 @@ export function SPADashboard({ initialView = "inicio" }: SPADashboardProps) {
                   href="#"
                   onClick={(e) => {
                     e.preventDefault()
-                    setCurrentView("inicio")
+                    handleViewChange("inicio")
                   }}
                 >
                   Dashboard

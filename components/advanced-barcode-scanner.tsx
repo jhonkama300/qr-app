@@ -5,7 +5,7 @@ import Webcam from "react-webcam"
 import { BrowserMultiFormatReader, BarcodeFormat, DecodeHintType } from "@zxing/library"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -14,7 +14,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import {
   CameraOffIcon,
   CameraIcon,
-  RefreshCcwIcon,
   Loader2Icon,
   CheckCircle,
   XCircle,
@@ -24,7 +23,6 @@ import {
   Search,
   AlertCircle,
   RefreshCw,
-  Play,
 } from "lucide-react"
 import { useStudentStoreContext } from "@/components/providers/student-store-provider"
 import { useQ10Validation } from "@/hooks/use-q10-validation"
@@ -39,7 +37,7 @@ interface ScanResultDisplay {
   timestamp: string
 }
 
-export function BarcodeScanner() {
+export function AdvancedBarcodeScanner() {
   const { getStudentById, markStudentAccess, checkIfAlreadyScanned } = useStudentStoreContext()
   const { processQ10Url, isProcessingQ10, q10Message } = useQ10Validation()
   const { user, fullName } = useAuth()
@@ -55,7 +53,6 @@ export function BarcodeScanner() {
   const [manualInputError, setManualInputError] = useState<string | null>(null)
   const [showResult, setShowResult] = useState(false)
   const [isScanning, setIsScanning] = useState(false)
-  const [isScannerActive, setIsScannerActive] = useState(false)
 
   const router = useRouter()
   const webcamRef = useRef<Webcam>(null)
@@ -250,30 +247,13 @@ export function BarcodeScanner() {
   )
 
   useEffect(() => {
-    if (
-      !isClient ||
-      !hasPermission ||
-      !selectedDeviceId ||
-      isProcessingQ10 ||
-      isScanning ||
-      isManualProcessing ||
-      !isScannerActive
-    ) {
-      if (codeReader.current) {
-        console.log("[v0] Reseteando lector (condiciones no cumplidas)...")
-        codeReader.current.reset()
-      }
+    if (!isClient || !hasPermission || !selectedDeviceId || isProcessingQ10 || isScanning || !codeReader.current) {
       return
     }
 
     const video = webcamRef.current?.video
     if (!video) {
       console.warn("[v0] Elemento de video no listo para escanear.")
-      return
-    }
-
-    if (!codeReader.current) {
-      setError("El lector de códigos no está inicializado.")
       return
     }
 
@@ -304,24 +284,6 @@ export function BarcodeScanner() {
         console.log("[v0] Reseteando lector en cleanup...")
         codeReader.current.reset()
       }
-    }
-  }, [
-    isClient,
-    hasPermission,
-    selectedDeviceId,
-    isProcessingQ10,
-    isScanning,
-    isManualProcessing,
-    processScanResult,
-    isScannerActive,
-  ])
-
-  useEffect(() => {
-    return () => {
-      console.log("[v0] Component unmounting, cleaning up camera...")
-      if (codeReader.current) {
-        codeReader.current.reset()
-      }
       if (webcamRef.current?.video?.srcObject) {
         const stream = webcamRef.current.video.srcObject as MediaStream
         stream.getTracks().forEach((track) => {
@@ -329,9 +291,8 @@ export function BarcodeScanner() {
           console.log("[v0] Track stopped on unmount:", track.kind)
         })
       }
-      setIsScannerActive(false)
     }
-  }, [])
+  }, [isClient, hasPermission, selectedDeviceId, isProcessingQ10, isScanning, processScanResult])
 
   const requestCameraPermission = () => {
     if (!isClient) return
@@ -347,25 +308,6 @@ export function BarcodeScanner() {
         setError("No se pudo acceder a la cámara. Por favor, conceda permisos e inténtelo de nuevo.")
         setHasPermission(false)
       })
-  }
-
-  const switchCamera = () => {
-    if (!isClient || devices.length <= 1) return
-
-    console.log("[v0] Switching camera...")
-
-    // Resetear el lector completamente
-    if (codeReader.current) {
-      codeReader.current.reset()
-    }
-
-    // Esperar un momento antes de cambiar
-    setTimeout(() => {
-      const currentIndex = devices.findIndex((device) => device.deviceId === selectedDeviceId)
-      const nextIndex = (currentIndex + 1) % devices.length
-      console.log("[v0] Switching to device:", devices[nextIndex].label)
-      setSelectedDeviceId(devices[nextIndex].deviceId)
-    }, 100)
   }
 
   const handleManualSubmit = async () => {
@@ -418,27 +360,6 @@ export function BarcodeScanner() {
     }
   }
 
-  const startScanner = () => {
-    console.log("[v0] Starting scanner manually...")
-    setError(null)
-    setIsScannerActive(true)
-  }
-
-  const stopScanner = () => {
-    console.log("[v0] Stopping scanner manually...")
-    if (codeReader.current) {
-      codeReader.current.reset()
-    }
-    if (webcamRef.current?.video?.srcObject) {
-      const stream = webcamRef.current.video.srcObject as MediaStream
-      stream.getTracks().forEach((track) => {
-        track.stop()
-        console.log("[v0] Track stopped:", track.kind)
-      })
-    }
-    setIsScannerActive(false)
-  }
-
   if (!isClient) {
     return (
       <div className="flex flex-col items-center justify-center p-8 text-center bg-card rounded-lg border border-border shadow-sm">
@@ -468,13 +389,14 @@ export function BarcodeScanner() {
   }
 
   return (
-    <div className="w-full max-w-md @container">
+    <div className="flex flex-1 flex-col gap-4 p-4">
       <Card>
         <CardHeader className="text-center">
           <CardTitle className="flex items-center justify-center gap-2">
             <CameraIcon className="w-5 h-5" />
-            Escáner QR/Código
+            Escáner QR/Código Avanzado
           </CardTitle>
+          <CardDescription>Escáner avanzado para control de acceso al evento</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           {error && (
@@ -483,55 +405,28 @@ export function BarcodeScanner() {
             </div>
           )}
 
-          {!isScannerActive ? (
-            <div className="flex flex-col items-center justify-center p-8 space-y-4">
-              <CameraOffIcon className="w-16 h-16 text-muted-foreground" />
-              <p className="text-center text-muted-foreground">Presiona el botón para iniciar el escáner</p>
-              <Button onClick={startScanner} size="lg" className="w-full">
-                <Play className="w-5 h-5 mr-2" />
-                Comenzar a Escanear
-              </Button>
+          <div className="relative w-full pt-[100%] overflow-hidden rounded-lg bg-card shadow-lg border border-border">
+            {selectedDeviceId && (
+              <Webcam
+                ref={webcamRef}
+                audio={false}
+                videoConstraints={{
+                  deviceId: selectedDeviceId,
+                  facingMode: "environment",
+                }}
+                className="absolute inset-0 w-full h-full object-cover"
+              />
+            )}
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[90%] h-[50%] border-4 border-primary rounded-lg shadow-[0_0_0_9999px_rgba(0,0,0,0.5)]">
+              <div className="absolute top-1/2 left-[5%] right-[5%] h-[2px] bg-primary animate-scan"></div>
             </div>
-          ) : (
-            <>
-              <div className="relative w-full pt-[100%] overflow-hidden rounded-lg bg-card shadow-lg border border-border">
-                {selectedDeviceId && (
-                  <Webcam
-                    ref={webcamRef}
-                    audio={false}
-                    videoConstraints={{
-                      deviceId: selectedDeviceId,
-                      facingMode: undefined,
-                    }}
-                    className="absolute inset-0 w-full h-full object-cover"
-                  />
-                )}
-                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[90%] h-[50%] border-4 border-primary rounded-lg shadow-[0_0_0_9999px_rgba(0,0,0,0.5)]">
-                  <div className="absolute top-1/2 left-[5%] right-[5%] h-[2px] bg-primary animate-scan"></div>
-                </div>
-                {devices.length > 1 && (
-                  <button
-                    onClick={switchCamera}
-                    className="absolute top-4 right-4 bg-secondary/70 text-foreground p-3 rounded-full hover:bg-secondary transition-colors shadow-md"
-                    aria-label="Cambiar cámara"
-                  >
-                    <RefreshCcwIcon className="size-6" />
-                  </button>
-                )}
-              </div>
+          </div>
 
-              <div className="text-center">
-                <p className="text-sm text-muted-foreground">
-                  {isScanning ? "Procesando..." : "Escaneando... Apunta al código"}
-                </p>
-              </div>
-
-              <Button onClick={stopScanner} variant="outline" className="w-full bg-transparent">
-                <CameraOffIcon className="w-4 h-4 mr-2" />
-                Detener Escáner
-              </Button>
-            </>
-          )}
+          <div className="text-center">
+            <p className="text-sm text-muted-foreground">
+              {isScanning ? "Procesando..." : "Escaneando automáticamente... Apunta al código"}
+            </p>
+          </div>
         </CardContent>
       </Card>
 
