@@ -46,40 +46,92 @@ export function QRScanner() {
   const [scanResult, setScanResult] = useState<ScanResult | null>(null)
   const [showResult, setShowResult] = useState(false)
   const [stream, setStream] = useState<MediaStream | null>(null)
+  const [wasCameraRunning, setWasCameraRunning] = useState(false)
   const videoRef = useRef<HTMLVideoElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
 
-  // Limpiar stream al desmontar
   useEffect(() => {
     return () => {
       if (stream) {
-        stream.getTracks().forEach((track) => track.stop())
+        console.log("[v0] Cleaning up camera stream on unmount")
+        stream.getTracks().forEach((track) => {
+          track.stop()
+          console.log("[v0] Track stopped:", track.kind)
+        })
       }
     }
   }, [stream])
 
+  useEffect(() => {
+    if (showResult && isScanning) {
+      console.log("[v0] Modal opened, pausing camera")
+      setWasCameraRunning(true)
+      if (stream) {
+        stream.getTracks().forEach((track) => {
+          track.enabled = false
+        })
+      }
+    } else if (!showResult && wasCameraRunning) {
+      console.log("[v0] Modal closed, restarting camera")
+      setWasCameraRunning(false)
+      if (stream) {
+        stream.getTracks().forEach((track) => {
+          track.enabled = true
+        })
+      } else {
+        startCamera()
+      }
+    }
+  }, [showResult])
+
   const startCamera = async () => {
     try {
       setError("")
+      console.log("[v0] Starting camera...")
+
+      if (stream) {
+        stream.getTracks().forEach((track) => track.stop())
+      }
+
       const mediaStream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "environment" }, // Cámara trasera en móviles
+        video: {
+          facingMode: "environment",
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+        },
       })
 
       if (videoRef.current) {
         videoRef.current.srcObject = mediaStream
         setStream(mediaStream)
         setIsScanning(true)
+        console.log("[v0] Camera started successfully")
       }
-    } catch (error) {
-      console.error("Error al acceder a la cámara:", error)
-      setError("No se pudo acceder a la cámara. Verifica los permisos.")
+    } catch (error: any) {
+      console.error("[v0] Error al acceder a la cámara:", error)
+      if (error.name === "NotAllowedError") {
+        setError("Permiso de cámara denegado. Por favor, permite el acceso a la cámara.")
+      } else if (error.name === "NotFoundError") {
+        setError("No se encontró ninguna cámara en el dispositivo.")
+      } else if (error.name === "NotReadableError") {
+        setError("La cámara está siendo usada por otra aplicación. Ciérrala e intenta de nuevo.")
+      } else {
+        setError("No se pudo acceder a la cámara. Verifica los permisos.")
+      }
     }
   }
 
   const stopCamera = () => {
+    console.log("[v0] Stopping camera...")
     if (stream) {
-      stream.getTracks().forEach((track) => track.stop())
+      stream.getTracks().forEach((track) => {
+        track.stop()
+        console.log("[v0] Track stopped:", track.kind)
+      })
       setStream(null)
+    }
+    if (videoRef.current) {
+      videoRef.current.srcObject = null
     }
     setIsScanning(false)
     setScanning(false)
@@ -99,18 +151,13 @@ export function QRScanner() {
 
       if (!context) throw new Error("No se pudo obtener el contexto del canvas")
 
-      // Configurar canvas con las dimensiones del video
       canvas.width = video.videoWidth
       canvas.height = video.videoHeight
 
-      // Capturar frame del video
       context.drawImage(video, 0, 0, canvas.width, canvas.height)
 
-      // Convertir a ImageData para procesamiento
       const imageData = context.getImageData(0, 0, canvas.width, canvas.height)
 
-      // Aquí usarías una librería como jsQR para decodificar
-      // Por ahora simularemos el proceso
       await simulateQRProcessing()
     } catch (error) {
       console.error("Error al procesar QR:", error)
@@ -121,9 +168,7 @@ export function QRScanner() {
     }
   }
 
-  // Simulación del procesamiento QR (reemplazar con jsQR real)
   const simulateQRProcessing = async () => {
-    // Simular URL del QR (en producción vendría del decoder QR)
     const simulatedURL = "https://example.com/profile/119276897"
 
     await processQRUrl(simulatedURL)
@@ -133,7 +178,6 @@ export function QRScanner() {
     try {
       setProcessing(true)
 
-      // Hacer fetch a la URL del QR
       const response = await fetch(`/api/scrape-page?url=${encodeURIComponent(url)}`)
       const data = await response.json()
 
@@ -155,7 +199,6 @@ export function QRScanner() {
         return
       }
 
-      // Buscar en la base de datos
       const person = await searchPersonInDatabase(identificacion)
 
       setScanResult({
@@ -204,10 +247,24 @@ export function QRScanner() {
   }
 
   const resetScanner = () => {
+    console.log("[v0] Resetting scanner...")
     setScanResult(null)
     setShowResult(false)
     setError("")
-    startCamera()
+    if (!isScanning) {
+      startCamera()
+    }
+  }
+
+  const handleModalClose = (open: boolean) => {
+    setShowResult(open)
+    if (!open) {
+      console.log("[v0] Modal closed by user")
+      setScanResult(null)
+      setError("")
+      setScanning(false)
+      setProcessing(false)
+    }
   }
 
   return (
@@ -246,7 +303,6 @@ export function QRScanner() {
                   />
                   <canvas ref={canvasRef} className="hidden" />
 
-                  {/* Overlay de escaneo */}
                   <div className="absolute inset-0 flex items-center justify-center">
                     <div className="w-48 h-48 border-2 border-white border-dashed rounded-lg flex items-center justify-center">
                       {scanning && (
@@ -299,8 +355,7 @@ export function QRScanner() {
         </Card>
       </div>
 
-      {/* Dialog de resultados */}
-      <Dialog open={showResult} onOpenChange={setShowResult}>
+      <Dialog open={showResult} onOpenChange={handleModalClose}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
@@ -394,7 +449,7 @@ export function QRScanner() {
               <RefreshCw className="w-4 h-4 mr-2" />
               Escanear Otro
             </Button>
-            <Button variant="outline" onClick={() => setShowResult(false)}>
+            <Button variant="outline" onClick={() => handleModalClose(false)}>
               Cerrar
             </Button>
           </div>

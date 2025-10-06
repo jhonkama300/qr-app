@@ -53,6 +53,8 @@ export function BarcodeScanner() {
   const [manualInputError, setManualInputError] = useState<string | null>(null)
   const [showResult, setShowResult] = useState(false)
   const [isScanning, setIsScanning] = useState(false)
+  const lastScanTime = useRef<number>(0)
+  const SCAN_COOLDOWN = 2000 // 2 seconds between scans
 
   const router = useRouter()
   const webcamRef = useRef<Webcam>(null)
@@ -66,9 +68,11 @@ export function BarcodeScanner() {
     if (!isClient) return
 
     codeReader.current = new BrowserMultiFormatReader()
+    console.log("[v0] ZXing reader initialized")
 
     return () => {
       if (codeReader.current) {
+        console.log("[v0] Cleaning up ZXing reader")
         codeReader.current.reset()
       }
     }
@@ -109,11 +113,18 @@ export function BarcodeScanner() {
 
   const processScanResult = useCallback(
     async (scannedContent: string, source: "direct" | "q10" | "manual") => {
+      const now = Date.now()
+      if (now - lastScanTime.current < SCAN_COOLDOWN) {
+        console.log("[v0] Scan cooldown active, ignoring")
+        return
+      }
+
       if (isScanning) {
         console.log("[v0] Scan already in progress, ignoring")
         return
       }
 
+      lastScanTime.current = now
       setIsScanning(true)
       let currentScanResult: ScanResultDisplay
 
@@ -174,6 +185,7 @@ export function BarcodeScanner() {
           setShowResult(false)
           setScanResultDisplay(null)
           setIsScanning(false)
+          lastScanTime.current = 0
         }, 5000)
         return
       } else {
@@ -228,6 +240,7 @@ export function BarcodeScanner() {
         setShowResult(false)
         setScanResultDisplay(null)
         setIsScanning(false)
+        lastScanTime.current = 0
       }, 5000)
     },
     [getStudentById, markStudentAccess, processQ10Url, user, checkIfAlreadyScanned, isScanning, fullName, activeRole],
@@ -236,7 +249,7 @@ export function BarcodeScanner() {
   useEffect(() => {
     if (!isClient || !hasPermission || !selectedDeviceId || isProcessingQ10 || isScanning || isManualProcessing) {
       if (codeReader.current) {
-        console.log("[v0] Reseteando lector (condiciones no cumplidas)...")
+        console.log("[v0] Resetting reader (conditions not met)...")
         codeReader.current.reset()
       }
       return
@@ -244,23 +257,32 @@ export function BarcodeScanner() {
 
     const video = webcamRef.current?.video
     if (!video) {
-      console.warn("[v0] Elemento de video no listo para escanear.")
+      console.warn("[v0] Video element not ready")
       return
     }
 
     if (!codeReader.current) {
+      console.error("[v0] Code reader not initialized")
       setError("El lector de códigos no está inicializado.")
       return
     }
 
     setError(null)
 
-    console.log("[v0] Iniciando escaneo continuo con dispositivo:", selectedDeviceId)
+    console.log("[v0] Starting continuous scan with device:", selectedDeviceId)
+
+    const initTimeout = setTimeout(() => {
+      console.error("[v0] Scanner initialization timeout")
+      setError("Tiempo de espera agotado al iniciar la cámara. Intenta cambiar de cámara.")
+    }, 10000)
+
     codeReader.current
       .decodeFromVideoDevice(selectedDeviceId, video, (result, err) => {
+        clearTimeout(initTimeout)
+
         if (result) {
           if (!isScanning && !isProcessingQ10 && !isManualProcessing) {
-            console.log("[v0] QR detectado:", result.getText())
+            console.log("[v0] QR detected:", result.getText())
             processScanResult(result.getText(), "direct")
           }
         }
@@ -270,21 +292,31 @@ export function BarcodeScanner() {
           err.name !== "AbortException" &&
           !err.message.includes("No MultiFormat Readers were able to detect the code")
         ) {
-          console.error("[v0] Error al escanear:", err)
-          setError("Error en el escáner: " + err.message)
+          console.error("[v0] Scanner error:", err)
+          if (err.name === "NotReadableError") {
+            setError("La cámara está siendo usada por otra aplicación.")
+          }
         }
       })
       .catch((err) => {
-        if (!err.message.includes("No MultiFormat Readers were able to detect the code")) {
-          console.error("[v0] Error al iniciar el escaneo continuo:", err)
-          setError("Error al iniciar el escáner: " + err.message)
+        clearTimeout(initTimeout)
+        console.error("[v0] Error starting continuous scan:", err)
+        if (err.name === "NotAllowedError") {
+          setError("Permiso de cámara denegado.")
+        } else if (err.name === "NotFoundError") {
+          setError("No se encontró la cámara.")
+        } else if (err.name === "NotReadableError") {
+          setError("La cámara está en uso. Cierra otras aplicaciones e intenta de nuevo.")
+        } else if (!err.message.includes("No MultiFormat Readers")) {
+          setError("Error al iniciar el escáner. Intenta recargar la página.")
         }
         codeReader.current?.reset()
       })
 
     return () => {
+      clearTimeout(initTimeout)
       if (codeReader.current) {
-        console.log("[v0] Reseteando lector en cleanup...")
+        console.log("[v0] Resetting reader in cleanup...")
         codeReader.current.reset()
       }
     }
@@ -353,12 +385,24 @@ export function BarcodeScanner() {
   }
 
   const resetScanner = () => {
+    console.log("[v0] Resetting scanner...")
     setScanResultDisplay(null)
     setShowResult(false)
     setError(null)
     setManualIdInput("")
     setManualInputError(null)
     setIsScanning(false)
+    lastScanTime.current = 0
+  }
+
+  const handleModalClose = (open: boolean) => {
+    setShowResult(open)
+    if (!open) {
+      console.log("[v0] Modal closed, resetting scanner state")
+      setScanResultDisplay(null)
+      setIsScanning(false)
+      lastScanTime.current = 0
+    }
   }
 
   return (
@@ -458,7 +502,7 @@ export function BarcodeScanner() {
         </CardContent>
       </Card>
 
-      <Dialog open={showResult} onOpenChange={setShowResult}>
+      <Dialog open={showResult} onOpenChange={handleModalClose}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
@@ -543,7 +587,7 @@ export function BarcodeScanner() {
               <RefreshCw className="w-4 h-4 mr-2" />
               Procesar Otro
             </Button>
-            <Button variant="outline" onClick={() => setShowResult(false)}>
+            <Button variant="outline" onClick={() => handleModalClose(false)}>
               Cerrar
             </Button>
           </div>

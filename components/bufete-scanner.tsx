@@ -4,7 +4,7 @@ import { useState, useRef, useEffect, useCallback } from "react"
 import Webcam from "react-webcam"
 import { BrowserMultiFormatReader, BarcodeFormat, DecodeHintType } from "@zxing/library"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
@@ -57,6 +57,8 @@ export function BuffeteScanner() {
   const codeReader = useRef<BrowserMultiFormatReader | null>(null)
   const scannerActive = useRef(false)
   const manualInputRef = useRef<HTMLInputElement>(null)
+  const lastScanTime = useRef<number>(0)
+  const SCAN_COOLDOWN = 2000
 
   useEffect(() => {
     setIsClient(true)
@@ -200,39 +202,81 @@ export function BuffeteScanner() {
   }
 
   useEffect(() => {
-    if (!isClient || !hasPermission || !selectedDeviceId || processing || isScanning || !codeReader.current || activeTab !== "qr") {
+    if (
+      !isClient ||
+      !hasPermission ||
+      !selectedDeviceId ||
+      processing ||
+      isScanning ||
+      !codeReader.current ||
+      activeTab !== "qr"
+    ) {
+      if (codeReader.current && scannerActive.current) {
+        console.log("[v0] Stopping scanner (conditions not met)")
+        codeReader.current.reset()
+        scannerActive.current = false
+      }
       return
     }
 
     const video = webcamRef.current?.video
     if (!video) {
+      console.warn("[v0] Video element not ready")
       return
     }
 
     if (scannerActive.current) {
+      console.log("[v0] Scanner already active")
       return
     }
 
-    console.log("[v0] Iniciando escaneo continuo con dispositivo:", selectedDeviceId)
+    console.log("[v0] Starting continuous scan with device:", selectedDeviceId)
     scannerActive.current = true
     setError("")
 
     const startScanning = async () => {
       try {
+        const initTimeout = setTimeout(() => {
+          console.error("[v0] Scanner initialization timeout")
+          setError("Tiempo de espera agotado. Intenta cambiar de cámara o recargar.")
+          scannerActive.current = false
+        }, 10000)
+
         await codeReader.current!.decodeFromVideoDevice(selectedDeviceId, video, (result, err) => {
+          clearTimeout(initTimeout)
+
           if (result && !isScanning && !processing) {
+            const now = Date.now()
+            if (now - lastScanTime.current < SCAN_COOLDOWN) {
+              console.log("[v0] Scan cooldown active")
+              return
+            }
+
             const scannedText = result.getText()
-            console.log("[v0] QR escaneado:", scannedText)
+            console.log("[v0] QR scanned:", scannedText)
+            lastScanTime.current = now
             setIsScanning(true)
             processStudentAccess(scannedText)
           }
           if (err && err.name !== "NotFoundException") {
-            console.log("[v0] Error del scanner:", err.name)
+            if (err.name === "NotReadableError") {
+              console.error("[v0] Camera in use by another app")
+              setError("La cámara está en uso. Cierra otras aplicaciones.")
+              scannerActive.current = false
+            }
           }
         })
-      } catch (err) {
-        console.error("[v0] Error al iniciar scanner:", err)
-        setError("Error al iniciar el escáner")
+      } catch (err: any) {
+        console.error("[v0] Error starting scanner:", err)
+        if (err.name === "NotAllowedError") {
+          setError("Permiso de cámara denegado")
+        } else if (err.name === "NotFoundError") {
+          setError("No se encontró la cámara")
+        } else if (err.name === "NotReadableError") {
+          setError("La cámara está en uso. Cierra otras aplicaciones e intenta de nuevo.")
+        } else {
+          setError("Error al iniciar el escáner")
+        }
         scannerActive.current = false
       }
     }
@@ -240,7 +284,7 @@ export function BuffeteScanner() {
     startScanning()
 
     return () => {
-      console.log("[v0] Reseteando lector en cleanup...")
+      console.log("[v0] Cleaning up scanner...")
       if (codeReader.current && scannerActive.current) {
         codeReader.current.reset()
         scannerActive.current = false
@@ -248,26 +292,30 @@ export function BuffeteScanner() {
     }
   }, [isClient, hasPermission, selectedDeviceId, processing, isScanning, activeTab])
 
-  const handleManualSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    if (manualId.trim()) {
-      processStudentAccess(manualId.trim())
-      setManualId("")
-    }
-  }
-
   const resetScanner = () => {
+    console.log("[v0] Resetting scanner...")
     setScanResult(null)
     setShowResult(false)
     setError("")
     setManualId("")
     setIsScanning(false)
+    lastScanTime.current = 0
+  }
+
+  const handleModalClose = (open: boolean) => {
+    setShowResult(open)
+    if (!open) {
+      console.log("[v0] Modal closed, resetting state")
+      setScanResult(null)
+      setIsScanning(false)
+      lastScanTime.current = 0
+    }
   }
 
   const switchCamera = () => {
     if (!isClient || devices.length <= 1) return
 
-    console.log("[v0] Cambiando cámara")
+    console.log("[v0] Switching camera")
     if (codeReader.current && scannerActive.current) {
       codeReader.current.reset()
       scannerActive.current = false
@@ -276,6 +324,7 @@ export function BuffeteScanner() {
     const currentIndex = devices.findIndex((device) => device.deviceId === selectedDeviceId)
     const nextIndex = (currentIndex + 1) % devices.length
     setSelectedDeviceId(devices[nextIndex].deviceId)
+    setError("")
   }
 
   const requestCameraPermission = () => {
@@ -341,7 +390,9 @@ export function BuffeteScanner() {
       <div className="flex flex-col items-center gap-3">
         <div className="text-center">
           <h1 className="text-xl md:text-2xl font-bold">Entrega de Comida</h1>
-          <p className="text-sm md:text-base text-muted-foreground">Bufete {user.mesaAsignada} - Escanea QR o ingresa ID</p>
+          <p className="text-sm md:text-base text-muted-foreground">
+            Bufete {user.mesaAsignada} - Escanea QR o ingresa ID
+          </p>
         </div>
 
         <Badge variant="outline" className="bg-green-50 text-green-700">
@@ -356,15 +407,15 @@ export function BuffeteScanner() {
             </h2>
             <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "qr" | "manual")} className="w-full">
               <TabsList className="grid w-full grid-cols-2 mb-4 bg-gray-100">
-                <TabsTrigger 
-                  value="qr" 
+                <TabsTrigger
+                  value="qr"
                   className="text-sm md:text-base data-[state=active]:bg-green-500 data-[state=active]:text-white"
                 >
                   <QrCode className="w-4 h-4 mr-2" />
                   Escanear QR
                 </TabsTrigger>
-                <TabsTrigger 
-                  value="manual" 
+                <TabsTrigger
+                  value="manual"
                   className="text-sm md:text-base data-[state=active]:bg-green-500 data-[state=active]:text-white"
                 >
                   <Hash className="w-4 h-4 mr-2" />
@@ -481,7 +532,7 @@ export function BuffeteScanner() {
         </Card>
       </div>
 
-      <Dialog open={showResult} onOpenChange={setShowResult}>
+      <Dialog open={showResult} onOpenChange={handleModalClose}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
@@ -554,7 +605,7 @@ export function BuffeteScanner() {
               <RefreshCw className="w-4 h-4 mr-2" />
               Procesar Otro Estudiante
             </Button>
-            <Button variant="outline" onClick={() => setShowResult(false)}>
+            <Button variant="outline" onClick={() => handleModalClose(false)}>
               Cerrar
             </Button>
           </div>
