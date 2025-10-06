@@ -1,7 +1,6 @@
 "use client"
 
 import type React from "react"
-
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -44,21 +43,13 @@ export function UnifiedLogin() {
   useEffect(() => {
     if (studentData) {
       const qrData = studentData.identificacion
-
       QRCode.toDataURL(qrData, {
         width: 200,
         margin: 2,
-        color: {
-          dark: "#000000",
-          light: "#FFFFFF",
-        },
+        color: { dark: "#000000", light: "#FFFFFF" },
       })
-        .then((url) => {
-          setQrCodeUrl(url)
-        })
-        .catch((err) => {
-          console.error("[v0] Error generando QR:", err)
-        })
+        .then((url) => setQrCodeUrl(url))
+        .catch((err) => console.error("[v0] Error generando QR:", err))
     }
   }, [studentData])
 
@@ -66,16 +57,13 @@ export function UnifiedLogin() {
     e.preventDefault()
     setError("")
     setLoading(true)
-
     try {
       const result = await checkIdType(idNumber)
-
       if (result.type === "none") {
         setError("Número de identificación no encontrado en el sistema")
         setLoading(false)
         return
       }
-
       if (result.type === "admin") {
         setUserType("admin")
         setStep("password")
@@ -96,43 +84,33 @@ export function UnifiedLogin() {
     e.preventDefault()
     setError("")
     setLoading(true)
-
     try {
       const user = await validateLogin(idNumber, password)
-
       if (!user) {
         setError("Contraseña incorrecta")
         setLoading(false)
         return
       }
-
       if (user.hasDefaultPassword) {
-        console.log("[v0] Usuario tiene contraseña predeterminada, requiere cambio")
         setLoggedUser(user)
         setShowChangePasswordModal(true)
         setLoading(false)
         return
       }
-
       login(user)
-
-      let accessMessage = ""
-      const primaryRole = user.roles[0] // Use first role as primary
-      if (primaryRole === "administrador") {
-        accessMessage = "Acceso Administrador"
-      } else if (primaryRole === "operativo") {
-        accessMessage = "Acceso Operativo"
-      } else if (primaryRole === "bufete") {
-        accessMessage = "Acceso Bufete"
-      }
-
+      const primaryRole = user.roles[0]
+      const accessMessage =
+        primaryRole === "administrador"
+          ? "Acceso Administrador"
+          : primaryRole === "operativo"
+          ? "Acceso Operativo"
+          : primaryRole === "bufete"
+          ? "Acceso Bufete"
+          : "Acceso concedido"
       setSuccessMessage(accessMessage)
       setLoading(false)
-
-      setTimeout(() => {
-        router.push("/dashboard")
-      }, 1500)
-    } catch (err) {
+      setTimeout(() => router.push("/dashboard"), 1500)
+    } catch {
       setError("Error al iniciar sesión")
       setLoading(false)
     }
@@ -148,14 +126,12 @@ export function UnifiedLogin() {
       setChangingPassword(false)
       return
     }
-
     if (newPassword.length < 6) {
       setChangePasswordError("La contraseña debe tener al menos 6 caracteres")
       setChangingPassword(false)
       return
     }
-
-    if (newPassword === "Uparsistem123") {
+    if (newPassword === "Uparsistem01-") {
       setChangePasswordError("No puedes usar la contraseña predeterminada del sistema")
       setChangingPassword(false)
       return
@@ -164,28 +140,21 @@ export function UnifiedLogin() {
     try {
       if (loggedUser) {
         await changePassword(loggedUser.id, newPassword)
-
-        // Actualizar el usuario para que ya no tenga la contraseña predeterminada
         const updatedUser = { ...loggedUser, hasDefaultPassword: false }
         login(updatedUser)
-
-        let accessMessage = ""
         const primaryRole = updatedUser.roles[0]
-        if (primaryRole === "administrador") {
-          accessMessage = "Acceso Administrador"
-        } else if (primaryRole === "operativo") {
-          accessMessage = "Acceso Operativo"
-        } else if (primaryRole === "bufete") {
-          accessMessage = "Acceso Bufete"
-        }
-
+        const accessMessage =
+          primaryRole === "administrador"
+            ? "Acceso Administrador"
+            : primaryRole === "operativo"
+            ? "Acceso Operativo"
+            : primaryRole === "bufete"
+            ? "Acceso Bufete"
+            : "Acceso concedido"
         setSuccessMessage(accessMessage)
         setShowChangePasswordModal(false)
         setChangingPassword(false)
-
-        setTimeout(() => {
-          router.push("/dashboard")
-        }, 1500)
+        setTimeout(() => router.push("/dashboard"), 1500)
       }
     } catch (error: any) {
       console.error("[v0] Error al cambiar contraseña:", error)
@@ -212,13 +181,25 @@ export function UnifiedLogin() {
   return (
     <>
       <div className="relative min-h-screen flex items-center justify-center p-4 overflow-hidden">
-        <video autoPlay loop muted playsInline className="absolute inset-0 w-full h-full object-cover">
-          <source src="/videos/background.mp4" type="video/mp4" />
-        </video>
+        {/* === Fondo con IMAGEN (Next/Image) === */}
+        <div className="absolute inset-0 -z-10">
+          <Image
+            src="/images/graduacion-hero.jpg"
+            alt="Ceremonia de grados"
+            fill
+            priority
+            // Cubrimos toda la pantalla y centramos el momento de los birretes
+            className="object-cover object-[50%_25%] select-none pointer-events-none"
+            sizes="100vw"
+          />
+          {/* Capa de oscurecido para dar contraste al formulario */}
+          <div className="absolute inset-0 bg-black/45" />
+          {/* Suavizamos un poco para texto más legible en móviles */}
+          <div className="absolute inset-0 backdrop-blur-[1px]" />
+        </div>
 
-        <div className="absolute inset-0 bg-black/40" />
-
-        <Card className="relative z-10 w-full max-w-sm shadow-2xl border-0 overflow-hidden backdrop-blur-sm bg-white/95">
+        {/* Tarjeta del login */}
+        <Card className="relative z-10 w-full max-w-sm shadow-2xl border-0 overflow-hidden backdrop-blur-sm bg-white/90">
           <div className="bg-gradient-to-r from-lime-500 to-green-600 p-8 text-center">
             <div className="flex justify-center mb-4">
               <div className="bg-white rounded-full p-3 shadow-lg">
@@ -237,12 +218,10 @@ export function UnifiedLogin() {
 
           <CardHeader className="text-center space-y-2 pt-6">
             <CardTitle className="text-xl font-bold text-gray-800">
-              {step === "id" && "Acceso al Sistema"}
-              {step === "password" && "Acceso Administrativo"}
+              {step === "id" ? "Acceso al Sistema" : "Acceso Administrativo"}
             </CardTitle>
             <CardDescription className="text-gray-600">
-              {step === "id" && "Ingresa tu número de identificación para continuar"}
-              {step === "password" && "Ingresa tu contraseña para acceder"}
+              {step === "id" ? "Ingresa tu número de identificación para continuar" : "Ingresa tu contraseña para acceder"}
             </CardDescription>
           </CardHeader>
 
@@ -298,7 +277,7 @@ export function UnifiedLogin() {
                     Contraseña
                   </Label>
                   <div className="relative">
-                    <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-lime-600" />
+                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-lime-600" />
                     <Input
                       id="password"
                       type="password"
@@ -364,6 +343,7 @@ export function UnifiedLogin() {
         </Card>
       </div>
 
+      {/* === Modales (sin cambios funcionales) === */}
       <Dialog open={showStudentModal} onOpenChange={setShowStudentModal}>
         <DialogContent className="sm:max-w-md" onInteractOutside={(e) => e.preventDefault()}>
           <DialogHeader>
@@ -381,22 +361,18 @@ export function UnifiedLogin() {
                   <span className="text-sm font-medium text-gray-600">Nombre Completo</span>
                   <span className="text-sm font-bold text-gray-900 text-right">{studentData.nombre}</span>
                 </div>
-
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-medium text-gray-600">Identificación</span>
                   <span className="text-sm font-bold text-gray-900">{studentData.identificacion}</span>
                 </div>
-
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-medium text-gray-600">Programa</span>
                   <span className="text-sm font-bold text-gray-900 text-right">{studentData.programa}</span>
                 </div>
-
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-medium text-gray-600">Puesto Asignado</span>
                   <Badge className="font-bold bg-lime-600 hover:bg-lime-700">{studentData.puesto}</Badge>
                 </div>
-
                 <div className="pt-2 border-t border-lime-200">
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-medium text-gray-600">Bufetes Disponibles</span>
@@ -479,7 +455,7 @@ export function UnifiedLogin() {
                 Nueva Contraseña
               </Label>
               <div className="relative">
-                <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
                 <Input
                   id="newPassword"
                   type={showNewPassword ? "text" : "password"}
@@ -494,7 +470,7 @@ export function UnifiedLogin() {
                 <button
                   type="button"
                   onClick={() => setShowNewPassword(!showNewPassword)}
-                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
                   disabled={changingPassword || !!successMessage}
                 >
                   {showNewPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -507,7 +483,7 @@ export function UnifiedLogin() {
                 Confirmar Nueva Contraseña
               </Label>
               <div className="relative">
-                <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
                 <Input
                   id="confirmPassword"
                   type={showConfirmPassword ? "text" : "password"}
@@ -522,7 +498,7 @@ export function UnifiedLogin() {
                 <button
                   type="button"
                   onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
                   disabled={changingPassword || !!successMessage}
                 >
                   {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
