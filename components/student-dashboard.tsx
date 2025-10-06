@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { useStudentAuth } from "@/components/student-auth-provider"
 import { getStudentInfo } from "@/lib/student-auth-service"
-import { collection, query, where, getDocs } from "firebase/firestore"
+import { collection, query, where, getDocs, onSnapshot, doc } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -42,8 +42,60 @@ export default function StudentDashboard() {
   useEffect(() => {
     if (!student) {
       router.push("/student/login")
-    } else {
-      loadAccessLogs()
+      return
+    }
+
+    const studentDocRef = doc(db, "personas", student.identificacion)
+    const unsubscribeStudent = onSnapshot(
+      studentDocRef,
+      (docSnapshot) => {
+        if (docSnapshot.exists()) {
+          const updatedData = docSnapshot.data()
+          const updatedStudent = {
+            ...student,
+            cuposConsumidos: updatedData.cuposConsumidos || 0,
+            cuposExtras: updatedData.cuposExtras || 0,
+            nombre: updatedData.nombre || student.nombre,
+            programa: updatedData.programa || student.programa,
+            puesto: updatedData.puesto || student.puesto,
+          }
+          setStudentInfo(updatedStudent)
+          localStorage.setItem("currentStudent", JSON.stringify(updatedStudent))
+        }
+      },
+      (error) => {
+        console.error("Error en listener de estudiante:", error)
+      },
+    )
+
+    const q = query(collection(db, "access_logs"), where("identificacion", "==", student.identificacion))
+    const unsubscribeLogs = onSnapshot(
+      q,
+      (querySnapshot) => {
+        const logs: AccessLog[] = []
+        querySnapshot.forEach((doc) => {
+          const data = doc.data()
+          logs.push({
+            timestamp: data.timestamp,
+            status: data.status,
+            details: data.details,
+            mesaUsada: data.mesaUsada,
+          })
+        })
+
+        logs.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+        setAccessLogs(logs.slice(0, 5))
+        setLoadingLogs(false)
+      },
+      (error) => {
+        console.error("Error en listener de logs:", error)
+        setLoadingLogs(false)
+      },
+    )
+
+    return () => {
+      unsubscribeStudent()
+      unsubscribeLogs()
     }
   }, [student, router])
 
@@ -66,9 +118,8 @@ export default function StudentDashboard() {
         })
       })
 
-      // Ordenar por fecha más reciente
       logs.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
-      setAccessLogs(logs.slice(0, 5)) // Mostrar solo los últimos 5 registros
+      setAccessLogs(logs.slice(0, 5))
     } catch (error) {
       console.error("Error al cargar registros de acceso:", error)
     } finally {
@@ -189,6 +240,29 @@ export default function StudentDashboard() {
             </div>
           </div>
 
+          {/* Silla Asignada */}
+          <Card className="bg-gradient-to-br from-blue-500 to-blue-700 text-white shadow-2xl border-0">
+            <CardContent className="pt-8 pb-8">
+              <div className="text-center space-y-4">
+                <div className="flex justify-center">
+                  <div className="w-20 h-20 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center">
+                    <Armchair className="w-10 h-10 text-white" />
+                  </div>
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-blue-100 uppercase tracking-wider mb-2">Tu Silla Asignada</p>
+                  <p className="text-6xl sm:text-7xl font-black tracking-tight">{studentInfo.puesto}</p>
+                </div>
+                <div className="pt-2">
+                  <div className="inline-flex items-center gap-2 bg-white/20 backdrop-blur-sm px-4 py-2 rounded-full">
+                    <BookOpen className="w-4 h-4" />
+                    <span className="text-sm font-medium">{studentInfo.programa}</span>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
           {/* Información Personal */}
           <Card className="bg-white/95 backdrop-blur-sm shadow-xl">
             <CardHeader>
@@ -207,20 +281,6 @@ export default function StudentDashboard() {
                   <p className="text-xs text-muted-foreground">Identificación</p>
                   <p className="font-medium text-sm">{studentInfo.identificacion}</p>
                 </div>
-                <div className="space-y-1">
-                  <p className="text-xs text-muted-foreground">Programa</p>
-                  <p className="font-medium text-sm flex items-center gap-2">
-                    <BookOpen className="w-4 h-4 text-blue-600" />
-                    {studentInfo.programa}
-                  </p>
-                </div>
-                <div className="space-y-1">
-                  <p className="text-xs text-muted-foreground">Silla Asignada</p>
-                  <p className="font-medium text-sm flex items-center gap-2">
-                    <Armchair className="w-4 h-4 text-blue-600" />
-                    {studentInfo.puesto}
-                  </p>
-                </div>
               </div>
             </CardContent>
           </Card>
@@ -228,37 +288,47 @@ export default function StudentDashboard() {
           {/* Cupos de Comida */}
           <Card className="bg-white/95 backdrop-blur-sm shadow-xl">
             <CardHeader>
-              <CardTitle className="text-lg flex items-center gap-2">
-                <UtensilsCrossed className="w-5 h-5 text-blue-600" />
-                Cupos de Comida
-              </CardTitle>
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <UtensilsCrossed className="w-5 h-5 text-blue-600" />
+                  Cupos de Comida
+                </CardTitle>
+                <div className="flex items-center gap-1 text-xs text-green-600 bg-green-50 px-2 py-1 rounded-full">
+                  <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+                  <span className="font-medium">En vivo</span>
+                </div>
+              </div>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                <div className="text-center p-3 bg-blue-50 rounded-lg">
-                  <p className="text-2xl font-bold text-blue-600">{cuposTotales}</p>
-                  <p className="text-xs text-muted-foreground">Total</p>
+              <div className="grid grid-cols-3 gap-3">
+                <div className="text-center p-4 bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl border-2 border-blue-200">
+                  <p className="text-3xl font-black text-blue-600">{cuposTotales}</p>
+                  <p className="text-xs text-muted-foreground font-medium mt-1">Total</p>
                 </div>
-                <div className="text-center p-3 bg-green-50 rounded-lg">
-                  <p className="text-2xl font-bold text-green-600">{cuposDisponibles}</p>
-                  <p className="text-xs text-muted-foreground">Disponibles</p>
+                <div className="text-center p-4 bg-gradient-to-br from-green-50 to-green-100 rounded-xl border-2 border-green-200">
+                  <p className="text-3xl font-black text-green-600">{cuposDisponibles}</p>
+                  <p className="text-xs text-muted-foreground font-medium mt-1">Disponibles</p>
                 </div>
-                <div className="text-center p-3 bg-orange-50 rounded-lg col-span-2 sm:col-span-1">
-                  <p className="text-2xl font-bold text-orange-600">{studentInfo.cuposConsumidos}</p>
-                  <p className="text-xs text-muted-foreground">Consumidos</p>
+                <div className="text-center p-4 bg-gradient-to-br from-orange-50 to-orange-100 rounded-xl border-2 border-orange-200">
+                  <p className="text-3xl font-black text-orange-600">{studentInfo.cuposConsumidos}</p>
+                  <p className="text-xs text-muted-foreground font-medium mt-1">Consumidos</p>
                 </div>
               </div>
 
               {/* Barra de progreso */}
               <div className="space-y-2">
                 <div className="flex justify-between text-xs text-muted-foreground">
-                  <span>Uso de cupos</span>
-                  <span>{Math.round(porcentajeUsado)}%</span>
+                  <span className="font-medium">Uso de cupos</span>
+                  <span className="font-bold">{Math.round(porcentajeUsado)}%</span>
                 </div>
-                <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
+                <div className="w-full bg-gray-200 rounded-full h-4 overflow-hidden shadow-inner">
                   <div
-                    className={`h-full transition-all duration-500 ${
-                      porcentajeUsado < 50 ? "bg-green-500" : porcentajeUsado < 80 ? "bg-yellow-500" : "bg-red-500"
+                    className={`h-full transition-all duration-700 ease-out ${
+                      porcentajeUsado < 50
+                        ? "bg-gradient-to-r from-green-400 to-green-600"
+                        : porcentajeUsado < 80
+                          ? "bg-gradient-to-r from-yellow-400 to-yellow-600"
+                          : "bg-gradient-to-r from-red-400 to-red-600"
                     }`}
                     style={{ width: `${Math.min(porcentajeUsado, 100)}%` }}
                   />
@@ -267,7 +337,7 @@ export default function StudentDashboard() {
 
               {cuposDisponibles === 0 && (
                 <Alert variant="destructive" className="bg-red-50 border-red-200">
-                  <AlertDescription className="text-sm">
+                  <AlertDescription className="text-sm font-medium">
                     Has consumido todos tus cupos de comida disponibles.
                   </AlertDescription>
                 </Alert>
@@ -275,7 +345,7 @@ export default function StudentDashboard() {
 
               {cuposDisponibles > 0 && cuposDisponibles <= 2 && (
                 <Alert className="bg-yellow-50 border-yellow-200">
-                  <AlertDescription className="text-sm text-yellow-800">
+                  <AlertDescription className="text-sm text-yellow-800 font-medium">
                     Te quedan pocos cupos disponibles. Úsalos sabiamente.
                   </AlertDescription>
                 </Alert>
@@ -286,10 +356,16 @@ export default function StudentDashboard() {
           {/* Historial de Acceso */}
           <Card className="bg-white/95 backdrop-blur-sm shadow-xl">
             <CardHeader>
-              <CardTitle className="text-lg flex items-center gap-2">
-                <CheckCircle2 className="w-5 h-5 text-blue-600" />
-                Historial de Acceso
-              </CardTitle>
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <CheckCircle2 className="w-5 h-5 text-blue-600" />
+                  Historial de Acceso
+                </CardTitle>
+                <div className="flex items-center gap-1 text-xs text-green-600 bg-green-50 px-2 py-1 rounded-full">
+                  <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+                  <span className="font-medium">En vivo</span>
+                </div>
+              </div>
             </CardHeader>
             <CardContent>
               {loadingLogs ? (
@@ -304,11 +380,14 @@ export default function StudentDashboard() {
               ) : (
                 <div className="space-y-2">
                   {accessLogs.map((log, index) => (
-                    <div key={index} className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg">
+                    <div
+                      key={index}
+                      className="flex items-start gap-3 p-3 bg-gradient-to-r from-gray-50 to-gray-100 rounded-lg border border-gray-200 hover:shadow-md transition-shadow"
+                    >
                       <div className="mt-0.5">{getStatusIcon(log.status)}</div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between gap-2 mb-1">
-                          <p className="text-sm font-medium">{getStatusText(log.status)}</p>
+                          <p className="text-sm font-semibold">{getStatusText(log.status)}</p>
                           <p className="text-xs text-muted-foreground whitespace-nowrap">
                             {new Date(log.timestamp).toLocaleDateString("es-ES", {
                               day: "2-digit",
@@ -319,7 +398,12 @@ export default function StudentDashboard() {
                           </p>
                         </div>
                         {log.details && <p className="text-xs text-muted-foreground">{log.details}</p>}
-                        {log.mesaUsada && <p className="text-xs text-blue-600 mt-1">Mesa {log.mesaUsada}</p>}
+                        {log.mesaUsada && (
+                          <div className="inline-flex items-center gap-1 bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full mt-1">
+                            <UtensilsCrossed className="w-3 h-3" />
+                            <span className="text-xs font-medium">Mesa {log.mesaUsada}</span>
+                          </div>
+                        )}
                       </div>
                     </div>
                   ))}
