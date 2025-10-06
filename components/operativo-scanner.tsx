@@ -65,9 +65,40 @@ export function OperativoScanner() {
   const webcamRef = useRef<Webcam>(null)
   const codeReader = useRef<BrowserMultiFormatReader | null>(null)
   const scannerActive = useRef(false)
+  const activeStreamRef = useRef<MediaStream | null>(null)
 
   useEffect(() => {
     setIsClient(true)
+  }, [])
+
+  const stopCamera = useCallback(() => {
+    console.log("[v0] Stopping camera completely...")
+
+    if (codeReader.current && scannerActive.current) {
+      try {
+        codeReader.current.reset()
+        scannerActive.current = false
+      } catch (e) {
+        console.error("[v0] Error resetting code reader:", e)
+      }
+    }
+
+    if (activeStreamRef.current) {
+      activeStreamRef.current.getTracks().forEach((track) => {
+        track.stop()
+        console.log("[v0] Track stopped:", track.kind, track.label)
+      })
+      activeStreamRef.current = null
+    }
+
+    if (webcamRef.current?.video?.srcObject) {
+      const stream = webcamRef.current.video.srcObject as MediaStream
+      stream.getTracks().forEach((track) => {
+        track.stop()
+        console.log("[v0] Webcam track stopped:", track.kind)
+      })
+      webcamRef.current.video.srcObject = null
+    }
   }, [])
 
   useEffect(() => {
@@ -83,20 +114,51 @@ export function OperativoScanner() {
 
     return () => {
       console.log("[v0] OperativoScanner unmounting, cleaning up camera...")
-      if (codeReader.current && scannerActive.current) {
-        codeReader.current.reset()
-        scannerActive.current = false
-      }
-      if (webcamRef.current?.video?.srcObject) {
-        const stream = webcamRef.current.video.srcObject as MediaStream
-        stream.getTracks().forEach((track) => {
-          track.stop()
-          console.log("[v0] Track stopped on unmount:", track.kind)
+      stopCamera()
+    }
+  }, [isClient, stopCamera])
+
+  useEffect(() => {
+    if (!isClient) return
+
+    const requestCamera = async () => {
+      try {
+        stopCamera()
+        await new Promise((resolve) => setTimeout(resolve, 100))
+
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: "environment" },
         })
-        webcamRef.current.video.srcObject = null
+
+        activeStreamRef.current = stream
+        setHasPermission(true)
+        const devices = await navigator.mediaDevices.enumerateDevices()
+        setDevices(devices)
+
+        const backCamera = devices.find(
+          (device) =>
+            device.label.toLowerCase().includes("back") ||
+            device.label.toLowerCase().includes("trasera") ||
+            device.label.toLowerCase().includes("rear") ||
+            device.label.toLowerCase().includes("environment"),
+        )
+        if (backCamera) {
+          setSelectedDeviceId(backCamera.deviceId)
+        } else if (devices.length > 0) {
+          setSelectedDeviceId(devices[0].deviceId)
+        }
+
+        stream.getTracks().forEach((track) => track.stop())
+        activeStreamRef.current = null
+      } catch (err) {
+        console.error("Error al acceder a la cámara:", err)
+        setError("No se pudo acceder a la cámara. Por favor, concede permisos e inténtalo de nuevo.")
+        setHasPermission(false)
       }
     }
-  }, [])
+
+    requestCamera()
+  }, [isClient, stopCamera])
 
   useEffect(() => {
     if (!isClient || !hasPermission || !selectedDeviceId || isProcessingQ10 || isScanning || !codeReader.current) {
@@ -127,12 +189,21 @@ export function OperativoScanner() {
           }
           if (err && err.name !== "NotFoundException") {
             console.log("[v0] Scanner error:", err.name)
+            if (err.name === "NotReadableError") {
+              setError("La cámara está en uso. Cierra otras aplicaciones y recarga la página.")
+              stopCamera()
+            }
           }
         })
+
+        // Guardar referencia al stream
+        if (video.srcObject) {
+          activeStreamRef.current = video.srcObject as MediaStream
+        }
       } catch (err) {
         console.error("[v0] Error starting scanner:", err)
         setError("Error al iniciar el escáner")
-        scannerActive.current = false
+        stopCamera()
       }
     }
 
@@ -140,45 +211,9 @@ export function OperativoScanner() {
 
     return () => {
       console.log("[v0] Cleaning up scanner")
-      if (codeReader.current && scannerActive.current) {
-        codeReader.current.reset()
-        scannerActive.current = false
-      }
+      stopCamera()
     }
-  }, [isClient, hasPermission, selectedDeviceId, isProcessingQ10, isScanning])
-
-  const handleDevices = useCallback((mediaDevices: MediaDeviceInfo[]) => {
-    const videoDevices = mediaDevices.filter(({ kind }) => kind === "videoinput")
-    setDevices(videoDevices)
-    const backCamera = videoDevices.find(
-      (device) =>
-        device.label.toLowerCase().includes("back") ||
-        device.label.toLowerCase().includes("trasera") ||
-        device.label.toLowerCase().includes("rear") ||
-        device.label.toLowerCase().includes("environment"),
-    )
-    if (backCamera) {
-      setSelectedDeviceId(backCamera.deviceId)
-    } else if (videoDevices.length > 0) {
-      setSelectedDeviceId(videoDevices[0].deviceId)
-    }
-  }, [])
-
-  useEffect(() => {
-    if (!isClient) return
-
-    navigator.mediaDevices
-      .getUserMedia({ video: true })
-      .then(() => {
-        setHasPermission(true)
-        navigator.mediaDevices.enumerateDevices().then(handleDevices)
-      })
-      .catch((err) => {
-        console.error("Error al acceder a la cámara:", err)
-        setError("No se pudo acceder a la cámara. Por favor, conceda permisos e inténtelo de nuevo.")
-        setHasPermission(false)
-      })
-  }, [handleDevices, isClient])
+  }, [isClient, hasPermission, selectedDeviceId, isProcessingQ10, isScanning, stopCamera])
 
   const processScanResult = useCallback(
     async (scannedContent: string, source: "direct" | "q10" | "manual") => {
@@ -305,18 +340,24 @@ export function OperativoScanner() {
 
   const requestCameraPermission = () => {
     if (!isClient) return
-    navigator.mediaDevices
-      .getUserMedia({ video: true })
-      .then(() => {
-        setHasPermission(true)
-        setError(null)
-        navigator.mediaDevices.enumerateDevices().then(handleDevices)
-      })
-      .catch((err) => {
-        console.error("Error al acceder a la cámara:", err)
-        setError("No se pudo acceder a la cámara. Por favor, conceda permisos e inténtelo de nuevo.")
-        setHasPermission(false)
-      })
+    stopCamera()
+    setTimeout(() => {
+      navigator.mediaDevices
+        .getUserMedia({ video: { facingMode: "environment" } })
+        .then((stream) => {
+          activeStreamRef.current = stream
+          setHasPermission(true)
+          setError(null)
+          navigator.mediaDevices.enumerateDevices().then(setDevices)
+          stream.getTracks().forEach((track) => track.stop())
+          activeStreamRef.current = null
+        })
+        .catch((err) => {
+          console.error("Error al acceder a la cámara:", err)
+          setError("No se pudo acceder a la cámara. Por favor, conceda permisos e inténtelo de nuevo.")
+          setHasPermission(false)
+        })
+    }, 200)
   }
 
   const handleManualSubmit = async () => {

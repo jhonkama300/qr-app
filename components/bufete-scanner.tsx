@@ -58,6 +58,37 @@ export function BuffeteScanner() {
   const manualInputRef = useRef<HTMLInputElement>(null)
   const lastScanTime = useRef<number>(0)
   const SCAN_COOLDOWN = 2000
+  const activeStreamRef = useRef<MediaStream | null>(null)
+
+  const stopCamera = useCallback(() => {
+    console.log("[v0] Stopping camera completely...")
+
+    if (codeReader.current && scannerActive.current) {
+      try {
+        codeReader.current.reset()
+        scannerActive.current = false
+      } catch (e) {
+        console.error("[v0] Error resetting code reader:", e)
+      }
+    }
+
+    if (activeStreamRef.current) {
+      activeStreamRef.current.getTracks().forEach((track) => {
+        track.stop()
+        console.log("[v0] Track stopped:", track.kind, track.label)
+      })
+      activeStreamRef.current = null
+    }
+
+    if (webcamRef.current?.video?.srcObject) {
+      const stream = webcamRef.current.video.srcObject as MediaStream
+      stream.getTracks().forEach((track) => {
+        track.stop()
+        console.log("[v0] Webcam track stopped:", track.kind)
+      })
+      webcamRef.current.video.srcObject = null
+    }
+  }, [])
 
   useEffect(() => {
     setIsClient(true)
@@ -76,10 +107,7 @@ export function BuffeteScanner() {
 
     return () => {
       console.log("[v0] Cleaning up ZXing reader")
-      if (codeReader.current) {
-        codeReader.current.reset()
-        scannerActive.current = false
-      }
+      stopCamera()
     }
   }, [isClient])
 
@@ -103,18 +131,130 @@ export function BuffeteScanner() {
   useEffect(() => {
     if (!isClient) return
 
-    navigator.mediaDevices
-      .getUserMedia({ video: true })
-      .then(() => {
+    const requestCamera = async () => {
+      try {
+        stopCamera()
+        await new Promise((resolve) => setTimeout(resolve, 100))
+
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: "environment" },
+        })
+
+        activeStreamRef.current = stream
         setHasPermission(true)
-        navigator.mediaDevices.enumerateDevices().then(handleDevices)
-      })
-      .catch((err) => {
+        const devices = await navigator.mediaDevices.enumerateDevices()
+        handleDevices(devices)
+
+        stream.getTracks().forEach((track) => track.stop())
+        activeStreamRef.current = null
+      } catch (err) {
         console.error("Error al acceder a la cámara:", err)
-        setError("No se pudo acceder a la cámara. Por favor, conceda permisos e inténtelo de nuevo.")
+        setError("No se pudo acceder a la cámara. Por favor, concede permisos e inténtalo de nuevo.")
         setHasPermission(false)
-      })
+      }
+    }
+
+    requestCamera()
   }, [handleDevices, isClient])
+
+  useEffect(() => {
+    if (
+      !isClient ||
+      !hasPermission ||
+      !selectedDeviceId ||
+      processing ||
+      isScanning ||
+      !codeReader.current ||
+      activeTab !== "qr"
+    ) {
+      if (codeReader.current && scannerActive.current) {
+        console.log("[v0] Stopping scanner (conditions not met)")
+        stopCamera()
+      }
+      return
+    }
+
+    const video = webcamRef.current?.video
+    if (!video) {
+      console.warn("[v0] Video element not ready")
+      return
+    }
+
+    if (scannerActive.current) {
+      console.log("[v0] Scanner already active")
+      return
+    }
+
+    console.log("[v0] Starting continuous scan with device:", selectedDeviceId)
+    scannerActive.current = true
+    setError("")
+
+    const startScanning = async () => {
+      try {
+        const initTimeout = setTimeout(() => {
+          console.error("[v0] Scanner initialization timeout")
+          setError("Tiempo de espera agotado. Intenta recargar la página.")
+          stopCamera()
+        }, 10000)
+
+        await codeReader.current!.decodeFromVideoDevice(selectedDeviceId, video, (result, err) => {
+          clearTimeout(initTimeout)
+
+          if (result && !isScanning && !processing) {
+            const now = Date.now()
+            if (now - lastScanTime.current < SCAN_COOLDOWN) {
+              console.log("[v0] Scan cooldown active")
+              return
+            }
+
+            const scannedText = result.getText()
+            console.log("[v0] QR scanned:", scannedText)
+            lastScanTime.current = now
+            setIsScanning(true)
+            processStudentAccess(scannedText)
+          }
+          if (err && err.name !== "NotFoundException") {
+            if (err.name === "NotReadableError") {
+              console.error("[v0] Camera in use by another app")
+              setError("La cámara está en uso. Cierra otras aplicaciones y recarga la página.")
+              stopCamera()
+            }
+          }
+        })
+
+        // Guardar referencia al stream
+        if (video.srcObject) {
+          activeStreamRef.current = video.srcObject as MediaStream
+        }
+      } catch (err: any) {
+        console.error("[v0] Error starting scanner:", err)
+        if (err.name === "NotAllowedError") {
+          setError("Permiso de cámara denegado")
+        } else if (err.name === "NotFoundError") {
+          setError("No se encontró la cámara")
+        } else if (err.name === "NotReadableError") {
+          setError("La cámara está en uso. Cierra otras aplicaciones e intenta de nuevo.")
+        } else {
+          setError("Error al iniciar el escáner")
+        }
+        stopCamera()
+      }
+    }
+
+    startScanning()
+
+    return () => {
+      console.log("[v0] Cleaning up scanner...")
+      stopCamera()
+    }
+  }, [isClient, hasPermission, selectedDeviceId, processing, isScanning, activeTab])
+
+  useEffect(() => {
+    return () => {
+      console.log("[v0] BuffeteScanner unmounting, cleaning up camera...")
+      stopCamera()
+    }
+  }, [])
 
   useEffect(() => {
     if (activeTab === "manual" && manualInputRef.current) {
@@ -200,123 +340,6 @@ export function BuffeteScanner() {
     }
   }
 
-  useEffect(() => {
-    if (
-      !isClient ||
-      !hasPermission ||
-      !selectedDeviceId ||
-      processing ||
-      isScanning ||
-      !codeReader.current ||
-      activeTab !== "qr"
-    ) {
-      if (codeReader.current && scannerActive.current) {
-        console.log("[v0] Stopping scanner (conditions not met)")
-        codeReader.current.reset()
-        scannerActive.current = false
-      }
-      return
-    }
-
-    const video = webcamRef.current?.video
-    if (!video) {
-      console.warn("[v0] Video element not ready")
-      return
-    }
-
-    if (scannerActive.current) {
-      console.log("[v0] Scanner already active")
-      return
-    }
-
-    console.log("[v0] Starting continuous scan with device:", selectedDeviceId)
-    scannerActive.current = true
-    setError("")
-
-    const startScanning = async () => {
-      try {
-        const initTimeout = setTimeout(() => {
-          console.error("[v0] Scanner initialization timeout")
-          setError("Tiempo de espera agotado. Intenta cambiar de cámara o recargar.")
-          scannerActive.current = false
-        }, 10000)
-
-        await codeReader.current!.decodeFromVideoDevice(selectedDeviceId, video, (result, err) => {
-          clearTimeout(initTimeout)
-
-          if (result && !isScanning && !processing) {
-            const now = Date.now()
-            if (now - lastScanTime.current < SCAN_COOLDOWN) {
-              console.log("[v0] Scan cooldown active")
-              return
-            }
-
-            const scannedText = result.getText()
-            console.log("[v0] QR scanned:", scannedText)
-            lastScanTime.current = now
-            setIsScanning(true)
-            processStudentAccess(scannedText)
-          }
-          if (err && err.name !== "NotFoundException") {
-            if (err.name === "NotReadableError") {
-              console.error("[v0] Camera in use by another app")
-              setError("La cámara está en uso. Cierra otras aplicaciones.")
-              scannerActive.current = false
-            }
-          }
-        })
-      } catch (err: any) {
-        console.error("[v0] Error starting scanner:", err)
-        if (err.name === "NotAllowedError") {
-          setError("Permiso de cámara denegado")
-        } else if (err.name === "NotFoundError") {
-          setError("No se encontró la cámara")
-        } else if (err.name === "NotReadableError") {
-          setError("La cámara está en uso. Cierra otras aplicaciones e intenta de nuevo.")
-        } else {
-          setError("Error al iniciar el escáner")
-        }
-        scannerActive.current = false
-      }
-    }
-
-    startScanning()
-
-    return () => {
-      console.log("[v0] Cleaning up scanner...")
-      if (codeReader.current && scannerActive.current) {
-        codeReader.current.reset()
-        scannerActive.current = false
-      }
-      if (webcamRef.current?.video?.srcObject) {
-        const stream = webcamRef.current.video.srcObject as MediaStream
-        stream.getTracks().forEach((track) => {
-          track.stop()
-          console.log("[v0] Track stopped on unmount:", track.kind)
-        })
-        webcamRef.current.video.srcObject = null
-      }
-    }
-  }, [isClient, hasPermission, selectedDeviceId, processing, isScanning, activeTab])
-
-  useEffect(() => {
-    return () => {
-      console.log("[v0] BuffeteScanner unmounting, cleaning up camera...")
-      if (codeReader.current && scannerActive.current) {
-        codeReader.current.reset()
-        scannerActive.current = false
-      }
-      if (webcamRef.current?.video?.srcObject) {
-        const stream = webcamRef.current.video.srcObject as MediaStream
-        stream.getTracks().forEach((track) => {
-          track.stop()
-          console.log("[v0] Track stopped on unmount:", track.kind)
-        })
-        webcamRef.current.video.srcObject = null
-      }
-    }
-  }, [])
-
   const resetScanner = () => {
     console.log("[v0] Resetting scanner...")
     setScanResult(null)
@@ -373,7 +396,7 @@ export function BuffeteScanner() {
                 .then(() => setHasPermission(true))
                 .catch((err) => {
                   console.error("Error al acceder a la cámara:", err)
-                  setError("No se pudo acceder a la cámara. Por favor, conceda permisos e inténtelo de nuevo.")
+                  setError("No se pudo acceder a la cámara. Por favor, concede permisos e inténtalo de nuevo.")
                   setHasPermission(false)
                 })
             }

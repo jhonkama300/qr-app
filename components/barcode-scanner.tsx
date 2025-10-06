@@ -55,6 +55,7 @@ export function BarcodeScanner() {
   const lastScanTime = useRef<number>(0)
   const SCAN_COOLDOWN = 2000
   const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const activeStreamRef = useRef<MediaStream | null>(null)
 
   const router = useRouter()
   const webcamRef = useRef<Webcam>(null)
@@ -64,6 +65,35 @@ export function BarcodeScanner() {
     setIsClient(true)
   }, [])
 
+  const stopCamera = useCallback(() => {
+    console.log("[v0] Stopping camera completely...")
+
+    if (codeReader.current) {
+      try {
+        codeReader.current.reset()
+      } catch (e) {
+        console.error("[v0] Error resetting code reader:", e)
+      }
+    }
+
+    if (activeStreamRef.current) {
+      activeStreamRef.current.getTracks().forEach((track) => {
+        track.stop()
+        console.log("[v0] Track stopped:", track.kind, track.label)
+      })
+      activeStreamRef.current = null
+    }
+
+    if (webcamRef.current?.video?.srcObject) {
+      const stream = webcamRef.current.video.srcObject as MediaStream
+      stream.getTracks().forEach((track) => {
+        track.stop()
+        console.log("[v0] Webcam track stopped:", track.kind)
+      })
+      webcamRef.current.video.srcObject = null
+    }
+  }, [])
+
   useEffect(() => {
     if (!isClient) return
 
@@ -71,12 +101,10 @@ export function BarcodeScanner() {
     console.log("[v0] ZXing reader initialized")
 
     return () => {
-      if (codeReader.current) {
-        console.log("[v0] Cleaning up ZXing reader")
-        codeReader.current.reset()
-      }
+      console.log("[v0] Component unmounting, cleaning up...")
+      stopCamera()
     }
-  }, [isClient])
+  }, [isClient, stopCamera])
 
   const handleDevices = useCallback((mediaDevices: MediaDeviceInfo[]) => {
     const videoDevices = mediaDevices.filter(({ kind }) => kind === "videoinput")
@@ -104,18 +132,28 @@ export function BarcodeScanner() {
   useEffect(() => {
     if (!isClient) return
 
-    navigator.mediaDevices
-      .getUserMedia({ video: true })
-      .then(() => {
+    const requestCamera = async () => {
+      try {
+        stopCamera()
+        await new Promise((resolve) => setTimeout(resolve, 100))
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: "environment" },
+        })
+        activeStreamRef.current = stream
         setHasPermission(true)
-        navigator.mediaDevices.enumerateDevices().then(handleDevices)
-      })
-      .catch((err) => {
+        const devices = await navigator.mediaDevices.enumerateDevices()
+        handleDevices(devices)
+        stream.getTracks().forEach((track) => track.stop())
+        activeStreamRef.current = null
+      } catch (err) {
         console.error("Error al acceder a la cámara:", err)
-        setError("No se pudo acceder a la cámara. Por favor, conceda permisos e inténtelo de nuevo.")
+        setError("No se pudo acceder a la cámara. Por favor, concede permisos e inténtalo de nuevo.")
         setHasPermission(false)
-      })
-  }, [handleDevices, isClient])
+      }
+    }
+
+    requestCamera()
+  }, [handleDevices, isClient, stopCamera])
 
   const processScanResult = useCallback(
     async (scannedContent: string, source: "direct" | "q10" | "manual") => {
@@ -144,9 +182,6 @@ export function BarcodeScanner() {
         : undefined
 
       console.log("[v0] UserInfo creado en barcode-scanner:", userInfo)
-      console.log("[v0] fullName del AuthProvider:", fullName)
-      console.log("[v0] user.email:", user?.email)
-      console.log("[v0] user.role:", user?.role)
 
       if (
         scannedContent.startsWith("https://site2.q10.com/CertificadosAcademicos/") ||
@@ -254,10 +289,6 @@ export function BarcodeScanner() {
 
   useEffect(() => {
     if (!isClient || !hasPermission || !selectedDeviceId || isProcessingQ10 || isScanning || isManualProcessing) {
-      if (codeReader.current) {
-        console.log("[v0] Resetting reader (conditions not met)...")
-        codeReader.current.reset()
-      }
       return
     }
 
@@ -279,7 +310,7 @@ export function BarcodeScanner() {
 
     const initTimeout = setTimeout(() => {
       console.error("[v0] Scanner initialization timeout")
-      setError("Tiempo de espera agotado al iniciar la cámara. Intenta cambiar de cámara.")
+      setError("Tiempo de espera agotado al iniciar la cámara. Intenta recargar la página.")
     }, 10000)
 
     codeReader.current
@@ -300,8 +331,13 @@ export function BarcodeScanner() {
         ) {
           console.error("[v0] Scanner error:", err)
           if (err.name === "NotReadableError") {
-            setError("La cámara está siendo usada por otra aplicación.")
+            setError("La cámara está siendo usada por otra aplicación. Cierra otras apps y recarga la página.")
           }
+        }
+      })
+      .then((controls) => {
+        if (video.srcObject) {
+          activeStreamRef.current = video.srcObject as MediaStream
         }
       })
       .catch((err) => {
@@ -316,58 +352,52 @@ export function BarcodeScanner() {
         } else if (!err.message.includes("No MultiFormat Readers")) {
           setError("Error al iniciar el escáner. Intenta recargar la página.")
         }
-        codeReader.current?.reset()
+        stopCamera()
       })
 
     return () => {
       clearTimeout(initTimeout)
       console.log("[v0] Cleaning up scanner in useEffect...")
-      if (codeReader.current) {
-        console.log("[v0] Resetting reader in cleanup...")
-        codeReader.current.reset()
-      }
-      if (webcamRef.current?.video?.srcObject) {
-        const stream = webcamRef.current.video.srcObject as MediaStream
-        stream.getTracks().forEach((track) => {
-          track.stop()
-          console.log("[v0] Track stopped on cleanup:", track.kind)
-        })
-        webcamRef.current.video.srcObject = null
-      }
+      stopCamera()
     }
-  }, [isClient, hasPermission, selectedDeviceId, isProcessingQ10, isScanning, isManualProcessing, processScanResult])
+  }, [
+    isClient,
+    hasPermission,
+    selectedDeviceId,
+    isProcessingQ10,
+    isScanning,
+    isManualProcessing,
+    processScanResult,
+    stopCamera,
+  ])
 
   useEffect(() => {
     return () => {
       console.log("[v0] BarcodeScanner unmounting, final cleanup...")
-      if (codeReader.current) {
-        codeReader.current.reset()
-      }
-      if (webcamRef.current?.video?.srcObject) {
-        const stream = webcamRef.current.video.srcObject as MediaStream
-        stream.getTracks().forEach((track) => {
-          track.stop()
-          console.log("[v0] Track stopped on unmount:", track.kind)
-        })
-        webcamRef.current.video.srcObject = null
-      }
+      stopCamera()
     }
-  }, [])
+  }, [stopCamera])
 
   const requestCameraPermission = () => {
     if (!isClient) return
-    navigator.mediaDevices
-      .getUserMedia({ video: true })
-      .then(() => {
-        setHasPermission(true)
-        setError(null)
-        navigator.mediaDevices.enumerateDevices().then(handleDevices)
-      })
-      .catch((err) => {
-        console.error("Error al acceder a la cámara:", err)
-        setError("No se pudo acceder a la cámara. Por favor, conceda permisos e inténtelo de nuevo.")
-        setHasPermission(false)
-      })
+    stopCamera()
+    setTimeout(() => {
+      navigator.mediaDevices
+        .getUserMedia({ video: { facingMode: "environment" } })
+        .then((stream) => {
+          activeStreamRef.current = stream
+          setHasPermission(true)
+          setError(null)
+          navigator.mediaDevices.enumerateDevices().then(handleDevices)
+          stream.getTracks().forEach((track) => track.stop())
+          activeStreamRef.current = null
+        })
+        .catch((err) => {
+          console.error("Error al acceder a la cámara:", err)
+          setError("No se pudo acceder a la cámara. Por favor, concede permisos e inténtalo de nuevo.")
+          setHasPermission(false)
+        })
+    }, 200)
   }
 
   const handleManualSubmit = async () => {
