@@ -55,6 +55,7 @@ export function BarcodeScanner() {
   const [isScanning, setIsScanning] = useState(false)
   const lastScanTime = useRef<number>(0)
   const SCAN_COOLDOWN = 2000 // 2 seconds between scans
+  const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
   const router = useRouter()
   const webcamRef = useRef<Webcam>(null)
@@ -80,17 +81,24 @@ export function BarcodeScanner() {
 
   const handleDevices = useCallback((mediaDevices: MediaDeviceInfo[]) => {
     const videoDevices = mediaDevices.filter(({ kind }) => kind === "videoinput")
+    console.log("[v0] Available video devices:", videoDevices.length)
     setDevices(videoDevices)
+
+    // Buscar cámara trasera con múltiples criterios
     const backCamera = videoDevices.find(
       (device) =>
         device.label.toLowerCase().includes("back") ||
         device.label.toLowerCase().includes("trasera") ||
         device.label.toLowerCase().includes("rear") ||
-        device.label.toLowerCase().includes("environment"),
+        device.label.toLowerCase().includes("environment") ||
+        device.label.toLowerCase().includes("posterior"),
     )
+
     if (backCamera) {
+      console.log("[v0] Back camera found:", backCamera.label)
       setSelectedDeviceId(backCamera.deviceId)
     } else if (videoDevices.length > 0) {
+      console.log("[v0] Using first available camera:", videoDevices[0].label)
       setSelectedDeviceId(videoDevices[0].deviceId)
     }
   }, [])
@@ -341,13 +349,20 @@ export function BarcodeScanner() {
   const switchCamera = () => {
     if (!isClient || devices.length <= 1) return
 
+    console.log("[v0] Switching camera...")
+
+    // Resetear el lector completamente
     if (codeReader.current) {
       codeReader.current.reset()
     }
 
-    const currentIndex = devices.findIndex((device) => device.deviceId === selectedDeviceId)
-    const nextIndex = (currentIndex + 1) % devices.length
-    setSelectedDeviceId(devices[nextIndex].deviceId)
+    // Esperar un momento antes de cambiar
+    setTimeout(() => {
+      const currentIndex = devices.findIndex((device) => device.deviceId === selectedDeviceId)
+      const nextIndex = (currentIndex + 1) % devices.length
+      console.log("[v0] Switching to device:", devices[nextIndex].label)
+      setSelectedDeviceId(devices[nextIndex].deviceId)
+    }, 100)
   }
 
   const handleManualSubmit = async () => {
@@ -393,6 +408,12 @@ export function BarcodeScanner() {
     setManualInputError(null)
     setIsScanning(false)
     lastScanTime.current = 0
+
+    // Limpiar cualquier timeout pendiente
+    if (retryTimeoutRef.current) {
+      clearTimeout(retryTimeoutRef.current)
+      retryTimeoutRef.current = null
+    }
   }
 
   const handleModalClose = (open: boolean) => {
@@ -402,6 +423,12 @@ export function BarcodeScanner() {
       setScanResultDisplay(null)
       setIsScanning(false)
       lastScanTime.current = 0
+
+      // Limpiar cualquier timeout pendiente
+      if (retryTimeoutRef.current) {
+        clearTimeout(retryTimeoutRef.current)
+        retryTimeoutRef.current = null
+      }
     }
   }
 
@@ -428,7 +455,7 @@ export function BarcodeScanner() {
                 audio={false}
                 videoConstraints={{
                   deviceId: selectedDeviceId,
-                  facingMode: "environment",
+                  facingMode: undefined, // Dejar que el deviceId maneje la selección
                 }}
                 className="absolute inset-0 w-full h-full object-cover"
               />

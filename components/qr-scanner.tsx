@@ -89,23 +89,66 @@ export function QRScanner() {
       setError("")
       console.log("[v0] Starting camera...")
 
+      // Detener cualquier stream existente primero
       if (stream) {
-        stream.getTracks().forEach((track) => track.stop())
+        stream.getTracks().forEach((track) => {
+          track.stop()
+          console.log("[v0] Stopped existing track:", track.kind)
+        })
+        setStream(null)
       }
 
-      const mediaStream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          facingMode: "environment",
-          width: { ideal: 1280 },
-          height: { ideal: 720 },
+      // Esperar un momento para que la cámara se libere completamente
+      await new Promise((resolve) => setTimeout(resolve, 300))
+
+      // Intentar con diferentes configuraciones de restricciones
+      const constraints = [
+        // Intento 1: Restricciones ideales con cámara trasera
+        {
+          video: {
+            facingMode: { ideal: "environment" },
+            width: { ideal: 1280 },
+            height: { ideal: 720 },
+          },
         },
-      })
+        // Intento 2: Solo facingMode sin resolución específica
+        {
+          video: {
+            facingMode: "environment",
+          },
+        },
+        // Intento 3: Cualquier cámara disponible
+        {
+          video: true,
+        },
+      ]
+
+      let mediaStream: MediaStream | null = null
+      let lastError: any = null
+
+      for (const constraint of constraints) {
+        try {
+          console.log("[v0] Trying camera with constraints:", constraint)
+          mediaStream = await navigator.mediaDevices.getUserMedia(constraint)
+          console.log("[v0] Camera started successfully with constraints:", constraint)
+          break
+        } catch (err: any) {
+          console.warn("[v0] Failed with constraints:", constraint, err)
+          lastError = err
+          // Esperar antes del siguiente intento
+          await new Promise((resolve) => setTimeout(resolve, 200))
+        }
+      }
+
+      if (!mediaStream) {
+        throw lastError || new Error("No se pudo iniciar la cámara")
+      }
 
       if (videoRef.current) {
         videoRef.current.srcObject = mediaStream
         setStream(mediaStream)
         setIsScanning(true)
-        console.log("[v0] Camera started successfully")
+        console.log("[v0] Camera stream set successfully")
       }
     } catch (error: any) {
       console.error("[v0] Error al acceder a la cámara:", error)
@@ -113,10 +156,10 @@ export function QRScanner() {
         setError("Permiso de cámara denegado. Por favor, permite el acceso a la cámara.")
       } else if (error.name === "NotFoundError") {
         setError("No se encontró ninguna cámara en el dispositivo.")
-      } else if (error.name === "NotReadableError") {
-        setError("La cámara está siendo usada por otra aplicación. Ciérrala e intenta de nuevo.")
+      } else if (error.name === "NotReadableError" || error.name === "AbortError") {
+        setError("La cámara está en uso. Intenta cerrar otras aplicaciones que usen la cámara o recarga la página.")
       } else {
-        setError("No se pudo acceder a la cámara. Verifica los permisos.")
+        setError("No se pudo acceder a la cámara. Verifica los permisos o intenta recargar la página.")
       }
     }
   }
@@ -251,8 +294,18 @@ export function QRScanner() {
     setScanResult(null)
     setShowResult(false)
     setError("")
+    setScanning(false)
+    setProcessing(false)
+    setWasCameraRunning(false)
+
+    // Reiniciar la cámara si no está activa
     if (!isScanning) {
       startCamera()
+    } else if (stream) {
+      // Si ya está activa, asegurarse de que los tracks estén habilitados
+      stream.getTracks().forEach((track) => {
+        track.enabled = true
+      })
     }
   }
 
@@ -264,6 +317,17 @@ export function QRScanner() {
       setError("")
       setScanning(false)
       setProcessing(false)
+      setWasCameraRunning(false)
+
+      // Reactivar la cámara después de cerrar el modal
+      if (stream) {
+        stream.getTracks().forEach((track) => {
+          track.enabled = true
+        })
+      } else if (isScanning) {
+        // Si se perdió el stream pero debería estar escaneando, reiniciar
+        startCamera()
+      }
     }
   }
 
