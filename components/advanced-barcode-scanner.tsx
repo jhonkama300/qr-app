@@ -400,7 +400,7 @@ export function AdvancedBarcodeScanner() {
 
       return () => {
         if (unsubscribeRef.current) {
-          console.log("[v0] Cleaning up Firestore listener")
+          console.log("[v0] Cleaning up realtime listener")
           unsubscribeRef.current()
           unsubscribeRef.current = null
         }
