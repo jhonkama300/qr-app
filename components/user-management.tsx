@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { createUser, resetUserPassword, changePassword } from "@/lib/auth-service"
 import { collection, getDocs, deleteDoc, doc, updateDoc, query } from "firebase/firestore"
 import { db } from "@/lib/firebase"
@@ -31,8 +31,10 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { Loader2, Plus, Trash2, Shield, User, Award as IdCard, Scale, KeyRound, Edit } from "lucide-react"
+import { Loader2, Plus, Trash2, Shield, User, Award as IdCard, Scale, KeyRound, Edit, Search } from "lucide-react"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Badge } from "@/components/ui/badge"
 
 interface UserData {
   id: string
@@ -58,6 +60,12 @@ export function UserManagement() {
     fullName: "",
     password: "",
   })
+
+  const [searchQuery, setSearchQuery] = useState("")
+  const [selectedRoleFilter, setSelectedRoleFilter] = useState<"todos" | "administrador" | "operativo" | "bufete">(
+    "todos",
+  )
+  const [activeTab, setActiveTab] = useState<"todos" | "administrador" | "operativo" | "bufete">("todos")
 
   const [confirmDialog, setConfirmDialog] = useState<{
     open: boolean
@@ -145,6 +153,34 @@ export function UserManagement() {
       setLoading(false)
     }
   }
+
+  const filteredUsers = useMemo(() => {
+    let filtered = users
+
+    // Filtrar por búsqueda
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase()
+      filtered = filtered.filter(
+        (user) => user.fullName.toLowerCase().includes(query) || user.idNumber.toLowerCase().includes(query),
+      )
+    }
+
+    // Filtrar por tab activo
+    if (activeTab !== "todos") {
+      filtered = filtered.filter((user) => user.roles.includes(activeTab))
+    }
+
+    return filtered
+  }, [users, searchQuery, activeTab])
+
+  const userStats = useMemo(() => {
+    return {
+      total: users.length,
+      administradores: users.filter((u) => u.roles.includes("administrador")).length,
+      operativos: users.filter((u) => u.roles.includes("operativo")).length,
+      bufetes: users.filter((u) => u.roles.includes("bufete")).length,
+    }
+  }, [users])
 
   const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -551,163 +587,253 @@ export function UserManagement() {
         </Dialog>
       </header>
 
-      {users.length === 0 ? (
-        <Card>
-          <CardContent className="py-12">
-            <div className="text-center">
-              <User className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
-              <p className="text-muted-foreground mb-2">No hay usuarios registrados</p>
-              <p className="text-sm text-muted-foreground">Crea el primer usuario para comenzar</p>
-            </div>
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="space-y-3">
-          {users.map((user) => (
-            <Card key={user.id}>
-              <CardContent className="p-4">
-                <div className="space-y-3">
-                  <div className="flex items-start gap-3">
-                    <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center shrink-0">
-                      {getRoleIcon(user.roles[0])}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        <p className="font-medium text-sm truncate">{user.fullName}</p>
-                      </div>
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground mb-2">
-                        <span>ID: {user.idNumber}</span>
-                        <span>•</span>
-                        <span>{new Date(user.createdAt).toLocaleDateString()}</span>
-                      </div>
-                      <div className="flex items-center gap-2 flex-wrap">
-                        {user.roles.map((role) => (
-                          <span
-                            key={role}
-                            className={`px-2 py-1 rounded-full text-xs font-medium ${getRoleBadge(role)}`}
-                          >
-                            {role === "administrador" ? "Administrador" : role === "bufete" ? "Bufete" : "Operativo"}
-                          </span>
-                        ))}
-                        {user.roles.includes("bufete") && user.mesaAsignada && (
-                          <span className="px-2 py-1 bg-green-100 text-green-700 rounded-full text-xs font-medium">
-                            Mesa {user.mesaAsignada}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  </div>
+      <div className="space-y-3">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            type="text"
+            placeholder="Buscar por nombre o identificación..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-10"
+          />
+        </div>
 
-                  <div className="flex flex-col gap-2 pt-2 border-t">
-                    <div className="space-y-2">
-                      <Label className="text-xs text-muted-foreground">Roles</Label>
-                      <div className="space-y-2 border rounded-lg p-2">
-                        <div className="flex items-center space-x-2">
-                          <Checkbox
-                            id={`${user.id}-operativo`}
-                            checked={user.roles.includes("operativo")}
-                            onCheckedChange={() => handleRoleToggle(user.id, "operativo", user.roles)}
-                          />
-                          <label
-                            htmlFor={`${user.id}-operativo`}
-                            className="flex items-center gap-2 text-xs cursor-pointer"
-                          >
-                            <User className="w-3 h-3" />
-                            Operativo
-                          </label>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <Checkbox
-                            id={`${user.id}-administrador`}
-                            checked={user.roles.includes("administrador")}
-                            onCheckedChange={() => handleRoleToggle(user.id, "administrador", user.roles)}
-                          />
-                          <label
-                            htmlFor={`${user.id}-administrador`}
-                            className="flex items-center gap-2 text-xs cursor-pointer"
-                          >
-                            <Shield className="w-3 h-3" />
-                            Administrador
-                          </label>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <Checkbox
-                            id={`${user.id}-bufete`}
-                            checked={user.roles.includes("bufete")}
-                            onCheckedChange={() => handleRoleToggle(user.id, "bufete", user.roles)}
-                          />
-                          <label
-                            htmlFor={`${user.id}-bufete`}
-                            className="flex items-center gap-2 text-xs cursor-pointer"
-                          >
-                            <Scale className="w-3 h-3" />
-                            Bufete
-                          </label>
-                        </div>
-                      </div>
-                    </div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+          <Card>
+            <CardContent className="p-3">
+              <div className="text-center">
+                <p className="text-2xl font-bold">{userStats.total}</p>
+                <p className="text-xs text-muted-foreground">Total</p>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-3">
+              <div className="text-center">
+                <p className="text-2xl font-bold text-red-600">{userStats.administradores}</p>
+                <p className="text-xs text-muted-foreground">Admins</p>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-3">
+              <div className="text-center">
+                <p className="text-2xl font-bold text-blue-600">{userStats.operativos}</p>
+                <p className="text-xs text-muted-foreground">Operativos</p>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-3">
+              <div className="text-center">
+                <p className="text-2xl font-bold text-green-600">{userStats.bufetes}</p>
+                <p className="text-xs text-muted-foreground">Bufetes</p>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
 
-                    {user.roles.includes("bufete") && (
-                      <div className="space-y-1">
-                        <Label className="text-xs text-muted-foreground">Mesa</Label>
-                        <Select
-                          value={user.mesaAsignada?.toString() || ""}
-                          onValueChange={(value) => handleMesaChange(user.id, Number.parseInt(value))}
-                        >
-                          <SelectTrigger className="h-8 text-xs">
-                            <SelectValue placeholder="Seleccionar mesa" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {mesasActivas.map((mesa) => (
-                              <SelectItem key={mesa} value={mesa.toString()}>
-                                Mesa {mesa}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    )}
+      <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as typeof activeTab)} className="w-full">
+        <TabsList className="grid w-full grid-cols-4">
+          <TabsTrigger value="todos" className="text-xs">
+            Todos
+            <Badge variant="secondary" className="ml-1.5 px-1.5 py-0 text-xs">
+              {userStats.total}
+            </Badge>
+          </TabsTrigger>
+          <TabsTrigger value="administrador" className="text-xs">
+            <Shield className="w-3 h-3 mr-1" />
+            Admin
+            <Badge variant="secondary" className="ml-1.5 px-1.5 py-0 text-xs">
+              {userStats.administradores}
+            </Badge>
+          </TabsTrigger>
+          <TabsTrigger value="operativo" className="text-xs">
+            <User className="w-3 h-3 mr-1" />
+            Oper.
+            <Badge variant="secondary" className="ml-1.5 px-1.5 py-0 text-xs">
+              {userStats.operativos}
+            </Badge>
+          </TabsTrigger>
+          <TabsTrigger value="bufete" className="text-xs">
+            <Scale className="w-3 h-3 mr-1" />
+            Bufete
+            <Badge variant="secondary" className="ml-1.5 px-1.5 py-0 text-xs">
+              {userStats.bufetes}
+            </Badge>
+          </TabsTrigger>
+        </TabsList>
 
-                    <div className="flex gap-2 pt-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleOpenEditDialog(user)}
-                        className="flex-1 h-8 text-xs"
-                      >
-                        <Edit className="w-3 h-3 mr-1" />
-                        Editar
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleResetPassword(user.id, user.fullName)}
-                        disabled={resettingPassword === user.id}
-                        className="flex-1 h-8 text-xs"
-                      >
-                        {resettingPassword === user.id ? (
-                          <Loader2 className="w-3 h-3 mr-1 animate-spin" />
-                        ) : (
-                          <KeyRound className="w-3 h-3 mr-1" />
-                        )}
-                        {resettingPassword === user.id ? "Restaurando..." : "Restaurar"}
-                      </Button>
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        onClick={() => handleDeleteUser(user.id, user.fullName)}
-                        className="h-8 px-3"
-                      >
-                        <Trash2 className="w-3.5 h-3.5 text-white" />
-                      </Button>
-                    </div>
-                  </div>
+        <TabsContent value={activeTab} className="mt-4">
+          {filteredUsers.length === 0 ? (
+            <Card>
+              <CardContent className="py-12">
+                <div className="text-center">
+                  <User className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
+                  <p className="text-muted-foreground mb-2">
+                    {searchQuery ? "No se encontraron usuarios" : "No hay usuarios en esta categoría"}
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    {searchQuery ? "Intenta con otra búsqueda" : "Crea el primer usuario para comenzar"}
+                  </p>
                 </div>
               </CardContent>
             </Card>
-          ))}
-        </div>
-      )}
+          ) : (
+            <div className="space-y-3">
+              {filteredUsers.map((user) => (
+                <Card key={user.id}>
+                  <CardContent className="p-4">
+                    <div className="space-y-3">
+                      <div className="flex items-start gap-3">
+                        <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center shrink-0">
+                          {getRoleIcon(user.roles[0])}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <p className="font-medium text-sm truncate">{user.fullName}</p>
+                          </div>
+                          <div className="flex items-center gap-2 text-xs text-muted-foreground mb-2">
+                            <span>ID: {user.idNumber}</span>
+                            <span>•</span>
+                            <span>{new Date(user.createdAt).toLocaleDateString()}</span>
+                          </div>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            {user.roles.map((role) => (
+                              <span
+                                key={role}
+                                className={`px-2 py-1 rounded-full text-xs font-medium ${getRoleBadge(role)}`}
+                              >
+                                {role === "administrador"
+                                  ? "Administrador"
+                                  : role === "bufete"
+                                    ? "Bufete"
+                                    : "Operativo"}
+                              </span>
+                            ))}
+                            {user.roles.includes("bufete") && user.mesaAsignada && (
+                              <span className="px-2 py-1 bg-green-100 text-green-700 rounded-full text-xs font-medium">
+                                Mesa {user.mesaAsignada}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex flex-col gap-2 pt-2 border-t">
+                        <div className="space-y-2">
+                          <Label className="text-xs text-muted-foreground">Roles</Label>
+                          <div className="space-y-2 border rounded-lg p-2">
+                            <div className="flex items-center space-x-2">
+                              <Checkbox
+                                id={`${user.id}-operativo`}
+                                checked={user.roles.includes("operativo")}
+                                onCheckedChange={() => handleRoleToggle(user.id, "operativo", user.roles)}
+                              />
+                              <label
+                                htmlFor={`${user.id}-operativo`}
+                                className="flex items-center gap-2 text-xs cursor-pointer"
+                              >
+                                <User className="w-3 h-3" />
+                                Operativo
+                              </label>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <Checkbox
+                                id={`${user.id}-administrador`}
+                                checked={user.roles.includes("administrador")}
+                                onCheckedChange={() => handleRoleToggle(user.id, "administrador", user.roles)}
+                              />
+                              <label
+                                htmlFor={`${user.id}-administrador`}
+                                className="flex items-center gap-2 text-xs cursor-pointer"
+                              >
+                                <Shield className="w-3 h-3" />
+                                Administrador
+                              </label>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <Checkbox
+                                id={`${user.id}-bufete`}
+                                checked={user.roles.includes("bufete")}
+                                onCheckedChange={() => handleRoleToggle(user.id, "bufete", user.roles)}
+                              />
+                              <label
+                                htmlFor={`${user.id}-bufete`}
+                                className="flex items-center gap-2 text-xs cursor-pointer"
+                              >
+                                <Scale className="w-3 h-3" />
+                                Bufete
+                              </label>
+                            </div>
+                          </div>
+                        </div>
+
+                        {user.roles.includes("bufete") && (
+                          <div className="space-y-1">
+                            <Label className="text-xs text-muted-foreground">Mesa</Label>
+                            <Select
+                              value={user.mesaAsignada?.toString() || ""}
+                              onValueChange={(value) => handleMesaChange(user.id, Number.parseInt(value))}
+                            >
+                              <SelectTrigger className="h-8 text-xs">
+                                <SelectValue placeholder="Seleccionar mesa" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {mesasActivas.map((mesa) => (
+                                  <SelectItem key={mesa} value={mesa.toString()}>
+                                    Mesa {mesa}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        )}
+
+                        <div className="flex gap-2 pt-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleOpenEditDialog(user)}
+                            className="flex-1 h-8 text-xs"
+                          >
+                            <Edit className="w-3 h-3 mr-1" />
+                            Editar
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleResetPassword(user.id, user.fullName)}
+                            disabled={resettingPassword === user.id}
+                            className="flex-1 h-8 text-xs"
+                          >
+                            {resettingPassword === user.id ? (
+                              <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                            ) : (
+                              <KeyRound className="w-3 h-3 mr-1" />
+                            )}
+                            {resettingPassword === user.id ? "Restaurando..." : "Restaurar"}
+                          </Button>
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            onClick={() => handleDeleteUser(user.id, user.fullName)}
+                            className="h-8 px-3"
+                          >
+                            <Trash2 className="w-3.5 h-3.5 text-white" />
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+        </TabsContent>
+      </Tabs>
 
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
         <DialogContent className="w-[95vw] max-w-md mx-auto">

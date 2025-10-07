@@ -24,6 +24,7 @@ import { Switch } from "@/components/ui/switch"
 // Importar todos los componentes de las vistas
 import { DashboardStats } from "@/components/dashboard-stats"
 import { BarcodeScanner } from "@/components/barcode-scanner"
+import { AdvancedBarcodeScanner } from "@/components/advanced-barcode-scanner"
 import { AccessControl } from "@/components/access-control"
 import { UserManagement } from "@/components/user-management"
 import { DatabaseManagement } from "@/components/database-management"
@@ -280,11 +281,7 @@ export function SPADashboard({ initialView = "inicio" }: SPADashboardProps) {
         } else if (userRole === "operativo") {
           return <OperativoScanner key={`operativo-${scannerKey}`} />
         } else if (userRole === "administrador") {
-          return (
-            <div className="flex flex-1 flex-col items-center justify-center p-4">
-              <BarcodeScanner key={`admin-${scannerKey}`} />
-            </div>
-          )
+          return <AdvancedBarcodeScanner key={`admin-${scannerKey}`} />
         } else {
           return (
             <div className="flex flex-1 flex-col items-center justify-center p-4">

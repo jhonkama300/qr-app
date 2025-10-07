@@ -16,6 +16,7 @@ export const metadata: Metadata = {
     icon: "/images/logoupar.ico",
     shortcut: "/favicon-16x16.png",
   },
+    generator: 'v0.app'
 }
 
 export const viewport: Viewport = {

@@ -5,12 +5,13 @@ import Webcam from "react-webcam"
 import { BrowserMultiFormatReader, BarcodeFormat, DecodeHintType } from "@zxing/library"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
   CameraOffIcon,
   CameraIcon,
@@ -19,14 +20,17 @@ import {
   XCircle,
   User,
   AlertTriangle,
-  Keyboard,
   Search,
-  AlertCircle,
   RefreshCw,
+  QrCode,
+  Hash,
+  Shield,
 } from "lucide-react"
 import { useStudentStoreContext } from "@/components/providers/student-store-provider"
 import { useQ10Validation } from "@/hooks/use-q10-validation"
 import { useAuth } from "@/components/auth-provider"
+import { db } from "@/lib/firebase"
+import { doc, onSnapshot } from "firebase/firestore"
 
 interface ScanResultDisplay {
   type: "success" | "denied" | "error" | "info"
@@ -53,11 +57,15 @@ export function AdvancedBarcodeScanner() {
   const [manualInputError, setManualInputError] = useState<string | null>(null)
   const [showResult, setShowResult] = useState(false)
   const [isScanning, setIsScanning] = useState(false)
+  const [activeTab, setActiveTab] = useState<"qr" | "manual">("qr")
+  const [realtimeStudentData, setRealtimeStudentData] = useState<any>(null)
+  const unsubscribeRef = useRef<(() => void) | null>(null)
 
   const router = useRouter()
   const webcamRef = useRef<Webcam>(null)
   const codeReader = useRef<BrowserMultiFormatReader | null>(null)
   const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const activeStreamRef = useRef<MediaStream | null>(null)
 
   useEffect(() => {
     setIsClient(true)
@@ -114,8 +122,10 @@ export function AdvancedBarcodeScanner() {
 
     navigator.mediaDevices
       .getUserMedia({ video: true })
-      .then(() => {
+      .then((stream) => {
         setHasPermission(true)
+        setError(null)
+        activeStreamRef.current = stream
         navigator.mediaDevices.enumerateDevices().then(handleDevices)
       })
       .catch((err) => {
@@ -284,8 +294,8 @@ export function AdvancedBarcodeScanner() {
         console.log("[v0] Reseteando lector en cleanup...")
         codeReader.current.reset()
       }
-      if (webcamRef.current?.video?.srcObject) {
-        const stream = webcamRef.current.video.srcObject as MediaStream
+      if (activeStreamRef.current) {
+        const stream = activeStreamRef.current
         stream.getTracks().forEach((track) => {
           track.stop()
           console.log("[v0] Track stopped on unmount:", track.kind)
@@ -298,9 +308,10 @@ export function AdvancedBarcodeScanner() {
     if (!isClient) return
     navigator.mediaDevices
       .getUserMedia({ video: true })
-      .then(() => {
+      .then((stream) => {
         setHasPermission(true)
         setError(null)
+        activeStreamRef.current = stream
         navigator.mediaDevices.enumerateDevices().then(handleDevices)
       })
       .catch((err) => {
@@ -358,7 +369,49 @@ export function AdvancedBarcodeScanner() {
       clearTimeout(retryTimeoutRef.current)
       retryTimeoutRef.current = null
     }
+
+    // Limpiar cualquier listener de Firestore en cleanup
+    if (unsubscribeRef.current) {
+      console.log("[v0] Cleaning up Firestore listener")
+      unsubscribeRef.current()
+      unsubscribeRef.current = null
+    }
   }
+
+  useEffect(() => {
+    if (scanResultDisplay?.identificacion && showResult && scanResultDisplay.type === "success") {
+      console.log("[v0] Setting up realtime listener for:", scanResultDisplay.identificacion)
+
+      const studentDocRef = doc(db, "estudiantes", scanResultDisplay.identificacion)
+
+      unsubscribeRef.current = onSnapshot(
+        studentDocRef,
+        (docSnapshot) => {
+          if (docSnapshot.exists()) {
+            const updatedData = docSnapshot.data()
+            console.log("[v0] Realtime update received:", updatedData)
+            setRealtimeStudentData(updatedData)
+          }
+        },
+        (error) => {
+          console.error("[v0] Error in realtime listener:", error)
+        },
+      )
+
+      return () => {
+        if (unsubscribeRef.current) {
+          console.log("[v0] Cleaning up Firestore listener")
+          unsubscribeRef.current()
+          unsubscribeRef.current = null
+        }
+      }
+    }
+  }, [scanResultDisplay?.identificacion, showResult, scanResultDisplay?.type])
+
+  const displayPerson = realtimeStudentData || scanResultDisplay?.person
+  const cuposDisponibles = displayPerson
+    ? 2 + (displayPerson.cuposExtras || 0) - (displayPerson.cuposConsumidos || 0)
+    : 0
 
   if (!isClient) {
     return (
@@ -389,93 +442,135 @@ export function AdvancedBarcodeScanner() {
   }
 
   return (
-    <div className="flex flex-1 flex-col gap-4 p-4">
-      <Card>
-        <CardHeader className="text-center">
-          <CardTitle className="flex items-center justify-center gap-2">
-            <CameraIcon className="w-5 h-5" />
-            Escáner QR/Código Avanzado
-          </CardTitle>
-          <CardDescription>Escáner avanzado para control de acceso al evento</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {error && (
-            <div className="p-3 bg-red-50 border border-red-200 rounded-md">
-              <p className="text-sm text-red-600">{error}</p>
-            </div>
-          )}
+    <div className="flex flex-1 flex-col gap-4 p-3 md:p-4 bg-gradient-to-br from-blue-50 to-indigo-50 min-h-screen">
+      <div className="flex flex-col items-center gap-3">
+        <div className="text-center">
+          <h1 className="text-xl md:text-2xl font-bold text-blue-900">Control de Acceso Administrativo</h1>
+          <p className="text-sm md:text-base text-blue-700">
+            Escanea QR o ingresa identificación para control de acceso
+          </p>
+        </div>
 
-          <div className="relative w-full pt-[100%] overflow-hidden rounded-lg bg-card shadow-lg border border-border">
-            {selectedDeviceId && (
-              <Webcam
-                ref={webcamRef}
-                audio={false}
-                videoConstraints={{
-                  deviceId: selectedDeviceId,
-                  facingMode: "environment",
-                }}
-                className="absolute inset-0 w-full h-full object-cover"
-              />
-            )}
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[90%] h-[50%] border-4 border-primary rounded-lg shadow-[0_0_0_9999px_rgba(0,0,0,0.5)]">
-              <div className="absolute top-1/2 left-[5%] right-[5%] h-[2px] bg-primary animate-scan"></div>
-            </div>
-          </div>
+        <Badge variant="outline" className="bg-blue-100 text-blue-800 border-blue-300">
+          <Shield className="w-3 h-3 md:w-4 md:h-4 mr-1" />
+          Administrador
+        </Badge>
 
-          <div className="text-center">
-            <p className="text-sm text-muted-foreground">
-              {isScanning ? "Procesando..." : "Escaneando automáticamente... Apunta al código"}
-            </p>
-          </div>
-        </CardContent>
-      </Card>
+        <Card className="w-full max-w-2xl bg-white shadow-lg border-blue-200">
+          <CardContent className="p-4 md:p-6">
+            <h2 className="text-lg md:text-xl font-semibold text-center mb-4 text-blue-900">
+              Escanea QR o ingresa identificación
+            </h2>
+            <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "qr" | "manual")} className="w-full">
+              <TabsList className="grid w-full grid-cols-2 mb-4 bg-blue-100">
+                <TabsTrigger
+                  value="qr"
+                  className="text-sm md:text-base data-[state=active]:bg-blue-600 data-[state=active]:text-white"
+                >
+                  <QrCode className="w-4 h-4 mr-2" />
+                  Escanear QR
+                </TabsTrigger>
+                <TabsTrigger
+                  value="manual"
+                  className="text-sm md:text-base data-[state=active]:bg-blue-600 data-[state=active]:text-white"
+                >
+                  <Hash className="w-4 h-4 mr-2" />
+                  Ingreso Manual
+                </TabsTrigger>
+              </TabsList>
 
-      <Card className="mt-6">
-        <CardHeader className="text-center">
-          <CardTitle className="flex items-center justify-center gap-2">
-            <Keyboard className="w-5 h-5" />
-            Entrada Manual
-          </CardTitle>
-          <CardDescription>Ingresa la identificación si el escaneo no es posible</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {manualInputError && (
-            <Alert variant="destructive">
-              <AlertCircle className="h-4 w-4" />
-              <AlertDescription>{manualInputError}</AlertDescription>
-            </Alert>
-          )}
-          <div className="space-y-2">
-            <Label htmlFor="manual-id">Número de Identificación</Label>
-            <Input
-              id="manual-id"
-              type="text"
-              placeholder="Ej: 123456789"
-              value={manualIdInput}
-              onChange={(e) => setManualIdInput(e.target.value)}
-              disabled={isManualProcessing || isProcessingQ10}
-              className="h-11 text-base"
-            />
-          </div>
-          <Button
-            onClick={handleManualSubmit}
-            disabled={isManualProcessing || isProcessingQ10 || !manualIdInput.trim()}
-            className="w-full h-11 text-base"
-          >
-            {isManualProcessing ? (
-              <>
-                <Loader2Icon className="mr-2 h-4 w-4 animate-spin" />
-                Validando...
-              </>
-            ) : (
-              <>
-                <Search className="mr-2 h-4 w-4" />
-                Validar Identificación
-              </>
-            )}
-          </Button>
-        </CardContent>
-      </Card>
+              <TabsContent value="qr" className="space-y-4 mt-0">
+                {error && activeTab === "qr" && (
+                  <Alert variant="destructive">
+                    <AlertTriangle className="h-4 w-4" />
+                    <AlertDescription>{error}</AlertDescription>
+                  </Alert>
+                )}
+
+                <div className="relative w-full pt-[100%] overflow-hidden rounded-lg bg-card shadow-lg border border-blue-200">
+                  {selectedDeviceId && (
+                    <Webcam
+                      ref={webcamRef}
+                      audio={false}
+                      videoConstraints={{
+                        deviceId: selectedDeviceId,
+                        facingMode: "environment",
+                      }}
+                      className="absolute inset-0 w-full h-full object-cover"
+                    />
+                  )}
+                  <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[90%] h-[50%] border-4 border-blue-500 rounded-lg shadow-[0_0_0_9999px_rgba(0,0,0,0.5)]">
+                    <div className="absolute top-1/2 left-[5%] right-[5%] h-[2px] bg-blue-500 animate-scan"></div>
+                  </div>
+                </div>
+
+                <div className="text-center p-3 bg-blue-50 rounded-lg border border-blue-200">
+                  <p className="text-sm text-blue-700">
+                    {isScanning ? (
+                      <span className="flex items-center justify-center gap-2">
+                        <Loader2Icon className="w-4 h-4 animate-spin" />
+                        Procesando...
+                      </span>
+                    ) : (
+                      "Apunta la cámara al código QR del estudiante"
+                    )}
+                  </p>
+                </div>
+              </TabsContent>
+
+              <TabsContent value="manual" className="space-y-4 mt-0">
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="manual-id" className="text-base text-blue-900">
+                      Número de Identificación
+                    </Label>
+                    <Input
+                      id="manual-id"
+                      type="text"
+                      placeholder="Ej: 1065123456"
+                      value={manualIdInput}
+                      onChange={(e) => setManualIdInput(e.target.value)}
+                      onKeyPress={(e) => {
+                        if (e.key === "Enter" && manualIdInput.trim() && !isManualProcessing) {
+                          handleManualSubmit()
+                        }
+                      }}
+                      disabled={isManualProcessing}
+                      className="text-lg h-12 border-blue-300 focus:border-blue-500"
+                    />
+                    <p className="text-xs text-blue-600">Ingresa el número de cédula del estudiante</p>
+                  </div>
+
+                  <Button
+                    onClick={handleManualSubmit}
+                    disabled={isManualProcessing || !manualIdInput.trim()}
+                    className="w-full h-12 text-base bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 text-white"
+                    size="lg"
+                  >
+                    {isManualProcessing ? (
+                      <>
+                        <Loader2Icon className="w-5 h-5 mr-2 animate-spin" />
+                        Procesando...
+                      </>
+                    ) : (
+                      <>
+                        <Search className="w-5 h-5 mr-2" />
+                        Continuar
+                      </>
+                    )}
+                  </Button>
+                </div>
+
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                  <p className="text-xs text-blue-900">
+                    <strong>Tip:</strong> El estudiante debe mostrar su documento de identidad para verificar el número.
+                  </p>
+                </div>
+              </TabsContent>
+            </Tabs>
+          </CardContent>
+        </Card>
+      </div>
 
       <Dialog open={showResult} onOpenChange={setShowResult}>
         <DialogContent className="sm:max-w-md">
@@ -502,7 +597,7 @@ export function AdvancedBarcodeScanner() {
                   </Badge>
                 </div>
 
-                {scanResultDisplay.type === "success" && scanResultDisplay.person && (
+                {scanResultDisplay.type === "success" && displayPerson && (
                   <Card className="border-green-200 bg-green-50">
                     <CardHeader className="pb-2">
                       <CardTitle className="text-sm text-green-800">✅ Acceso Concedido al Evento</CardTitle>
@@ -510,19 +605,19 @@ export function AdvancedBarcodeScanner() {
                     <CardContent className="space-y-2">
                       <div>
                         <span className="font-medium text-sm">Nombre:</span>
-                        <p className="text-sm">{scanResultDisplay.person.nombre}</p>
+                        <p className="text-sm">{displayPerson.nombre}</p>
                       </div>
                       <div>
                         <span className="font-medium text-sm">Programa:</span>
-                        <p className="text-sm">{scanResultDisplay.person.programa}</p>
+                        <p className="text-sm">{displayPerson.programa}</p>
                       </div>
                       <div>
                         <span className="font-medium text-sm">Puesto:</span>
-                        <p className="text-sm">{scanResultDisplay.person.puesto}</p>
+                        <p className="text-sm">{displayPerson.puesto}</p>
                       </div>
                       <div>
                         <span className="font-medium text-sm">Cupos Extras:</span>
-                        <p className="text-sm">{scanResultDisplay.person.cuposExtras || 0}</p>
+                        <p className="text-sm">{displayPerson.cuposExtras || 0}</p>
                       </div>
                       <div className="text-xs text-green-700 bg-green-100 p-2 rounded">Bienvenido al evento</div>
                     </CardContent>
