@@ -43,8 +43,8 @@ interface ScanResult {
 }
 
 export function BuffeteScanner() {
-  const { user, fullName, activeRole } = useAuth()
-  const { getStudentById, markStudentAccess, validateMesaAccess } = useStudentStoreContext()
+  const { user, fullName, activeRole, loading: authLoading } = useAuth()
+  const studentStore = useStudentStoreContext()
 
   const [isClient, setIsClient] = useState(false)
   const [hasPermission, setHasPermission] = useState<boolean | null>(null)
@@ -98,27 +98,6 @@ export function BuffeteScanner() {
     }
   }, [])
 
-  useEffect(() => {
-    setIsClient(true)
-  }, [])
-
-  useEffect(() => {
-    if (!isClient) return
-
-    if (!codeReader.current) {
-      const hints = new Map<DecodeHintType, any>()
-      hints.set(DecodeHintType.POSSIBLE_FORMATS, [BarcodeFormat.QR_CODE])
-      hints.set(DecodeHintType.TRY_HARDER, true)
-      codeReader.current = new BrowserMultiFormatReader(hints)
-      console.log("[v0] ZXing reader initialized for bufete")
-    }
-
-    return () => {
-      console.log("[v0] Cleaning up ZXing reader")
-      stopCamera()
-    }
-  }, [isClient])
-
   const handleDevices = useCallback((mediaDevices: MediaDeviceInfo[]) => {
     const videoDevices = mediaDevices.filter(({ kind }) => kind === "videoinput")
     setDevices(videoDevices)
@@ -136,34 +115,60 @@ export function BuffeteScanner() {
     }
   }, [])
 
+  const requestCamera = useCallback(async () => {
+    try {
+      stopCamera()
+      await new Promise((resolve) => setTimeout(resolve, 100))
+
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: "environment" },
+      })
+
+      activeStreamRef.current = stream
+      setHasPermission(true)
+      const devices = await navigator.mediaDevices.enumerateDevices()
+      handleDevices(devices)
+
+      stream.getTracks().forEach((track) => track.stop())
+      activeStreamRef.current = null
+    } catch (err) {
+      console.error("Error al acceder a la cámara:", err)
+      setError("No se pudo acceder a la cámara. Por favor, concede permisos e inténtalo de nuevo.")
+      setHasPermission(false)
+    }
+  }, [handleDevices, stopCamera])
+
+  useEffect(() => {
+    setIsClient(true)
+  }, [])
+
   useEffect(() => {
     if (!isClient) return
 
-    const requestCamera = async () => {
-      try {
-        stopCamera()
-        await new Promise((resolve) => setTimeout(resolve, 100))
-
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: "environment" },
-        })
-
-        activeStreamRef.current = stream
-        setHasPermission(true)
-        const devices = await navigator.mediaDevices.enumerateDevices()
-        handleDevices(devices)
-
-        stream.getTracks().forEach((track) => track.stop())
-        activeStreamRef.current = null
-      } catch (err) {
-        console.error("Error al acceder a la cámara:", err)
-        setError("No se pudo acceder a la cámara. Por favor, concede permisos e inténtalo de nuevo.")
-        setHasPermission(false)
+    try {
+      if (!codeReader.current) {
+        const hints = new Map<DecodeHintType, any>()
+        hints.set(DecodeHintType.POSSIBLE_FORMATS, [BarcodeFormat.QR_CODE])
+        hints.set(DecodeHintType.TRY_HARDER, true)
+        codeReader.current = new BrowserMultiFormatReader(hints)
+        console.log("[v0] ZXing reader initialized for bufete")
       }
+    } catch (error) {
+      console.error("[v0] Error initializing ZXing reader:", error)
+      setError("Error al inicializar el lector de códigos QR")
     }
 
+    return () => {
+      console.log("[v0] Cleaning up ZXing reader")
+      stopCamera()
+    }
+  }, [isClient, stopCamera])
+
+  useEffect(() => {
+    if (!isClient) return
+
     requestCamera()
-  }, [handleDevices, isClient])
+  }, [isClient, requestCamera])
 
   useEffect(() => {
     if (
@@ -230,7 +235,6 @@ export function BuffeteScanner() {
           }
         })
 
-        // Guardar referencia al stream
         if (video.srcObject) {
           activeStreamRef.current = video.srcObject as MediaStream
         }
@@ -255,14 +259,14 @@ export function BuffeteScanner() {
       console.log("[v0] Cleaning up scanner...")
       stopCamera()
     }
-  }, [isClient, hasPermission, selectedDeviceId, processing, isScanning, activeTab])
+  }, [isClient, hasPermission, selectedDeviceId, processing, isScanning, activeTab, stopCamera])
 
   useEffect(() => {
     return () => {
       console.log("[v0] BuffeteScanner unmounting, cleaning up camera...")
       stopCamera()
     }
-  }, [])
+  }, [stopCamera])
 
   useEffect(() => {
     if (activeTab === "manual" && manualInputRef.current) {
@@ -305,7 +309,7 @@ export function BuffeteScanner() {
       setProcessing(true)
       setError("")
 
-      if (!user?.mesaAsignada) {
+      if (!user || !user.mesaAsignada) {
         setScanResult({
           identificacion,
           student: null,
@@ -317,7 +321,7 @@ export function BuffeteScanner() {
         return
       }
 
-      const validation = await validateMesaAccess(identificacion, user.mesaAsignada)
+      const validation = await studentStore.validateMesaAccess(identificacion, user.mesaAsignada)
 
       if (!validation.valid) {
         setScanResult({
@@ -331,7 +335,7 @@ export function BuffeteScanner() {
         return
       }
 
-      const student = await getStudentById(identificacion)
+      const student = await studentStore.getStudentById(identificacion)
 
       if (!student) {
         setScanResult({
@@ -353,10 +357,16 @@ export function BuffeteScanner() {
         mesaAsignada: user.mesaAsignada,
       }
 
-      await markStudentAccess(identificacion, true, `Comida entregada en Mesa ${user.mesaAsignada}`, "manual", userInfo)
+      await studentStore.markStudentAccess(
+        identificacion,
+        true,
+        `Comida entregada en Mesa ${user.mesaAsignada}`,
+        "manual",
+        userInfo,
+      )
 
       await new Promise((resolve) => setTimeout(resolve, 500))
-      const updatedStudent = await getStudentById(identificacion)
+      const updatedStudent = await studentStore.getStudentById(identificacion)
 
       console.log("[v0] Datos actualizados después del descuento:", updatedStudent)
 
@@ -409,6 +419,26 @@ export function BuffeteScanner() {
     }
   }
 
+  if (authLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center p-8 text-center bg-card rounded-lg border shadow-sm">
+        <Loader2 className="text-primary mb-4 size-16 animate-spin" />
+        <p className="text-muted-foreground text-lg">Cargando autenticación...</p>
+      </div>
+    )
+  }
+
+  if (!user) {
+    return (
+      <div className="flex items-center justify-center p-8">
+        <Alert variant="destructive">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertDescription>No se pudo cargar la información del usuario</AlertDescription>
+        </Alert>
+      </div>
+    )
+  }
+
   if (activeRole !== "bufete") {
     return (
       <div className="flex items-center justify-center p-8">
@@ -438,19 +468,7 @@ export function BuffeteScanner() {
           {error || "Se requiere acceso a la cámara para escanear códigos QR."}
         </p>
         <div className="flex gap-2">
-          <Button
-            onClick={() =>
-              navigator.mediaDevices
-                .getUserMedia({ video: true })
-                .then(() => setHasPermission(true))
-                .catch((err) => {
-                  console.error("Error al acceder a la cámara:", err)
-                  setError("No se pudo acceder a la cámara. Por favor, concede permisos e inténtalo de nuevo.")
-                  setHasPermission(false)
-                })
-            }
-            className="h-12 px-6 text-base"
-          >
+          <Button onClick={requestCamera} className="h-12 px-6 text-base">
             <Camera className="mr-2 size-5" />
             Permitir acceso
           </Button>
@@ -473,12 +491,14 @@ export function BuffeteScanner() {
       <div className="flex flex-col items-center gap-3">
         <div className="text-center">
           <h1 className="text-xl md:text-2xl font-bold text-green-900">Entrega de Comida</h1>
-          <p className="text-sm md:text-base text-green-700">Bufete {user.mesaAsignada} - Escanea QR o ingresa ID</p>
+          <p className="text-sm md:text-base text-green-700">
+            Bufete {user?.mesaAsignada || "N/A"} - Escanea QR o ingresa ID
+          </p>
         </div>
 
         <Badge variant="outline" className="bg-green-100 text-green-800 border-green-300">
           <Utensils className="w-3 h-3 md:w-4 md:h-4 mr-1" />
-          Bufete {user.mesaAsignada}
+          Bufete {user?.mesaAsignada || "N/A"}
         </Badge>
 
         <Card className="w-full max-w-2xl bg-white shadow-lg border-green-200">
