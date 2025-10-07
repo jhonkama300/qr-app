@@ -25,10 +25,14 @@ import {
   RefreshCw,
   Utensils,
   Hash,
-  RotateCw,
   QrCode,
-  Play,
+  GraduationCap,
+  MapPin,
+  Ticket,
+  Clock,
 } from "lucide-react"
+import { db } from "@/lib/firebase"
+import { doc, onSnapshot } from "firebase/firestore"
 
 interface ScanResult {
   identificacion: string
@@ -39,8 +43,8 @@ interface ScanResult {
 }
 
 export function BuffeteScanner() {
-  const { user, fullName, activeRole } = useAuth()
-  const { getStudentById, markStudentAccess, validateMesaAccess } = useStudentStoreContext()
+  const { user, fullName, activeRole, loading: authLoading } = useAuth()
+  const studentStore = useStudentStoreContext()
 
   const [isClient, setIsClient] = useState(false)
   const [hasPermission, setHasPermission] = useState<boolean | null>(null)
@@ -53,7 +57,8 @@ export function BuffeteScanner() {
   const [showResult, setShowResult] = useState(false)
   const [manualId, setManualId] = useState("")
   const [activeTab, setActiveTab] = useState<"qr" | "manual">("qr")
-  const [isScannerActive, setIsScannerActive] = useState(false)
+  const [realtimeStudentData, setRealtimeStudentData] = useState<any>(null)
+  const unsubscribeRef = useRef<(() => void) | null>(null)
 
   const webcamRef = useRef<Webcam>(null)
   const codeReader = useRef<BrowserMultiFormatReader | null>(null)
@@ -61,30 +66,37 @@ export function BuffeteScanner() {
   const manualInputRef = useRef<HTMLInputElement>(null)
   const lastScanTime = useRef<number>(0)
   const SCAN_COOLDOWN = 2000
+  const activeStreamRef = useRef<MediaStream | null>(null)
 
-  useEffect(() => {
-    setIsClient(true)
-  }, [])
+  const stopCamera = useCallback(() => {
+    console.log("[v0] Stopping camera completely...")
 
-  useEffect(() => {
-    if (!isClient) return
-
-    if (!codeReader.current) {
-      const hints = new Map<DecodeHintType, any>()
-      hints.set(DecodeHintType.POSSIBLE_FORMATS, [BarcodeFormat.QR_CODE])
-      hints.set(DecodeHintType.TRY_HARDER, true)
-      codeReader.current = new BrowserMultiFormatReader(hints)
-      console.log("[v0] ZXing reader initialized for bufete")
-    }
-
-    return () => {
-      console.log("[v0] Cleaning up ZXing reader")
-      if (codeReader.current) {
+    if (codeReader.current && scannerActive.current) {
+      try {
         codeReader.current.reset()
         scannerActive.current = false
+      } catch (e) {
+        console.error("[v0] Error resetting code reader:", e)
       }
     }
-  }, [isClient])
+
+    if (activeStreamRef.current) {
+      activeStreamRef.current.getTracks().forEach((track) => {
+        track.stop()
+        console.log("[v0] Track stopped:", track.kind, track.label)
+      })
+      activeStreamRef.current = null
+    }
+
+    if (webcamRef.current?.video?.srcObject) {
+      const stream = webcamRef.current.video.srcObject as MediaStream
+      stream.getTracks().forEach((track) => {
+        track.stop()
+        console.log("[v0] Webcam track stopped:", track.kind)
+      })
+      webcamRef.current.video.srcObject = null
+    }
+  }, [])
 
   const handleDevices = useCallback((mediaDevices: MediaDeviceInfo[]) => {
     const videoDevices = mediaDevices.filter(({ kind }) => kind === "videoinput")
@@ -103,105 +115,60 @@ export function BuffeteScanner() {
     }
   }, [])
 
+  const requestCamera = useCallback(async () => {
+    try {
+      stopCamera()
+      await new Promise((resolve) => setTimeout(resolve, 100))
+
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: "environment" },
+      })
+
+      activeStreamRef.current = stream
+      setHasPermission(true)
+      const devices = await navigator.mediaDevices.enumerateDevices()
+      handleDevices(devices)
+
+      stream.getTracks().forEach((track) => track.stop())
+      activeStreamRef.current = null
+    } catch (err) {
+      console.error("Error al acceder a la cámara:", err)
+      setError("No se pudo acceder a la cámara. Por favor, concede permisos e inténtalo de nuevo.")
+      setHasPermission(false)
+    }
+  }, [handleDevices, stopCamera])
+
+  useEffect(() => {
+    setIsClient(true)
+  }, [])
+
   useEffect(() => {
     if (!isClient) return
 
-    navigator.mediaDevices
-      .getUserMedia({ video: true })
-      .then(() => {
-        setHasPermission(true)
-        navigator.mediaDevices.enumerateDevices().then(handleDevices)
-      })
-      .catch((err) => {
-        console.error("Error al acceder a la cámara:", err)
-        setError("No se pudo acceder a la cámara. Por favor, conceda permisos e inténtelo de nuevo.")
-        setHasPermission(false)
-      })
-  }, [handleDevices, isClient])
+    try {
+      if (!codeReader.current) {
+        const hints = new Map<DecodeHintType, any>()
+        hints.set(DecodeHintType.POSSIBLE_FORMATS, [BarcodeFormat.QR_CODE])
+        hints.set(DecodeHintType.TRY_HARDER, true)
+        codeReader.current = new BrowserMultiFormatReader(hints)
+        console.log("[v0] ZXing reader initialized for bufete")
+      }
+    } catch (error) {
+      console.error("[v0] Error initializing ZXing reader:", error)
+      setError("Error al inicializar el lector de códigos QR")
+    }
+
+    return () => {
+      console.log("[v0] Cleaning up ZXing reader")
+      stopCamera()
+    }
+  }, [isClient, stopCamera])
 
   useEffect(() => {
-    if (activeTab === "manual" && manualInputRef.current) {
-      manualInputRef.current.focus()
-    }
-  }, [activeTab])
+    if (!isClient) return
 
-  const processStudentAccess = async (identificacion: string) => {
-    try {
-      setProcessing(true)
-      setError("")
-
-      if (!user?.mesaAsignada) {
-        setScanResult({
-          identificacion,
-          student: null,
-          status: "error",
-          message: "Usuario sin mesa asignada",
-          timestamp: new Date().toISOString(),
-        })
-        setShowResult(true)
-        return
-      }
-
-      const validation = await validateMesaAccess(identificacion, user.mesaAsignada)
-
-      if (!validation.valid) {
-        setScanResult({
-          identificacion,
-          student: null,
-          status: "no_cupos",
-          message: validation.message,
-          timestamp: new Date().toISOString(),
-        })
-        setShowResult(true)
-        return
-      }
-
-      const student = await getStudentById(identificacion)
-
-      if (!student) {
-        setScanResult({
-          identificacion,
-          student: null,
-          status: "error",
-          message: "Estudiante no encontrado en la base de datos",
-          timestamp: new Date().toISOString(),
-        })
-        setShowResult(true)
-        return
-      }
-
-      const userInfo = {
-        userId: user.id,
-        userName: fullName || user.fullName || "Usuario Bufete",
-        userEmail: user.idNumber + "@sistema.com",
-        userRole: activeRole || "bufete",
-        mesaAsignada: user.mesaAsignada,
-      }
-
-      await markStudentAccess(identificacion, true, `Comida entregada en Mesa ${user.mesaAsignada}`, "manual", userInfo)
-
-      setScanResult({
-        identificacion,
-        student,
-        status: "success",
-        message: validation.message,
-        timestamp: new Date().toISOString(),
-      })
-      setShowResult(true)
-    } catch (error) {
-      console.error("Error al procesar acceso:", error)
-      setScanResult({
-        identificacion,
-        student: null,
-        status: "error",
-        message: "Error al procesar el acceso",
-        timestamp: new Date().toISOString(),
-      })
-      setShowResult(true)
-    } finally {
-      setProcessing(false)
-    }
-  }
+    requestCamera()
+  }, [isClient, requestCamera])
 
   useEffect(() => {
     if (
@@ -211,13 +178,11 @@ export function BuffeteScanner() {
       processing ||
       isScanning ||
       !codeReader.current ||
-      activeTab !== "qr" ||
-      !isScannerActive
+      activeTab !== "qr"
     ) {
       if (codeReader.current && scannerActive.current) {
         console.log("[v0] Stopping scanner (conditions not met)")
-        codeReader.current.reset()
-        scannerActive.current = false
+        stopCamera()
       }
       return
     }
@@ -241,8 +206,8 @@ export function BuffeteScanner() {
       try {
         const initTimeout = setTimeout(() => {
           console.error("[v0] Scanner initialization timeout")
-          setError("Tiempo de espera agotado. Intenta cambiar de cámara o recargar.")
-          scannerActive.current = false
+          setError("Tiempo de espera agotado. Intenta recargar la página.")
+          stopCamera()
         }, 10000)
 
         await codeReader.current!.decodeFromVideoDevice(selectedDeviceId, video, (result, err) => {
@@ -264,11 +229,15 @@ export function BuffeteScanner() {
           if (err && err.name !== "NotFoundException") {
             if (err.name === "NotReadableError") {
               console.error("[v0] Camera in use by another app")
-              setError("La cámara está en uso. Cierra otras aplicaciones.")
-              scannerActive.current = false
+              setError("La cámara está en uso. Cierra otras aplicaciones e intenta de nuevo.")
+              stopCamera()
             }
           }
         })
+
+        if (video.srcObject) {
+          activeStreamRef.current = video.srcObject as MediaStream
+        }
       } catch (err: any) {
         console.error("[v0] Error starting scanner:", err)
         if (err.name === "NotAllowedError") {
@@ -280,7 +249,7 @@ export function BuffeteScanner() {
         } else {
           setError("Error al iniciar el escáner")
         }
-        scannerActive.current = false
+        stopCamera()
       }
     }
 
@@ -288,42 +257,146 @@ export function BuffeteScanner() {
 
     return () => {
       console.log("[v0] Cleaning up scanner...")
-      if (codeReader.current && scannerActive.current) {
-        codeReader.current.reset()
-        scannerActive.current = false
-      }
-      if (webcamRef.current?.video?.srcObject) {
-        const stream = webcamRef.current.video.srcObject as MediaStream
-        stream.getTracks().forEach((track) => {
-          track.stop()
-          console.log("[v0] Track stopped on unmount:", track.kind)
-        })
-      }
-      setIsScannerActive(false)
+      stopCamera()
     }
-  }, [isClient, hasPermission, selectedDeviceId, processing, isScanning, activeTab, isScannerActive])
+  }, [isClient, hasPermission, selectedDeviceId, processing, isScanning, activeTab, stopCamera])
 
   useEffect(() => {
     return () => {
-      console.log("[v0] Component unmounting, cleaning up camera...")
-      if (codeReader.current && scannerActive.current) {
-        codeReader.current.reset()
-        scannerActive.current = false
-      }
-      if (webcamRef.current?.video?.srcObject) {
-        const stream = webcamRef.current.video.srcObject as MediaStream
-        stream.getTracks().forEach((track) => {
-          track.stop()
-          console.log("[v0] Track stopped on unmount:", track.kind)
-        })
-      }
-      setIsScannerActive(false)
+      console.log("[v0] BuffeteScanner unmounting, cleaning up camera...")
+      stopCamera()
     }
-  }, [])
+  }, [stopCamera])
+
+  useEffect(() => {
+    if (activeTab === "manual" && manualInputRef.current) {
+      manualInputRef.current.focus()
+    }
+  }, [activeTab])
+
+  useEffect(() => {
+    if (scanResult?.identificacion && showResult) {
+      console.log("[v0] Setting up realtime listener for:", scanResult.identificacion)
+
+      const studentDocRef = doc(db, "estudiantes", scanResult.identificacion)
+
+      unsubscribeRef.current = onSnapshot(
+        studentDocRef,
+        (docSnapshot) => {
+          if (docSnapshot.exists()) {
+            const updatedData = docSnapshot.data()
+            console.log("[v0] Realtime update received:", updatedData)
+            setRealtimeStudentData(updatedData)
+          }
+        },
+        (error) => {
+          console.error("[v0] Error in realtime listener:", error)
+        },
+      )
+
+      return () => {
+        if (unsubscribeRef.current) {
+          console.log("[v0] Cleaning up realtime listener")
+          unsubscribeRef.current()
+          unsubscribeRef.current = null
+        }
+      }
+    }
+  }, [scanResult?.identificacion, showResult])
+
+  const processStudentAccess = async (identificacion: string) => {
+    try {
+      setProcessing(true)
+      setError("")
+
+      if (!user || !user.mesaAsignada) {
+        setScanResult({
+          identificacion,
+          student: null,
+          status: "error",
+          message: "Usuario sin mesa asignada",
+          timestamp: new Date().toISOString(),
+        })
+        setShowResult(true)
+        return
+      }
+
+      const validation = await studentStore.validateMesaAccess(identificacion, user.mesaAsignada)
+
+      if (!validation.valid) {
+        setScanResult({
+          identificacion,
+          student: null,
+          status: "no_cupos",
+          message: validation.message,
+          timestamp: new Date().toISOString(),
+        })
+        setShowResult(true)
+        return
+      }
+
+      const student = await studentStore.getStudentById(identificacion)
+
+      if (!student) {
+        setScanResult({
+          identificacion,
+          student: null,
+          status: "error",
+          message: "Estudiante no encontrado en la base de datos",
+          timestamp: new Date().toISOString(),
+        })
+        setShowResult(true)
+        return
+      }
+
+      const userInfo = {
+        userId: user.id,
+        userName: fullName || user.fullName || "Usuario Bufete",
+        userEmail: user.idNumber + "@sistema.com",
+        userRole: activeRole || "bufete",
+        mesaAsignada: user.mesaAsignada,
+      }
+
+      await studentStore.markStudentAccess(
+        identificacion,
+        true,
+        `Comida entregada en Mesa ${user.mesaAsignada}`,
+        "manual",
+        userInfo,
+      )
+
+      await new Promise((resolve) => setTimeout(resolve, 500))
+      const updatedStudent = await studentStore.getStudentById(identificacion)
+
+      console.log("[v0] Datos actualizados después del descuento:", updatedStudent)
+
+      setScanResult({
+        identificacion,
+        student: updatedStudent || student,
+        status: "success",
+        message: validation.message,
+        timestamp: new Date().toISOString(),
+      })
+      setShowResult(true)
+    } catch (error) {
+      console.error("Error al procesar acceso:", error)
+      setScanResult({
+        identificacion,
+        student: null,
+        status: "error",
+        message: "Error al procesar el acceso",
+        timestamp: new Date().toISOString(),
+      })
+      setShowResult(true)
+    } finally {
+      setProcessing(false)
+    }
+  }
 
   const resetScanner = () => {
     console.log("[v0] Resetting scanner...")
     setScanResult(null)
+    setRealtimeStudentData(null)
     setShowResult(false)
     setError("")
     setManualId("")
@@ -335,63 +408,35 @@ export function BuffeteScanner() {
     setShowResult(open)
     if (!open) {
       console.log("[v0] Modal closed, resetting state")
+      if (unsubscribeRef.current) {
+        unsubscribeRef.current()
+        unsubscribeRef.current = null
+      }
       setScanResult(null)
+      setRealtimeStudentData(null)
       setIsScanning(false)
       lastScanTime.current = 0
     }
   }
 
-  const switchCamera = () => {
-    if (!isClient || devices.length <= 1) return
-
-    console.log("[v0] Switching camera")
-    if (codeReader.current && scannerActive.current) {
-      codeReader.current.reset()
-      scannerActive.current = false
-    }
-
-    const currentIndex = devices.findIndex((device) => device.deviceId === selectedDeviceId)
-    const nextIndex = (currentIndex + 1) % devices.length
-    setSelectedDeviceId(devices[nextIndex].deviceId)
-    setError("")
+  if (authLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center p-8 text-center bg-card rounded-lg border shadow-sm">
+        <Loader2 className="text-primary mb-4 size-16 animate-spin" />
+        <p className="text-muted-foreground text-lg">Cargando autenticación...</p>
+      </div>
+    )
   }
 
-  const requestCameraPermission = () => {
-    if (!isClient) return
-    navigator.mediaDevices
-      .getUserMedia({ video: true })
-      .then(() => {
-        setHasPermission(true)
-        setError("")
-        navigator.mediaDevices.enumerateDevices().then(handleDevices)
-      })
-      .catch((err) => {
-        console.error("Error al acceder a la cámara:", err)
-        setError("No se pudo acceder a la cámara. Por favor, conceda permisos e inténtelo de nuevo.")
-        setHasPermission(false)
-      })
-  }
-
-  const startScanner = () => {
-    console.log("[v0] Starting scanner manually...")
-    setError("")
-    setIsScannerActive(true)
-  }
-
-  const stopScanner = () => {
-    console.log("[v0] Stopping scanner manually...")
-    if (codeReader.current && scannerActive.current) {
-      codeReader.current.reset()
-      scannerActive.current = false
-    }
-    if (webcamRef.current?.video?.srcObject) {
-      const stream = webcamRef.current.video.srcObject as MediaStream
-      stream.getTracks().forEach((track) => {
-        track.stop()
-        console.log("[v0] Track stopped:", track.kind)
-      })
-    }
-    setIsScannerActive(false)
+  if (!user) {
+    return (
+      <div className="flex items-center justify-center p-8">
+        <Alert variant="destructive">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertDescription>No se pudo cargar la información del usuario</AlertDescription>
+        </Alert>
+      </div>
+    )
   }
 
   if (activeRole !== "bufete") {
@@ -423,7 +468,7 @@ export function BuffeteScanner() {
           {error || "Se requiere acceso a la cámara para escanear códigos QR."}
         </p>
         <div className="flex gap-2">
-          <Button onClick={requestCameraPermission} className="h-12 px-6 text-base">
+          <Button onClick={requestCamera} className="h-12 px-6 text-base">
             <Camera className="mr-2 size-5" />
             Permitir acceso
           </Button>
@@ -436,38 +481,43 @@ export function BuffeteScanner() {
     )
   }
 
+  const displayStudent = realtimeStudentData || scanResult?.student
+  const cuposDisponibles = displayStudent
+    ? 2 + (displayStudent.cuposExtras || 0) - (displayStudent.cuposConsumidos || 0)
+    : 0
+
   return (
-    <div className="flex flex-1 flex-col gap-4 p-3 md:p-4">
+    <div className="flex flex-1 flex-col gap-4 p-3 md:p-4 bg-gradient-to-br from-green-50 to-emerald-50 min-h-screen">
       <div className="flex flex-col items-center gap-3">
         <div className="text-center">
-          <h1 className="text-xl md:text-2xl font-bold">Entrega de Comida</h1>
-          <p className="text-sm md:text-base text-muted-foreground">
-            Bufete {user.mesaAsignada} - Escanea QR o ingresa ID
+          <h1 className="text-xl md:text-2xl font-bold text-green-900">Entrega de Comida</h1>
+          <p className="text-sm md:text-base text-green-700">
+            Bufete {user?.mesaAsignada || "N/A"} - Escanea QR o ingresa ID
           </p>
         </div>
 
-        <Badge variant="outline" className="bg-green-50 text-green-700">
+        <Badge variant="outline" className="bg-green-100 text-green-800 border-green-300">
           <Utensils className="w-3 h-3 md:w-4 md:h-4 mr-1" />
-          Bufete {user.mesaAsignada}
+          Bufete {user?.mesaAsignada || "N/A"}
         </Badge>
 
-        <Card className="w-full max-w-2xl bg-white shadow-lg">
+        <Card className="w-full max-w-2xl bg-white shadow-lg border-green-200">
           <CardContent className="p-4 md:p-6">
-            <h2 className="text-lg md:text-xl font-semibold text-center mb-4 text-gray-800">
+            <h2 className="text-lg md:text-xl font-semibold text-center mb-4 text-green-900">
               Escanea QR o ingresa identificación
             </h2>
             <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "qr" | "manual")} className="w-full">
-              <TabsList className="grid w-full grid-cols-2 mb-4 bg-gray-100">
+              <TabsList className="grid w-full grid-cols-2 mb-4 bg-green-100">
                 <TabsTrigger
                   value="qr"
-                  className="text-sm md:text-base data-[state=active]:bg-green-500 data-[state=active]:text-white"
+                  className="text-sm md:text-base data-[state=active]:bg-green-600 data-[state=active]:text-white"
                 >
                   <QrCode className="w-4 h-4 mr-2" />
                   Escanear QR
                 </TabsTrigger>
                 <TabsTrigger
                   value="manual"
-                  className="text-sm md:text-base data-[state=active]:bg-green-500 data-[state=active]:text-white"
+                  className="text-sm md:text-base data-[state=active]:bg-green-600 data-[state=active]:text-white"
                 >
                   <Hash className="w-4 h-4 mr-2" />
                   Ingreso Manual
@@ -482,68 +532,41 @@ export function BuffeteScanner() {
                   </Alert>
                 )}
 
-                {!isScannerActive ? (
-                  <div className="flex flex-col items-center justify-center p-8 space-y-4">
-                    <CameraOff className="w-16 h-16 text-muted-foreground" />
-                    <p className="text-center text-muted-foreground">Presiona el botón para iniciar el escáner</p>
-                    <Button onClick={startScanner} size="lg" className="w-full">
-                      <Play className="w-5 h-5 mr-2" />
-                      Comenzar a Escanear
-                    </Button>
+                <div className="relative w-full pt-[100%] overflow-hidden rounded-lg bg-card shadow-lg border border-green-200">
+                  {selectedDeviceId && (
+                    <Webcam
+                      ref={webcamRef}
+                      audio={false}
+                      videoConstraints={{
+                        deviceId: selectedDeviceId,
+                        facingMode: "environment",
+                      }}
+                      className="absolute inset-0 w-full h-full object-cover"
+                    />
+                  )}
+                  <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[90%] h-[50%] border-4 border-green-500 rounded-lg shadow-[0_0_0_9999px_rgba(0,0,0,0.5)]">
+                    <div className="absolute top-1/2 left-[5%] right-[5%] h-[2px] bg-green-500 animate-scan"></div>
                   </div>
-                ) : (
-                  <>
-                    <div className="relative w-full pt-[100%] overflow-hidden rounded-lg bg-card shadow-lg border">
-                      {selectedDeviceId && (
-                        <Webcam
-                          ref={webcamRef}
-                          audio={false}
-                          videoConstraints={{
-                            deviceId: selectedDeviceId,
-                            facingMode: "environment",
-                          }}
-                          className="absolute inset-0 w-full h-full object-cover"
-                        />
-                      )}
-                      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[90%] h-[50%] border-4 border-primary rounded-lg shadow-[0_0_0_9999px_rgba(0,0,0,0.5)]">
-                        <div className="absolute top-1/2 left-[5%] right-[5%] h-[2px] bg-primary animate-scan"></div>
-                      </div>
-                      {devices.length > 1 && (
-                        <button
-                          onClick={switchCamera}
-                          className="absolute top-4 right-4 bg-secondary/70 p-2 md:p-3 rounded-full hover:bg-secondary transition-colors shadow-md"
-                          aria-label="Cambiar cámara"
-                        >
-                          <RotateCw className="size-5 md:size-6" />
-                        </button>
-                      )}
-                    </div>
+                </div>
 
-                    <div className="text-center p-3 bg-muted rounded-lg">
-                      <p className="text-sm text-muted-foreground">
-                        {processing || isScanning ? (
-                          <span className="flex items-center justify-center gap-2">
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                            Procesando...
-                          </span>
-                        ) : (
-                          "Apunta la cámara al código QR del estudiante"
-                        )}
-                      </p>
-                    </div>
-
-                    <Button onClick={stopScanner} variant="outline" className="w-full bg-transparent">
-                      <CameraOff className="w-4 h-4 mr-2" />
-                      Detener Escáner
-                    </Button>
-                  </>
-                )}
+                <div className="text-center p-3 bg-green-50 rounded-lg border border-green-200">
+                  <p className="text-sm text-green-700">
+                    {processing || isScanning ? (
+                      <span className="flex items-center justify-center gap-2">
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Procesando...
+                      </span>
+                    ) : (
+                      "Apunta la cámara al código QR del estudiante"
+                    )}
+                  </p>
+                </div>
               </TabsContent>
 
               <TabsContent value="manual" className="space-y-4 mt-0">
                 <div className="space-y-4">
                   <div className="space-y-2">
-                    <Label htmlFor="manual-id" className="text-base">
+                    <Label htmlFor="manual-id" className="text-base text-green-900">
                       Número de Identificación
                     </Label>
                     <Input
@@ -560,9 +583,9 @@ export function BuffeteScanner() {
                         }
                       }}
                       disabled={processing}
-                      className="text-lg h-12"
+                      className="text-lg h-12 border-green-300 focus:border-green-500"
                     />
-                    <p className="text-xs text-muted-foreground">Ingresa el número de cédula del estudiante</p>
+                    <p className="text-xs text-green-600">Ingresa el número de cédula del estudiante</p>
                   </div>
 
                   <Button
@@ -573,7 +596,7 @@ export function BuffeteScanner() {
                       }
                     }}
                     disabled={processing || !manualId.trim()}
-                    className="w-full h-12 text-base bg-gradient-to-r from-lime-500 to-green-500 hover:from-lime-600 hover:to-green-600 text-white"
+                    className="w-full h-12 text-base bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white"
                     size="lg"
                   >
                     {processing ? (
@@ -590,8 +613,8 @@ export function BuffeteScanner() {
                   </Button>
                 </div>
 
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                  <p className="text-xs text-blue-900">
+                <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+                  <p className="text-xs text-green-900">
                     <strong>Tip:</strong> El estudiante debe mostrar su documento de identidad para verificar el número.
                   </p>
                 </div>
@@ -602,79 +625,157 @@ export function BuffeteScanner() {
       </div>
 
       <Dialog open={showResult} onOpenChange={handleModalClose}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              {scanResult?.status === "success" && <CheckCircle className="w-5 h-5 text-green-600" />}
-              {scanResult?.status === "no_cupos" && <XCircle className="w-5 h-5 text-red-600" />}
-              {scanResult?.status === "error" && <AlertTriangle className="w-5 h-5 text-red-600" />}
+            <DialogTitle className="flex items-center gap-2 text-base md:text-lg">
+              {scanResult?.status === "success" && <CheckCircle className="w-5 h-5 md:w-6 md:h-6 text-green-600" />}
+              {scanResult?.status === "no_cupos" && <XCircle className="w-5 h-5 md:w-6 md:h-6 text-red-600" />}
+              {scanResult?.status === "error" && <AlertTriangle className="w-5 h-5 md:w-6 md:h-6 text-orange-600" />}
               Resultado del Proceso
+              {realtimeStudentData && (
+                <Badge
+                  variant="outline"
+                  className="ml-auto bg-green-50 text-green-700 border-green-200 animate-pulse text-xs"
+                >
+                  <Clock className="w-3 h-3 mr-1" />
+                  En vivo
+                </Badge>
+              )}
             </DialogTitle>
           </DialogHeader>
 
-          <div className="space-y-4">
+          <div className="space-y-3">
             {scanResult && (
               <>
-                <div className="space-y-2">
+                <div className="bg-gradient-to-r from-lime-50 to-green-50 rounded-lg p-3 border border-lime-200">
                   <div className="flex items-center gap-2">
-                    <User className="w-4 h-4 text-muted-foreground" />
-                    <span className="text-sm font-medium">Identificación:</span>
+                    <div className="bg-white rounded-full p-1.5 shadow-sm">
+                      <User className="w-4 h-4 text-lime-600" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[10px] text-gray-600 font-medium">Identificación</p>
+                      <p className="text-base md:text-lg font-bold text-gray-900 truncate">
+                        {scanResult.identificacion}
+                      </p>
+                    </div>
                   </div>
-                  <Badge variant="outline" className="text-sm">
-                    {scanResult.identificacion}
-                  </Badge>
                 </div>
 
-                {scanResult.status === "success" && scanResult.student && (
-                  <Card className="border-green-200 bg-green-50">
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-sm text-green-800">✅ Comida Entregada</CardTitle>
+                {scanResult.status === "success" && displayStudent && (
+                  <Card className="border-green-200 bg-gradient-to-br from-green-50 to-emerald-50 shadow-lg">
+                    <CardHeader className="pb-2 pt-3 px-3 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-t-lg">
+                      <CardTitle className="text-sm md:text-base flex items-center gap-2">
+                        <CheckCircle className="w-4 h-4 md:w-5 md:h-5" />
+                        Comida Entregada Exitosamente
+                      </CardTitle>
                     </CardHeader>
-                    <CardContent className="space-y-2">
-                      <div>
-                        <span className="font-medium text-sm">Nombre:</span>
-                        <p className="text-sm">{scanResult.student.nombre}</p>
+                    <CardContent className="space-y-3 pt-3 px-3 pb-3">
+                      <div className="space-y-2">
+                        <div className="flex items-start gap-2">
+                          <GraduationCap className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-[10px] text-gray-600 font-medium">Nombre Completo</p>
+                            <p className="text-xs md:text-sm font-bold text-gray-900 break-words">
+                              {displayStudent.nombre}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-start gap-2">
+                          <MapPin className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-[10px] text-gray-600 font-medium">Programa Académico</p>
+                            <p className="text-xs md:text-sm font-semibold text-gray-800 break-words">
+                              {displayStudent.programa}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-start gap-2">
+                          <Utensils className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-[10px] text-gray-600 font-medium">Bufete de Entrega</p>
+                            <Badge className="bg-green-600 hover:bg-green-700 text-white font-bold text-xs">
+                              Bufete {user.mesaAsignada}
+                            </Badge>
+                          </div>
+                        </div>
                       </div>
-                      <div>
-                        <span className="font-medium text-sm">Programa:</span>
-                        <p className="text-sm">{scanResult.student.programa}</p>
+
+                      <div className="bg-white rounded-lg p-3 border-2 border-green-200 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-1.5">
+                            <Ticket className="w-3.5 h-3.5 text-green-600" />
+                            <span className="text-xs md:text-sm font-semibold text-gray-700">Bufetes Disponibles</span>
+                          </div>
+                          <span className="text-xl md:text-2xl font-bold text-green-600">{cuposDisponibles}</span>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-1.5 text-[10px] md:text-xs">
+                          <div className="bg-gray-50 rounded p-1.5">
+                            <p className="text-gray-600">Total</p>
+                            <p className="font-bold text-gray-900 text-sm">{2 + (displayStudent.cuposExtras || 0)}</p>
+                          </div>
+                          <div className="bg-orange-50 rounded p-1.5">
+                            <p className="text-orange-600">Consumidos</p>
+                            <p className="font-bold text-orange-700 text-sm">{displayStudent.cuposConsumidos || 0}</p>
+                          </div>
+                        </div>
+
+                        <div className="w-full bg-gray-200 rounded-full h-1.5 mt-1">
+                          <div
+                            className="bg-gradient-to-r from-green-500 to-emerald-500 h-1.5 rounded-full transition-all duration-500"
+                            style={{
+                              width: `${(cuposDisponibles / (2 + (displayStudent.cuposExtras || 0))) * 100}%`,
+                            }}
+                          />
+                        </div>
                       </div>
-                      <div>
-                        <span className="font-medium text-sm">Bufete:</span>
-                        <p className="text-sm">Bufete {user.mesaAsignada}</p>
+
+                      <div className="text-[10px] md:text-xs text-green-700 bg-green-100 p-2 rounded-lg font-medium text-center">
+                        {scanResult.message}
                       </div>
-                      <div className="text-xs text-green-700 bg-green-100 p-2 rounded">{scanResult.message}</div>
                     </CardContent>
                   </Card>
                 )}
 
                 {scanResult.status === "no_cupos" && (
-                  <Alert variant="destructive">
-                    <XCircle className="h-4 w-4" />
-                    <AlertDescription>{scanResult.message}</AlertDescription>
+                  <Alert variant="destructive" className="border-red-300 bg-red-50">
+                    <XCircle className="h-4 w-4 md:h-5 md:w-5" />
+                    <AlertDescription className="text-xs md:text-sm font-medium">{scanResult.message}</AlertDescription>
                   </Alert>
                 )}
 
                 {scanResult.status === "error" && (
-                  <Alert variant="destructive">
-                    <AlertTriangle className="h-4 w-4" />
-                    <AlertDescription>{scanResult.message}</AlertDescription>
+                  <Alert variant="destructive" className="border-orange-300 bg-orange-50">
+                    <AlertTriangle className="h-4 w-4 md:h-5 md:w-5 text-orange-600" />
+                    <AlertDescription className="text-xs md:text-sm font-medium text-orange-800">
+                      {scanResult.message}
+                    </AlertDescription>
                   </Alert>
                 )}
 
-                <div className="text-xs text-muted-foreground text-center">
+                <div className="text-[10px] md:text-xs text-gray-500 text-center flex items-center justify-center gap-1">
+                  <Clock className="w-3 h-3" />
                   Procesado el {new Date(scanResult.timestamp).toLocaleString()}
                 </div>
               </>
             )}
           </div>
 
-          <div className="flex gap-2">
-            <Button onClick={resetScanner} className="flex-1">
-              <RefreshCw className="w-4 h-4 mr-2" />
-              Procesar Otro Estudiante
+          <div className="flex gap-2 pt-2">
+            <Button
+              onClick={resetScanner}
+              className="flex-1 bg-gradient-to-r from-lime-500 to-green-500 hover:from-lime-600 hover:to-green-600 h-10 text-xs md:text-sm"
+            >
+              <RefreshCw className="w-3.5 h-3.5 md:w-4 md:h-4 mr-1.5" />
+              Procesar Otro
             </Button>
-            <Button variant="outline" onClick={() => handleModalClose(false)}>
+            <Button
+              variant="outline"
+              onClick={() => handleModalClose(false)}
+              className="border-gray-300 h-10 text-xs md:text-sm px-4"
+            >
               Cerrar
             </Button>
           </div>
