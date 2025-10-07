@@ -26,7 +26,13 @@ import {
   Utensils,
   Hash,
   QrCode,
+  GraduationCap,
+  MapPin,
+  Ticket,
+  Clock,
 } from "lucide-react"
+import { db } from "@/lib/firebase"
+import { doc, onSnapshot } from "firebase/firestore"
 
 interface ScanResult {
   identificacion: string
@@ -51,6 +57,8 @@ export function BuffeteScanner() {
   const [showResult, setShowResult] = useState(false)
   const [manualId, setManualId] = useState("")
   const [activeTab, setActiveTab] = useState<"qr" | "manual">("qr")
+  const [realtimeStudentData, setRealtimeStudentData] = useState<any>(null)
+  const unsubscribeRef = useRef<(() => void) | null>(null)
 
   const webcamRef = useRef<Webcam>(null)
   const codeReader = useRef<BrowserMultiFormatReader | null>(null)
@@ -216,7 +224,7 @@ export function BuffeteScanner() {
           if (err && err.name !== "NotFoundException") {
             if (err.name === "NotReadableError") {
               console.error("[v0] Camera in use by another app")
-              setError("La cámara está en uso. Cierra otras aplicaciones y recarga la página.")
+              setError("La cámara está en uso. Cierra otras aplicaciones e intenta de nuevo.")
               stopCamera()
             }
           }
@@ -261,6 +269,36 @@ export function BuffeteScanner() {
       manualInputRef.current.focus()
     }
   }, [activeTab])
+
+  useEffect(() => {
+    if (scanResult?.identificacion && showResult) {
+      console.log("[v0] Setting up realtime listener for:", scanResult.identificacion)
+
+      const studentDocRef = doc(db, "estudiantes", scanResult.identificacion)
+
+      unsubscribeRef.current = onSnapshot(
+        studentDocRef,
+        (docSnapshot) => {
+          if (docSnapshot.exists()) {
+            const updatedData = docSnapshot.data()
+            console.log("[v0] Realtime update received:", updatedData)
+            setRealtimeStudentData(updatedData)
+          }
+        },
+        (error) => {
+          console.error("[v0] Error in realtime listener:", error)
+        },
+      )
+
+      return () => {
+        if (unsubscribeRef.current) {
+          console.log("[v0] Cleaning up realtime listener")
+          unsubscribeRef.current()
+          unsubscribeRef.current = null
+        }
+      }
+    }
+  }, [scanResult?.identificacion, showResult])
 
   const processStudentAccess = async (identificacion: string) => {
     try {
@@ -343,6 +381,7 @@ export function BuffeteScanner() {
   const resetScanner = () => {
     console.log("[v0] Resetting scanner...")
     setScanResult(null)
+    setRealtimeStudentData(null)
     setShowResult(false)
     setError("")
     setManualId("")
@@ -354,7 +393,12 @@ export function BuffeteScanner() {
     setShowResult(open)
     if (!open) {
       console.log("[v0] Modal closed, resetting state")
+      if (unsubscribeRef.current) {
+        unsubscribeRef.current()
+        unsubscribeRef.current = null
+      }
       setScanResult(null)
+      setRealtimeStudentData(null)
       setIsScanning(false)
       lastScanTime.current = 0
     }
@@ -414,38 +458,41 @@ export function BuffeteScanner() {
     )
   }
 
+  const displayStudent = realtimeStudentData || scanResult?.student
+  const cuposDisponibles = displayStudent
+    ? 2 + (displayStudent.cuposExtras || 0) - (displayStudent.cuposConsumidos || 0)
+    : 0
+
   return (
-    <div className="flex flex-1 flex-col gap-4 p-3 md:p-4">
+    <div className="flex flex-1 flex-col gap-4 p-3 md:p-4 bg-gradient-to-br from-green-50 to-emerald-50 min-h-screen">
       <div className="flex flex-col items-center gap-3">
         <div className="text-center">
-          <h1 className="text-xl md:text-2xl font-bold">Entrega de Comida</h1>
-          <p className="text-sm md:text-base text-muted-foreground">
-            Bufete {user.mesaAsignada} - Escanea QR o ingresa ID
-          </p>
+          <h1 className="text-xl md:text-2xl font-bold text-green-900">Entrega de Comida</h1>
+          <p className="text-sm md:text-base text-green-700">Bufete {user.mesaAsignada} - Escanea QR o ingresa ID</p>
         </div>
 
-        <Badge variant="outline" className="bg-green-50 text-green-700">
+        <Badge variant="outline" className="bg-green-100 text-green-800 border-green-300">
           <Utensils className="w-3 h-3 md:w-4 md:h-4 mr-1" />
           Bufete {user.mesaAsignada}
         </Badge>
 
-        <Card className="w-full max-w-2xl bg-white shadow-lg">
+        <Card className="w-full max-w-2xl bg-white shadow-lg border-green-200">
           <CardContent className="p-4 md:p-6">
-            <h2 className="text-lg md:text-xl font-semibold text-center mb-4 text-gray-800">
+            <h2 className="text-lg md:text-xl font-semibold text-center mb-4 text-green-900">
               Escanea QR o ingresa identificación
             </h2>
             <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "qr" | "manual")} className="w-full">
-              <TabsList className="grid w-full grid-cols-2 mb-4 bg-gray-100">
+              <TabsList className="grid w-full grid-cols-2 mb-4 bg-green-100">
                 <TabsTrigger
                   value="qr"
-                  className="text-sm md:text-base data-[state=active]:bg-green-500 data-[state=active]:text-white"
+                  className="text-sm md:text-base data-[state=active]:bg-green-600 data-[state=active]:text-white"
                 >
                   <QrCode className="w-4 h-4 mr-2" />
                   Escanear QR
                 </TabsTrigger>
                 <TabsTrigger
                   value="manual"
-                  className="text-sm md:text-base data-[state=active]:bg-green-500 data-[state=active]:text-white"
+                  className="text-sm md:text-base data-[state=active]:bg-green-600 data-[state=active]:text-white"
                 >
                   <Hash className="w-4 h-4 mr-2" />
                   Ingreso Manual
@@ -460,7 +507,7 @@ export function BuffeteScanner() {
                   </Alert>
                 )}
 
-                <div className="relative w-full pt-[100%] overflow-hidden rounded-lg bg-card shadow-lg border">
+                <div className="relative w-full pt-[100%] overflow-hidden rounded-lg bg-card shadow-lg border border-green-200">
                   {selectedDeviceId && (
                     <Webcam
                       ref={webcamRef}
@@ -472,13 +519,13 @@ export function BuffeteScanner() {
                       className="absolute inset-0 w-full h-full object-cover"
                     />
                   )}
-                  <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[90%] h-[50%] border-4 border-primary rounded-lg shadow-[0_0_0_9999px_rgba(0,0,0,0.5)]">
-                    <div className="absolute top-1/2 left-[5%] right-[5%] h-[2px] bg-primary animate-scan"></div>
+                  <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[90%] h-[50%] border-4 border-green-500 rounded-lg shadow-[0_0_0_9999px_rgba(0,0,0,0.5)]">
+                    <div className="absolute top-1/2 left-[5%] right-[5%] h-[2px] bg-green-500 animate-scan"></div>
                   </div>
                 </div>
 
-                <div className="text-center p-3 bg-muted rounded-lg">
-                  <p className="text-sm text-muted-foreground">
+                <div className="text-center p-3 bg-green-50 rounded-lg border border-green-200">
+                  <p className="text-sm text-green-700">
                     {processing || isScanning ? (
                       <span className="flex items-center justify-center gap-2">
                         <Loader2 className="w-4 h-4 animate-spin" />
@@ -494,7 +541,7 @@ export function BuffeteScanner() {
               <TabsContent value="manual" className="space-y-4 mt-0">
                 <div className="space-y-4">
                   <div className="space-y-2">
-                    <Label htmlFor="manual-id" className="text-base">
+                    <Label htmlFor="manual-id" className="text-base text-green-900">
                       Número de Identificación
                     </Label>
                     <Input
@@ -511,9 +558,9 @@ export function BuffeteScanner() {
                         }
                       }}
                       disabled={processing}
-                      className="text-lg h-12"
+                      className="text-lg h-12 border-green-300 focus:border-green-500"
                     />
-                    <p className="text-xs text-muted-foreground">Ingresa el número de cédula del estudiante</p>
+                    <p className="text-xs text-green-600">Ingresa el número de cédula del estudiante</p>
                   </div>
 
                   <Button
@@ -524,7 +571,7 @@ export function BuffeteScanner() {
                       }
                     }}
                     disabled={processing || !manualId.trim()}
-                    className="w-full h-12 text-base bg-gradient-to-r from-lime-500 to-green-500 hover:from-lime-600 hover:to-green-600 text-white"
+                    className="w-full h-12 text-base bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white"
                     size="lg"
                   >
                     {processing ? (
@@ -541,8 +588,8 @@ export function BuffeteScanner() {
                   </Button>
                 </div>
 
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                  <p className="text-xs text-blue-900">
+                <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+                  <p className="text-xs text-green-900">
                     <strong>Tip:</strong> El estudiante debe mostrar su documento de identidad para verificar el número.
                   </p>
                 </div>
@@ -553,79 +600,144 @@ export function BuffeteScanner() {
       </div>
 
       <Dialog open={showResult} onOpenChange={handleModalClose}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              {scanResult?.status === "success" && <CheckCircle className="w-5 h-5 text-green-600" />}
-              {scanResult?.status === "no_cupos" && <XCircle className="w-5 h-5 text-red-600" />}
-              {scanResult?.status === "error" && <AlertTriangle className="w-5 h-5 text-red-600" />}
+            <DialogTitle className="flex items-center gap-2 text-lg">
+              {scanResult?.status === "success" && <CheckCircle className="w-6 h-6 text-green-600" />}
+              {scanResult?.status === "no_cupos" && <XCircle className="w-6 h-6 text-red-600" />}
+              {scanResult?.status === "error" && <AlertTriangle className="w-6 h-6 text-orange-600" />}
               Resultado del Proceso
+              {realtimeStudentData && (
+                <Badge variant="outline" className="ml-auto bg-green-50 text-green-700 border-green-200 animate-pulse">
+                  <Clock className="w-3 h-3 mr-1" />
+                  En vivo
+                </Badge>
+              )}
             </DialogTitle>
           </DialogHeader>
 
           <div className="space-y-4">
             {scanResult && (
               <>
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <User className="w-4 h-4 text-muted-foreground" />
-                    <span className="text-sm font-medium">Identificación:</span>
+                <div className="bg-gradient-to-r from-lime-50 to-green-50 rounded-lg p-4 border border-lime-200">
+                  <div className="flex items-center gap-3">
+                    <div className="bg-white rounded-full p-2 shadow-sm">
+                      <User className="w-5 h-5 text-lime-600" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-xs text-gray-600 font-medium">Identificación</p>
+                      <p className="text-lg font-bold text-gray-900">{scanResult.identificacion}</p>
+                    </div>
                   </div>
-                  <Badge variant="outline" className="text-sm">
-                    {scanResult.identificacion}
-                  </Badge>
                 </div>
 
-                {scanResult.status === "success" && scanResult.student && (
-                  <Card className="border-green-200 bg-green-50">
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-sm text-green-800">✅ Comida Entregada</CardTitle>
+                {scanResult.status === "success" && displayStudent && (
+                  <Card className="border-green-200 bg-gradient-to-br from-green-50 to-emerald-50 shadow-lg">
+                    <CardHeader className="pb-3 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-t-lg">
+                      <CardTitle className="text-base flex items-center gap-2">
+                        <CheckCircle className="w-5 h-5" />
+                        Comida Entregada Exitosamente
+                      </CardTitle>
                     </CardHeader>
-                    <CardContent className="space-y-2">
-                      <div>
-                        <span className="font-medium text-sm">Nombre:</span>
-                        <p className="text-sm">{scanResult.student.nombre}</p>
+                    <CardContent className="space-y-4 pt-4">
+                      <div className="space-y-3">
+                        <div className="flex items-start gap-3">
+                          <GraduationCap className="w-5 h-5 text-green-600 mt-0.5" />
+                          <div className="flex-1">
+                            <p className="text-xs text-gray-600 font-medium">Nombre Completo</p>
+                            <p className="text-sm font-bold text-gray-900">{displayStudent.nombre}</p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-start gap-3">
+                          <MapPin className="w-5 h-5 text-green-600 mt-0.5" />
+                          <div className="flex-1">
+                            <p className="text-xs text-gray-600 font-medium">Programa Académico</p>
+                            <p className="text-sm font-semibold text-gray-800">{displayStudent.programa}</p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-start gap-3">
+                          <Utensils className="w-5 h-5 text-green-600 mt-0.5" />
+                          <div className="flex-1">
+                            <p className="text-xs text-gray-600 font-medium">Bufete de Entrega</p>
+                            <Badge className="bg-green-600 hover:bg-green-700 text-white font-bold">
+                              Bufete {user.mesaAsignada}
+                            </Badge>
+                          </div>
+                        </div>
                       </div>
-                      <div>
-                        <span className="font-medium text-sm">Programa:</span>
-                        <p className="text-sm">{scanResult.student.programa}</p>
+
+                      <div className="bg-white rounded-lg p-4 border-2 border-green-200 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <Ticket className="w-4 h-4 text-green-600" />
+                            <span className="text-sm font-semibold text-gray-700">Bufetes Disponibles</span>
+                          </div>
+                          <span className="text-2xl font-bold text-green-600">{cuposDisponibles}</span>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-2 text-xs">
+                          <div className="bg-gray-50 rounded p-2">
+                            <p className="text-gray-600">Total</p>
+                            <p className="font-bold text-gray-900">{2 + (displayStudent.cuposExtras || 0)}</p>
+                          </div>
+                          <div className="bg-orange-50 rounded p-2">
+                            <p className="text-orange-600">Consumidos</p>
+                            <p className="font-bold text-orange-700">{displayStudent.cuposConsumidos || 0}</p>
+                          </div>
+                        </div>
+
+                        <div className="w-full bg-gray-200 rounded-full h-2 mt-2">
+                          <div
+                            className="bg-gradient-to-r from-green-500 to-emerald-500 h-2 rounded-full transition-all duration-500"
+                            style={{
+                              width: `${(cuposDisponibles / (2 + (displayStudent.cuposExtras || 0))) * 100}%`,
+                            }}
+                          />
+                        </div>
                       </div>
-                      <div>
-                        <span className="font-medium text-sm">Bufete:</span>
-                        <p className="text-sm">Bufete {user.mesaAsignada}</p>
+
+                      <div className="text-xs text-green-700 bg-green-100 p-3 rounded-lg font-medium text-center">
+                        {scanResult.message}
                       </div>
-                      <div className="text-xs text-green-700 bg-green-100 p-2 rounded">{scanResult.message}</div>
                     </CardContent>
                   </Card>
                 )}
 
                 {scanResult.status === "no_cupos" && (
-                  <Alert variant="destructive">
-                    <XCircle className="h-4 w-4" />
-                    <AlertDescription>{scanResult.message}</AlertDescription>
+                  <Alert variant="destructive" className="border-red-300 bg-red-50">
+                    <XCircle className="h-5 w-5" />
+                    <AlertDescription className="text-sm font-medium">{scanResult.message}</AlertDescription>
                   </Alert>
                 )}
 
                 {scanResult.status === "error" && (
-                  <Alert variant="destructive">
-                    <AlertTriangle className="h-4 w-4" />
-                    <AlertDescription>{scanResult.message}</AlertDescription>
+                  <Alert variant="destructive" className="border-orange-300 bg-orange-50">
+                    <AlertTriangle className="h-5 w-5 text-orange-600" />
+                    <AlertDescription className="text-sm font-medium text-orange-800">
+                      {scanResult.message}
+                    </AlertDescription>
                   </Alert>
                 )}
 
-                <div className="text-xs text-muted-foreground text-center">
+                <div className="text-xs text-gray-500 text-center flex items-center justify-center gap-1">
+                  <Clock className="w-3 h-3" />
                   Procesado el {new Date(scanResult.timestamp).toLocaleString()}
                 </div>
               </>
             )}
           </div>
 
-          <div className="flex gap-2">
-            <Button onClick={resetScanner} className="flex-1">
+          <div className="flex gap-2 pt-2">
+            <Button
+              onClick={resetScanner}
+              className="flex-1 bg-gradient-to-r from-lime-500 to-green-500 hover:from-lime-600 hover:to-green-600"
+            >
               <RefreshCw className="w-4 h-4 mr-2" />
               Procesar Otro Estudiante
             </Button>
-            <Button variant="outline" onClick={() => handleModalClose(false)}>
+            <Button variant="outline" onClick={() => handleModalClose(false)} className="border-gray-300">
               Cerrar
             </Button>
           </div>
