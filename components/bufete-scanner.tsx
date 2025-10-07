@@ -224,7 +224,20 @@ export function BuffeteScanner() {
             console.log("[v0] QR scanned:", scannedText)
             lastScanTime.current = now
             setIsScanning(true)
-            processStudentAccess(scannedText)
+
+            processStudentAccess(scannedText).catch((error) => {
+              console.error("[v0] Error processing QR scan:", error)
+              setScanResult({
+                identificacion: scannedText,
+                student: null,
+                status: "error",
+                message: "Error al procesar el código QR. Intenta de nuevo.",
+                timestamp: new Date().toISOString(),
+              })
+              setShowResult(true)
+              setProcessing(false)
+              setIsScanning(false)
+            })
           }
           if (err && err.name !== "NotFoundException") {
             if (err.name === "NotReadableError") {
@@ -309,7 +322,11 @@ export function BuffeteScanner() {
       setProcessing(true)
       setError("")
 
-      if (!user || !user.mesaAsignada) {
+      if (!user) {
+        throw new Error("Usuario no autenticado")
+      }
+
+      if (!user.mesaAsignada) {
         setScanResult({
           identificacion,
           student: null,
@@ -319,6 +336,10 @@ export function BuffeteScanner() {
         })
         setShowResult(true)
         return
+      }
+
+      if (!studentStore) {
+        throw new Error("Store de estudiantes no disponible")
       }
 
       const validation = await studentStore.validateMesaAccess(identificacion, user.mesaAsignada)
@@ -379,17 +400,19 @@ export function BuffeteScanner() {
       })
       setShowResult(true)
     } catch (error) {
-      console.error("Error al procesar acceso:", error)
+      console.error("[v0] Error al procesar acceso:", error)
+      const errorMessage = error instanceof Error ? error.message : "Error desconocido al procesar el acceso"
       setScanResult({
         identificacion,
         student: null,
         status: "error",
-        message: "Error al procesar el acceso",
+        message: errorMessage,
         timestamp: new Date().toISOString(),
       })
       setShowResult(true)
     } finally {
       setProcessing(false)
+      setIsScanning(false)
     }
   }
 
