@@ -296,6 +296,26 @@ export function OperativoScanner() {
         const q10Result = await processQ10Url(scannedContent)
 
         if (q10Result.success && q10Result.student) {
+          const alreadyScanned = await checkIfAlreadyScanned(q10Result.identificacion!)
+
+          if (alreadyScanned) {
+            currentScanResult = {
+              type: "error",
+              identificacion: q10Result.identificacion!,
+              message: `Esta persona ya ingresó al evento anteriormente. No se puede volver a escanear.`,
+              source: "q10",
+              timestamp: new Date().toISOString(),
+            }
+            setScanResultDisplay(currentScanResult)
+
+            setTimeout(() => {
+              setScanResultDisplay(null)
+              setProcessing(false)
+            }, 4000)
+            return
+          }
+          // </CHANGE>
+
           await markStudentAccess(q10Result.identificacion!, true, "Acceso concedido al evento", "q10", userInfo)
           currentScanResult = {
             type: "success",
@@ -372,7 +392,7 @@ export function OperativoScanner() {
         setProcessing(false)
       }, 5000)
     },
-    [getStudentById, markStudentAccess, processQ10Url, user, checkIfAlreadyScanned, processing],
+    [getStudentById, markStudentAccess, processQ10Url, user, checkIfAlreadyScanned, processing, fullName, activeRole],
   )
 
   const requestCameraPermission = () => {
