@@ -355,9 +355,14 @@ export function BuffeteScanner() {
 
       await markStudentAccess(identificacion, true, `Comida entregada en Mesa ${user.mesaAsignada}`, "manual", userInfo)
 
+      await new Promise((resolve) => setTimeout(resolve, 500))
+      const updatedStudent = await getStudentById(identificacion)
+
+      console.log("[v0] Datos actualizados después del descuento:", updatedStudent)
+
       setScanResult({
         identificacion,
-        student,
+        student: updatedStudent || student,
         status: "success",
         message: validation.message,
         timestamp: new Date().toISOString(),
@@ -600,15 +605,18 @@ export function BuffeteScanner() {
       </div>
 
       <Dialog open={showResult} onOpenChange={handleModalClose}>
-        <DialogContent className="sm:max-w-lg">
+        <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-lg">
-              {scanResult?.status === "success" && <CheckCircle className="w-6 h-6 text-green-600" />}
-              {scanResult?.status === "no_cupos" && <XCircle className="w-6 h-6 text-red-600" />}
-              {scanResult?.status === "error" && <AlertTriangle className="w-6 h-6 text-orange-600" />}
+            <DialogTitle className="flex items-center gap-2 text-base md:text-lg">
+              {scanResult?.status === "success" && <CheckCircle className="w-5 h-5 md:w-6 md:h-6 text-green-600" />}
+              {scanResult?.status === "no_cupos" && <XCircle className="w-5 h-5 md:w-6 md:h-6 text-red-600" />}
+              {scanResult?.status === "error" && <AlertTriangle className="w-5 h-5 md:w-6 md:h-6 text-orange-600" />}
               Resultado del Proceso
               {realtimeStudentData && (
-                <Badge variant="outline" className="ml-auto bg-green-50 text-green-700 border-green-200 animate-pulse">
+                <Badge
+                  variant="outline"
+                  className="ml-auto bg-green-50 text-green-700 border-green-200 animate-pulse text-xs"
+                >
                   <Clock className="w-3 h-3 mr-1" />
                   En vivo
                 </Badge>
@@ -616,81 +624,87 @@ export function BuffeteScanner() {
             </DialogTitle>
           </DialogHeader>
 
-          <div className="space-y-4">
+          <div className="space-y-3">
             {scanResult && (
               <>
-                <div className="bg-gradient-to-r from-lime-50 to-green-50 rounded-lg p-4 border border-lime-200">
-                  <div className="flex items-center gap-3">
-                    <div className="bg-white rounded-full p-2 shadow-sm">
-                      <User className="w-5 h-5 text-lime-600" />
+                <div className="bg-gradient-to-r from-lime-50 to-green-50 rounded-lg p-3 border border-lime-200">
+                  <div className="flex items-center gap-2">
+                    <div className="bg-white rounded-full p-1.5 shadow-sm">
+                      <User className="w-4 h-4 text-lime-600" />
                     </div>
-                    <div className="flex-1">
-                      <p className="text-xs text-gray-600 font-medium">Identificación</p>
-                      <p className="text-lg font-bold text-gray-900">{scanResult.identificacion}</p>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[10px] text-gray-600 font-medium">Identificación</p>
+                      <p className="text-base md:text-lg font-bold text-gray-900 truncate">
+                        {scanResult.identificacion}
+                      </p>
                     </div>
                   </div>
                 </div>
 
                 {scanResult.status === "success" && displayStudent && (
                   <Card className="border-green-200 bg-gradient-to-br from-green-50 to-emerald-50 shadow-lg">
-                    <CardHeader className="pb-3 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-t-lg">
-                      <CardTitle className="text-base flex items-center gap-2">
-                        <CheckCircle className="w-5 h-5" />
+                    <CardHeader className="pb-2 pt-3 px-3 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-t-lg">
+                      <CardTitle className="text-sm md:text-base flex items-center gap-2">
+                        <CheckCircle className="w-4 h-4 md:w-5 md:h-5" />
                         Comida Entregada Exitosamente
                       </CardTitle>
                     </CardHeader>
-                    <CardContent className="space-y-4 pt-4">
-                      <div className="space-y-3">
-                        <div className="flex items-start gap-3">
-                          <GraduationCap className="w-5 h-5 text-green-600 mt-0.5" />
-                          <div className="flex-1">
-                            <p className="text-xs text-gray-600 font-medium">Nombre Completo</p>
-                            <p className="text-sm font-bold text-gray-900">{displayStudent.nombre}</p>
+                    <CardContent className="space-y-3 pt-3 px-3 pb-3">
+                      <div className="space-y-2">
+                        <div className="flex items-start gap-2">
+                          <GraduationCap className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-[10px] text-gray-600 font-medium">Nombre Completo</p>
+                            <p className="text-xs md:text-sm font-bold text-gray-900 break-words">
+                              {displayStudent.nombre}
+                            </p>
                           </div>
                         </div>
 
-                        <div className="flex items-start gap-3">
-                          <MapPin className="w-5 h-5 text-green-600 mt-0.5" />
-                          <div className="flex-1">
-                            <p className="text-xs text-gray-600 font-medium">Programa Académico</p>
-                            <p className="text-sm font-semibold text-gray-800">{displayStudent.programa}</p>
+                        <div className="flex items-start gap-2">
+                          <MapPin className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-[10px] text-gray-600 font-medium">Programa Académico</p>
+                            <p className="text-xs md:text-sm font-semibold text-gray-800 break-words">
+                              {displayStudent.programa}
+                            </p>
                           </div>
                         </div>
 
-                        <div className="flex items-start gap-3">
-                          <Utensils className="w-5 h-5 text-green-600 mt-0.5" />
-                          <div className="flex-1">
-                            <p className="text-xs text-gray-600 font-medium">Bufete de Entrega</p>
-                            <Badge className="bg-green-600 hover:bg-green-700 text-white font-bold">
+                        <div className="flex items-start gap-2">
+                          <Utensils className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-[10px] text-gray-600 font-medium">Bufete de Entrega</p>
+                            <Badge className="bg-green-600 hover:bg-green-700 text-white font-bold text-xs">
                               Bufete {user.mesaAsignada}
                             </Badge>
                           </div>
                         </div>
                       </div>
 
-                      <div className="bg-white rounded-lg p-4 border-2 border-green-200 space-y-2">
+                      <div className="bg-white rounded-lg p-3 border-2 border-green-200 space-y-2">
                         <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <Ticket className="w-4 h-4 text-green-600" />
-                            <span className="text-sm font-semibold text-gray-700">Bufetes Disponibles</span>
+                          <div className="flex items-center gap-1.5">
+                            <Ticket className="w-3.5 h-3.5 text-green-600" />
+                            <span className="text-xs md:text-sm font-semibold text-gray-700">Bufetes Disponibles</span>
                           </div>
-                          <span className="text-2xl font-bold text-green-600">{cuposDisponibles}</span>
+                          <span className="text-xl md:text-2xl font-bold text-green-600">{cuposDisponibles}</span>
                         </div>
 
-                        <div className="grid grid-cols-2 gap-2 text-xs">
-                          <div className="bg-gray-50 rounded p-2">
+                        <div className="grid grid-cols-2 gap-1.5 text-[10px] md:text-xs">
+                          <div className="bg-gray-50 rounded p-1.5">
                             <p className="text-gray-600">Total</p>
-                            <p className="font-bold text-gray-900">{2 + (displayStudent.cuposExtras || 0)}</p>
+                            <p className="font-bold text-gray-900 text-sm">{2 + (displayStudent.cuposExtras || 0)}</p>
                           </div>
-                          <div className="bg-orange-50 rounded p-2">
+                          <div className="bg-orange-50 rounded p-1.5">
                             <p className="text-orange-600">Consumidos</p>
-                            <p className="font-bold text-orange-700">{displayStudent.cuposConsumidos || 0}</p>
+                            <p className="font-bold text-orange-700 text-sm">{displayStudent.cuposConsumidos || 0}</p>
                           </div>
                         </div>
 
-                        <div className="w-full bg-gray-200 rounded-full h-2 mt-2">
+                        <div className="w-full bg-gray-200 rounded-full h-1.5 mt-1">
                           <div
-                            className="bg-gradient-to-r from-green-500 to-emerald-500 h-2 rounded-full transition-all duration-500"
+                            className="bg-gradient-to-r from-green-500 to-emerald-500 h-1.5 rounded-full transition-all duration-500"
                             style={{
                               width: `${(cuposDisponibles / (2 + (displayStudent.cuposExtras || 0))) * 100}%`,
                             }}
@@ -698,7 +712,7 @@ export function BuffeteScanner() {
                         </div>
                       </div>
 
-                      <div className="text-xs text-green-700 bg-green-100 p-3 rounded-lg font-medium text-center">
+                      <div className="text-[10px] md:text-xs text-green-700 bg-green-100 p-2 rounded-lg font-medium text-center">
                         {scanResult.message}
                       </div>
                     </CardContent>
@@ -707,21 +721,21 @@ export function BuffeteScanner() {
 
                 {scanResult.status === "no_cupos" && (
                   <Alert variant="destructive" className="border-red-300 bg-red-50">
-                    <XCircle className="h-5 w-5" />
-                    <AlertDescription className="text-sm font-medium">{scanResult.message}</AlertDescription>
+                    <XCircle className="h-4 w-4 md:h-5 md:w-5" />
+                    <AlertDescription className="text-xs md:text-sm font-medium">{scanResult.message}</AlertDescription>
                   </Alert>
                 )}
 
                 {scanResult.status === "error" && (
                   <Alert variant="destructive" className="border-orange-300 bg-orange-50">
-                    <AlertTriangle className="h-5 w-5 text-orange-600" />
-                    <AlertDescription className="text-sm font-medium text-orange-800">
+                    <AlertTriangle className="h-4 w-4 md:h-5 md:w-5 text-orange-600" />
+                    <AlertDescription className="text-xs md:text-sm font-medium text-orange-800">
                       {scanResult.message}
                     </AlertDescription>
                   </Alert>
                 )}
 
-                <div className="text-xs text-gray-500 text-center flex items-center justify-center gap-1">
+                <div className="text-[10px] md:text-xs text-gray-500 text-center flex items-center justify-center gap-1">
                   <Clock className="w-3 h-3" />
                   Procesado el {new Date(scanResult.timestamp).toLocaleString()}
                 </div>
@@ -732,12 +746,16 @@ export function BuffeteScanner() {
           <div className="flex gap-2 pt-2">
             <Button
               onClick={resetScanner}
-              className="flex-1 bg-gradient-to-r from-lime-500 to-green-500 hover:from-lime-600 hover:to-green-600"
+              className="flex-1 bg-gradient-to-r from-lime-500 to-green-500 hover:from-lime-600 hover:to-green-600 h-10 text-xs md:text-sm"
             >
-              <RefreshCw className="w-4 h-4 mr-2" />
-              Procesar Otro Estudiante
+              <RefreshCw className="w-3.5 h-3.5 md:w-4 md:h-4 mr-1.5" />
+              Procesar Otro
             </Button>
-            <Button variant="outline" onClick={() => handleModalClose(false)} className="border-gray-300">
+            <Button
+              variant="outline"
+              onClick={() => handleModalClose(false)}
+              className="border-gray-300 h-10 text-xs md:text-sm px-4"
+            >
               Cerrar
             </Button>
           </div>
