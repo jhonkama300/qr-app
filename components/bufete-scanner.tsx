@@ -13,6 +13,7 @@ import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useAuth } from "@/components/auth-provider"
 import { useStudentStoreContext } from "@/components/providers/student-store-provider"
+import { useQ10Validation } from "@/hooks/use-q10-validation"
 import {
   Loader2,
   Camera,
@@ -40,11 +41,13 @@ interface ScanResult {
   status: "success" | "error" | "no_cupos"
   message: string
   timestamp: string
+  source?: "direct" | "q10" | "manual"
 }
 
 export function BuffeteScanner() {
   const { user, fullName, activeRole, loading: authLoading } = useAuth()
   const studentStore = useStudentStoreContext()
+  const { processQ10Url, isProcessingQ10, q10Message } = useQ10Validation()
 
   const [isClient, setIsClient] = useState(false)
   const [hasPermission, setHasPermission] = useState<boolean | null>(null)
@@ -168,7 +171,7 @@ export function BuffeteScanner() {
   }, [isClient, requestCamera])
 
   const processScanResult = useCallback(
-    async (identificacion: string, source: "direct" | "manual") => {
+    async (scannedContent: string, source: "direct" | "q10" | "manual") => {
       if (processing) {
         console.log("[v0] Scan already in progress, ignoring")
         return
@@ -184,11 +187,12 @@ export function BuffeteScanner() {
 
         if (!user.mesaAsignada) {
           setScanResult({
-            identificacion,
+            identificacion: scannedContent,
             student: null,
             status: "error",
             message: "Usuario sin mesa asignada",
             timestamp: new Date().toISOString(),
+            source,
           })
           setShowResult(true)
           return
@@ -197,6 +201,81 @@ export function BuffeteScanner() {
         if (!studentStore) {
           throw new Error("Store de estudiantes no disponible")
         }
+
+        if (
+          scannedContent.startsWith("https://site2.q10.com/CertificadosAcademicos/") ||
+          scannedContent.startsWith("https://uparsistemvalledupar.q10.com/CertificadosAcademicos/")
+        ) {
+          console.log("[v0] Q10 URL detected, processing certificate...")
+          setScanResult({
+            identificacion: scannedContent,
+            student: null,
+            status: "success",
+            message: "Procesando certificado Q10...",
+            timestamp: new Date().toISOString(),
+            source: "q10",
+          })
+          setShowResult(true)
+
+          try {
+            const q10Result = await processQ10Url(scannedContent)
+
+            if (q10Result.success && q10Result.student) {
+              const userInfo = {
+                userId: user.id,
+                userName: fullName || user.fullName || "Usuario Bufete",
+                userEmail: user.idNumber + "@sistema.com",
+                userRole: activeRole || "bufete",
+                mesaAsignada: user.mesaAsignada,
+              }
+
+              await studentStore.markStudentAccess(
+                q10Result.identificacion!,
+                true,
+                `Comida entregada en Mesa ${user.mesaAsignada}`,
+                "q10",
+                userInfo,
+              )
+
+              await new Promise((resolve) => setTimeout(resolve, 500))
+              const updatedStudent = await studentStore.getStudentById(q10Result.identificacion!)
+
+              setScanResult({
+                identificacion: q10Result.identificacion!,
+                student: updatedStudent || q10Result.student,
+                status: "success",
+                message: q10Result.message,
+                timestamp: new Date().toISOString(),
+                source: "q10",
+              })
+            } else {
+              setScanResult({
+                identificacion: q10Result.identificacion || scannedContent,
+                student: null,
+                status: q10Result.type as "denied" | "error",
+                message: q10Result.message,
+                timestamp: new Date().toISOString(),
+                source: "q10",
+              })
+            }
+            setShowResult(true)
+            return
+          } catch (q10Error) {
+            console.error("[v0] Error processing Q10 certificate:", q10Error)
+            setScanResult({
+              identificacion: scannedContent,
+              student: null,
+              status: "error",
+              message: "Error al procesar certificado Q10",
+              timestamp: new Date().toISOString(),
+              source: "q10",
+            })
+            setShowResult(true)
+            return
+          }
+        }
+
+        const identificacion = scannedContent
 
         const validation = await studentStore.validateMesaAccess(identificacion, user.mesaAsignada)
 
@@ -207,6 +286,7 @@ export function BuffeteScanner() {
             status: "no_cupos",
             message: validation.message,
             timestamp: new Date().toISOString(),
+            source,
           })
           setShowResult(true)
           return
@@ -221,6 +301,7 @@ export function BuffeteScanner() {
             status: "error",
             message: "Estudiante no encontrado en la base de datos",
             timestamp: new Date().toISOString(),
+            source,
           })
           setShowResult(true)
           return
@@ -238,7 +319,7 @@ export function BuffeteScanner() {
           identificacion,
           true,
           `Comida entregada en Mesa ${user.mesaAsignada}`,
-          "manual",
+          source === "q10" ? "q10" : "manual",
           userInfo,
         )
 
@@ -253,28 +334,38 @@ export function BuffeteScanner() {
           status: "success",
           message: validation.message,
           timestamp: new Date().toISOString(),
+          source,
         })
         setShowResult(true)
       } catch (error) {
         console.error("[v0] Error al procesar acceso:", error)
         const errorMessage = error instanceof Error ? error.message : "Error desconocido al procesar el acceso"
         setScanResult({
-          identificacion,
+          identificacion: scannedContent,
           student: null,
           status: "error",
           message: errorMessage,
           timestamp: new Date().toISOString(),
+          source,
         })
         setShowResult(true)
       } finally {
         setProcessing(false)
       }
     },
-    [processing, user, studentStore, fullName, activeRole],
+    [processing, user, studentStore, fullName, activeRole, processQ10Url],
   )
 
   useEffect(() => {
-    if (!isClient || !hasPermission || !selectedDeviceId || processing || !codeReader.current || activeTab !== "qr") {
+    if (
+      !isClient ||
+      !hasPermission ||
+      !selectedDeviceId ||
+      processing ||
+      isProcessingQ10 ||
+      !codeReader.current ||
+      activeTab !== "qr"
+    ) {
       if (codeReader.current && scannerActive.current) {
         console.log("[v0] Stopping scanner (conditions not met)")
         stopCamera()
@@ -308,7 +399,7 @@ export function BuffeteScanner() {
         await codeReader.current!.decodeFromVideoDevice(selectedDeviceId, video, (result, err) => {
           clearTimeout(initTimeout)
 
-          if (result && !processing) {
+          if (result && !processing && !isProcessingQ10) {
             const scannedText = result.getText()
             console.log("[v0] QR scanned:", scannedText)
             processScanResult(scannedText, "direct")
@@ -346,7 +437,7 @@ export function BuffeteScanner() {
       console.log("[v0] Cleaning up scanner...")
       stopCamera()
     }
-  }, [isClient, hasPermission, selectedDeviceId, processing, activeTab, stopCamera, processScanResult])
+  }, [isClient, hasPermission, selectedDeviceId, processing, isProcessingQ10, activeTab, stopCamera, processScanResult])
 
   useEffect(() => {
     return () => {
@@ -547,10 +638,10 @@ export function BuffeteScanner() {
 
                 <div className="text-center p-3 bg-green-50 rounded-lg border border-green-200">
                   <p className="text-sm text-green-700">
-                    {processing ? (
+                    {processing || isProcessingQ10 ? (
                       <span className="flex items-center justify-center gap-2">
                         <Loader2 className="w-4 h-4 animate-spin" />
-                        Procesando...
+                        {isProcessingQ10 ? "Procesando certificado Q10..." : "Procesando..."}
                       </span>
                     ) : (
                       "Apunta la cámara al código QR del estudiante"
@@ -573,12 +664,12 @@ export function BuffeteScanner() {
                       value={manualId}
                       onChange={(e) => setManualId(e.target.value)}
                       onKeyPress={(e) => {
-                        if (e.key === "Enter" && manualId.trim() && !processing) {
+                        if (e.key === "Enter" && manualId.trim() && !processing && !isProcessingQ10) {
                           processScanResult(manualId.trim(), "manual")
                           setManualId("")
                         }
                       }}
-                      disabled={processing}
+                      disabled={processing || isProcessingQ10}
                       className="text-lg h-12 border-green-300 focus:border-green-500"
                     />
                     <p className="text-xs text-green-600">Ingresa el número de cédula del estudiante</p>
@@ -591,14 +682,14 @@ export function BuffeteScanner() {
                         setManualId("")
                       }
                     }}
-                    disabled={processing || !manualId.trim()}
+                    disabled={processing || isProcessingQ10 || !manualId.trim()}
                     className="w-full h-12 text-base bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white"
                     size="lg"
                   >
-                    {processing ? (
+                    {processing || isProcessingQ10 ? (
                       <>
                         <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                        Procesando...
+                        {isProcessingQ10 ? "Procesando Q10..." : "Procesando..."}
                       </>
                     ) : (
                       <>
@@ -730,6 +821,14 @@ export function BuffeteScanner() {
 
                       <div className="text-[10px] md:text-xs text-green-700 bg-green-100 p-2 rounded-lg font-medium text-center">
                         {scanResult.message}
+                        {scanResult.source === "q10" && (
+                          <Badge
+                            variant="outline"
+                            className="ml-2 bg-blue-50 text-blue-700 border-blue-200 text-[10px]"
+                          >
+                            Q10
+                          </Badge>
+                        )}
                       </div>
                     </CardContent>
                   </Card>
