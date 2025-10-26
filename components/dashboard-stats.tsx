@@ -36,7 +36,7 @@ interface AccessLog {
   grantedByUserId?: string
   grantedByUserName?: string
   grantedByUserEmail?: string
-  grantedByUserRole?: string // Agregado campo de rol
+  grantedByUserRole?: string
   mesaUsada?: number
 }
 
@@ -44,7 +44,7 @@ interface UserStats {
   userId: string
   userName: string
   userEmail: string
-  userRole: string // Agregado campo de rol
+  userRole: string
   accedidos: number
   denegados: number
   total: number
@@ -73,7 +73,11 @@ interface UserData {
   idNumber: string
 }
 
-export function DashboardStats() {
+interface DashboardStatsProps {
+  currentUserRole?: string
+}
+
+export function DashboardStats({ currentUserRole = "administrador" }: DashboardStatsProps) {
   const [allPersons, setAllPersons] = useState<PersonData[]>([])
   const [accessLogs, setAccessLogs] = useState<AccessLog[]>([])
   const [loading, setLoading] = useState(true)
@@ -239,14 +243,41 @@ export function DashboardStats() {
     }
   }
 
+  const getFilteredLogs = () => {
+    // Filtrar según el rol del usuario actual
+    const filteredLogs = accessLogs.filter((log) => {
+      if (currentUserRole === "bufete") {
+        // Solo logs de bufete (tienen mesaUsada)
+        return log.mesaUsada !== undefined
+      } else {
+        // Solo logs de operativo/administrador (no tienen mesaUsada)
+        return log.mesaUsada === undefined
+      }
+    })
+
+    console.log("[v0] Logs filtrados por rol:", {
+      currentUserRole,
+      totalLogs: accessLogs.length,
+      filteredLogs: filteredLogs.length,
+    })
+
+    return filteredLogs
+  }
+
   const getUserStats = async (): Promise<UserStats[]> => {
     const userStatsMap = new Map<string, UserStats>()
 
-    for (const log of accessLogs) {
+    const filteredLogs = getFilteredLogs()
+
+    const userAccessMap = new Map<string, Set<string>>() // userId -> Set de identificaciones únicas accedidas
+
+    for (const log of filteredLogs) {
       console.log("[v0] Procesando log en getUserStats:", {
         grantedByUserId: log.grantedByUserId,
         grantedByUserName: log.grantedByUserName,
         grantedByUserRole: log.grantedByUserRole,
+        identificacion: log.identificacion,
+        status: log.status,
       })
 
       if (log.grantedByUserId) {
@@ -268,24 +299,44 @@ export function DashboardStats() {
         const isDenied = log.status === "denied" || log.status === "q10_failed"
 
         if (existing) {
-          if (isGranted) existing.accedidos++
+          if (isGranted) {
+            const userAccesses = userAccessMap.get(log.grantedByUserId) || new Set()
+            if (!userAccesses.has(log.identificacion)) {
+              userAccesses.add(log.identificacion)
+              userAccessMap.set(log.grantedByUserId, userAccesses)
+              existing.accedidos++
+            }
+          }
+          // Los denegados se cuentan siempre (cada intento fallido)
           if (isDenied) existing.denegados++
-          existing.total++
+          existing.total = existing.accedidos + existing.denegados
         } else {
+          const accedidos = isGranted ? 1 : 0
+          const denegados = isDenied ? 1 : 0
+
           userStatsMap.set(log.grantedByUserId, {
             userId: log.grantedByUserId,
             userName: userName,
             userEmail: log.grantedByUserEmail || "",
             userRole: userRole,
-            accedidos: isGranted ? 1 : 0,
-            denegados: isDenied ? 1 : 0,
-            total: 1,
+            accedidos,
+            denegados,
+            total: accedidos + denegados,
           })
+
+          if (isGranted) {
+            const userAccesses = new Set<string>()
+            userAccesses.add(log.identificacion)
+            userAccessMap.set(log.grantedByUserId, userAccesses)
+          }
         }
       }
     }
 
-    const stats = Array.from(userStatsMap.values()).sort((a, b) => b.total - a.total)
+    const stats = Array.from(userStatsMap.values())
+      .filter((stat) => stat.userName !== "Usuario desconocido")
+      .sort((a, b) => b.total - a.total)
+
     console.log("[v0] Estadísticas de usuarios calculadas:", stats)
     return stats
   }
@@ -298,11 +349,13 @@ export function DashboardStats() {
     if (accessLogs.length > 0) {
       loadUserStats()
     }
-  }, [accessLogs, realTimeUpdates])
+  }, [accessLogs, realTimeUpdates, currentUserRole])
 
   const getUniqueAccessLogs = () => {
+    const filteredLogs = getFilteredLogs()
     const uniqueLogs = new Map<string, AccessLog>()
-    accessLogs.forEach((log) => {
+
+    filteredLogs.forEach((log) => {
       if (
         !uniqueLogs.has(log.identificacion) ||
         new Date(log.timestamp) > new Date(uniqueLogs.get(log.identificacion)!.timestamp)

@@ -273,7 +273,7 @@ export function SPADashboard({ initialView = "inicio" }: SPADashboardProps) {
             </div>
           )
         }
-        return <DashboardStats />
+        return <DashboardStats currentUserRole={userRole} />
       case "escanear":
         if (userRole === "bufete") {
           return <BuffeteScanner key={`bufete-${scannerKey}`} />
@@ -309,7 +309,7 @@ export function SPADashboard({ initialView = "inicio" }: SPADashboardProps) {
       case "bufetes-gestion":
         if (!isBufete) {
           setCurrentView("inicio")
-          return <DashboardStats />
+          return <DashboardStats currentUserRole={userRole} />
         }
         return (
           <div className="flex flex-col gap-3 p-3 md:p-4">
@@ -402,23 +402,23 @@ export function SPADashboard({ initialView = "inicio" }: SPADashboardProps) {
       case "control-bufetes":
         if (!isAdmin) {
           setCurrentView("inicio")
-          return <DashboardStats />
+          return <DashboardStats currentUserRole={userRole} />
         }
         return <MesaControlAdmin />
       case "usuarios":
         if (!isAdmin) {
           setCurrentView("inicio")
-          return <DashboardStats />
+          return <DashboardStats currentUserRole={userRole} />
         }
         return <UserManagement />
       case "base-datos":
         if (!isAdmin) {
           setCurrentView("inicio")
-          return <DashboardStats />
+          return <DashboardStats currentUserRole={userRole} />
         }
         return <DatabaseManagement />
       default:
-        return <DashboardStats />
+        return <DashboardStats currentUserRole={userRole} />
     }
   }
 
