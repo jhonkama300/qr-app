@@ -302,7 +302,7 @@ export function OperativoScanner() {
             currentScanResult = {
               type: "error",
               identificacion: q10Result.identificacion!,
-              message: `Esta persona ya ingresó al evento anteriormente. No se puede volver a escanear.`,
+              message: `❌ Este código ya fue escaneado anteriormente. No se permite el ingreso duplicado.`,
               source: "q10",
               timestamp: new Date().toISOString(),
             }
@@ -340,7 +340,7 @@ export function OperativoScanner() {
           currentScanResult = {
             type: "error",
             identificacion: scannedContent,
-            message: `Esta persona ya ingresó al evento anteriormente. No se puede volver a escanear.`,
+            message: `❌ Este código ya fue escaneado anteriormente. No se permite el ingreso duplicado.`,
             source: source,
             timestamp: new Date().toISOString(),
           }

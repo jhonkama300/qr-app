@@ -230,7 +230,7 @@ export function BarcodeScanner() {
           currentScanResult = {
             type: "error",
             identificacion: scannedContent,
-            message: `Este usuario ya fue escaneado anteriormente. No se puede volver a escanear.`,
+            message: `❌ Este código ya fue escaneado anteriormente. No se permite el ingreso duplicado.`,
             source: source,
             timestamp: new Date().toISOString(),
           }

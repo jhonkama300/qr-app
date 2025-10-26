@@ -183,7 +183,10 @@ export function StudentStoreProvider({ children }: { children: React.ReactNode }
         const cuposDisponibles = cuposTotales - cuposConsumidos
 
         if (cuposDisponibles <= 0) {
-          return { valid: false, message: "No tiene cupos disponibles. Ya consumió todas sus comidas." }
+          return {
+            valid: false,
+            message: `❌ Se acabaron los cupos de comida. Ya consumió todas sus ${cuposTotales} comidas disponibles.`,
+          }
         }
 
         return {
