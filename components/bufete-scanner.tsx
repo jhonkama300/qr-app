@@ -221,6 +221,22 @@ export function BuffeteScanner() {
             const q10Result = await processQ10Url(scannedContent)
 
             if (q10Result.success && q10Result.student) {
+              const validation = await studentStore.validateMesaAccess(q10Result.identificacion!, user.mesaAsignada)
+
+              if (!validation.valid) {
+                setScanResult({
+                  identificacion: q10Result.identificacion!,
+                  student: q10Result.student,
+                  status: "no_cupos",
+                  message: validation.message,
+                  timestamp: new Date().toISOString(),
+                  source: "q10",
+                })
+                setShowResult(true)
+                setProcessing(false)
+                return
+              }
+
               const userInfo = {
                 userId: user.id,
                 userName: fullName || user.fullName || "Usuario Bufete",
@@ -244,7 +260,7 @@ export function BuffeteScanner() {
                 identificacion: q10Result.identificacion!,
                 student: updatedStudent || q10Result.student,
                 status: "success",
-                message: q10Result.message,
+                message: validation.message,
                 timestamp: new Date().toISOString(),
                 source: "q10",
               })
@@ -282,6 +298,16 @@ export function BuffeteScanner() {
         const validation = await studentStore.validateMesaAccess(identificacion, user.mesaAsignada)
 
         if (!validation.valid) {
+          const userInfo = {
+            userId: user.id,
+            userName: fullName || user.fullName || "Usuario Bufete",
+            userEmail: user.idNumber + "@sistema.com",
+            userRole: activeRole || "bufete",
+            mesaAsignada: user.mesaAsignada,
+          }
+
+          await studentStore.markStudentAccess(identificacion, false, validation.message, source, userInfo)
+
           setScanResult({
             identificacion,
             student: null,
