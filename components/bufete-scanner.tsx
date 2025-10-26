@@ -16,7 +16,6 @@ import { useStudentStoreContext } from "@/components/providers/student-store-pro
 import { useQ10Validation } from "@/hooks/use-q10-validation"
 import {
   Loader2,
-  Camera,
   CameraOff,
   CheckCircle,
   XCircle,
@@ -459,9 +458,19 @@ export function BuffeteScanner() {
   }, [activeTab])
 
   useEffect(() => {
-    if (scanResult?.identificacion && showResult) {
-      console.log("[v0] Setting up realtime listener for:", scanResult.identificacion)
+    if (!scanResult?.identificacion || !showResult) {
+      return
+    }
 
+    // Validar que la identificación sea válida antes de crear el listener
+    if (typeof scanResult.identificacion !== "string" || scanResult.identificacion.trim() === "") {
+      console.error("[v0] Invalid identificacion for realtime listener:", scanResult.identificacion)
+      return
+    }
+
+    console.log("[v0] Setting up realtime listener for:", scanResult.identificacion)
+
+    try {
       const studentDocRef = doc(db, "personas", scanResult.identificacion)
 
       unsubscribeRef.current = onSnapshot(
@@ -471,19 +480,29 @@ export function BuffeteScanner() {
             const updatedData = docSnapshot.data()
             console.log("[v0] Realtime update received:", updatedData)
             setRealtimeStudentData(updatedData)
+          } else {
+            console.log("[v0] Document does not exist:", scanResult.identificacion)
           }
         },
         (error) => {
           console.error("[v0] Error in realtime listener:", error)
+          // No lanzar el error, solo registrarlo
         },
       )
+    } catch (error) {
+      console.error("[v0] Error setting up realtime listener:", error)
+      // No lanzar el error, solo registrarlo
+    }
 
-      return () => {
-        if (unsubscribeRef.current) {
-          console.log("[v0] Cleaning up realtime listener")
+    return () => {
+      if (unsubscribeRef.current) {
+        console.log("[v0] Cleaning up realtime listener")
+        try {
           unsubscribeRef.current()
-          unsubscribeRef.current = null
+        } catch (error) {
+          console.error("[v0] Error cleaning up listener:", error)
         }
+        unsubscribeRef.current = null
       }
     }
   }, [scanResult?.identificacion, showResult])
@@ -556,20 +575,10 @@ export function BuffeteScanner() {
     return (
       <div className="flex flex-col items-center justify-center p-8 text-center bg-card rounded-lg border shadow-sm">
         <CameraOff className="text-destructive mb-6 size-20" />
-        <h3 className="text-2xl font-bold mb-3">Acceso a la cámara denegado</h3>
-        <p className="text-muted-foreground mb-8 text-base">
-          {error || "Se requiere acceso a la cámara para escanear códigos QR."}
+        <h3 className="text-2xl md:text-2xl font-bold text-green-900">Entrega de Comida</h3>
+        <p className="text-sm md:text-base text-green-700">
+          Bufete {user?.mesaAsignada || "N/A"} - Escanea QR o ingresa ID
         </p>
-        <div className="flex gap-2">
-          <Button onClick={requestCamera} className="h-12 px-6 text-base">
-            <Camera className="mr-2 size-5" />
-            Permitir acceso
-          </Button>
-          <Button onClick={() => setActiveTab("manual")} variant="outline" className="h-12 px-6 text-base">
-            <Hash className="mr-2 size-5" />
-            Ingresar ID
-          </Button>
-        </div>
       </div>
     )
   }
