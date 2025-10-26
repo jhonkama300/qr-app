@@ -195,6 +195,7 @@ export function BuffeteScanner() {
             source,
           })
           setShowResult(true)
+          setProcessing(false)
           return
         }
 
@@ -259,6 +260,7 @@ export function BuffeteScanner() {
               })
             }
             setShowResult(true)
+            setProcessing(false)
             return
           } catch (q10Error) {
             console.error("[v0] Error processing Q10 certificate:", q10Error)
@@ -271,6 +273,7 @@ export function BuffeteScanner() {
               source: "q10",
             })
             setShowResult(true)
+            setProcessing(false)
             return
           }
         }
@@ -289,6 +292,7 @@ export function BuffeteScanner() {
             source,
           })
           setShowResult(true)
+          setProcessing(false)
           return
         }
 
@@ -304,6 +308,7 @@ export function BuffeteScanner() {
             source,
           })
           setShowResult(true)
+          setProcessing(false)
           return
         }
 
@@ -337,6 +342,7 @@ export function BuffeteScanner() {
           source,
         })
         setShowResult(true)
+        setProcessing(false)
       } catch (error) {
         console.error("[v0] Error al procesar acceso:", error)
         const errorMessage = error instanceof Error ? error.message : "Error desconocido al procesar el acceso"
@@ -456,7 +462,7 @@ export function BuffeteScanner() {
     if (scanResult?.identificacion && showResult) {
       console.log("[v0] Setting up realtime listener for:", scanResult.identificacion)
 
-      const studentDocRef = doc(db, "estudiantes", scanResult.identificacion)
+      const studentDocRef = doc(db, "personas", scanResult.identificacion)
 
       unsubscribeRef.current = onSnapshot(
         studentDocRef,

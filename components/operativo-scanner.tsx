@@ -307,14 +307,9 @@ export function OperativoScanner() {
               timestamp: new Date().toISOString(),
             }
             setScanResultDisplay(currentScanResult)
-
-            setTimeout(() => {
-              setScanResultDisplay(null)
-              setProcessing(false)
-            }, 4000)
+            setProcessing(false)
             return
           }
-          // </CHANGE>
 
           await markStudentAccess(q10Result.identificacion!, true, "Acceso concedido al evento", "q10", userInfo)
           currentScanResult = {
@@ -336,11 +331,7 @@ export function OperativoScanner() {
         }
 
         setScanResultDisplay(currentScanResult)
-
-        setTimeout(() => {
-          setScanResultDisplay(null)
-          setProcessing(false)
-        }, 5000)
+        setProcessing(false)
         return
       } else {
         const alreadyScanned = await checkIfAlreadyScanned(scannedContent)
@@ -354,11 +345,7 @@ export function OperativoScanner() {
             timestamp: new Date().toISOString(),
           }
           setScanResultDisplay(currentScanResult)
-
-          setTimeout(() => {
-            setScanResultDisplay(null)
-            setProcessing(false)
-          }, 4000)
+          setProcessing(false)
           return
         }
 
@@ -386,11 +373,7 @@ export function OperativoScanner() {
       }
 
       setScanResultDisplay(currentScanResult)
-
-      setTimeout(() => {
-        setScanResultDisplay(null)
-        setProcessing(false)
-      }, 5000)
+      setProcessing(false)
     },
     [getStudentById, markStudentAccess, processQ10Url, user, checkIfAlreadyScanned, processing, fullName, activeRole],
   )

@@ -221,13 +221,7 @@ export function BarcodeScanner() {
 
         setScanResultDisplay(currentScanResult)
         setShowResult(true)
-
-        setTimeout(() => {
-          setShowResult(false)
-          setScanResultDisplay(null)
-          setIsScanning(false)
-          lastScanTime.current = 0
-        }, 5000)
+        setIsScanning(false)
         return
       } else {
         const alreadyScanned = await checkIfAlreadyScanned(scannedContent)
@@ -242,12 +236,7 @@ export function BarcodeScanner() {
           }
           setScanResultDisplay(currentScanResult)
           setShowResult(true)
-
-          setTimeout(() => {
-            setScanResultDisplay(null)
-            setShowResult(false)
-            setIsScanning(false)
-          }, 4000)
+          setIsScanning(false)
           return
         }
 
@@ -276,13 +265,7 @@ export function BarcodeScanner() {
 
       setScanResultDisplay(currentScanResult)
       setShowResult(true)
-
-      setTimeout(() => {
-        setShowResult(false)
-        setScanResultDisplay(null)
-        setIsScanning(false)
-        lastScanTime.current = 0
-      }, 5000)
+      setIsScanning(false)
     },
     [getStudentById, markStudentAccess, processQ10Url, user, checkIfAlreadyScanned, isScanning, fullName, activeRole],
   )
