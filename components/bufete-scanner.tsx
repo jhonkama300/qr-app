@@ -224,6 +224,22 @@ export function BuffeteScanner() {
               const validation = await studentStore.validateMesaAccess(q10Result.identificacion!, user.mesaAsignada)
 
               if (!validation.valid) {
+                const userInfo = {
+                  userId: user.id,
+                  userName: fullName || user.fullName || "Usuario Bufete",
+                  userEmail: user.idNumber + "@sistema.com",
+                  userRole: activeRole || "bufete",
+                  mesaAsignada: user.mesaAsignada,
+                }
+
+                await studentStore.markStudentAccess(
+                  q10Result.identificacion!,
+                  false,
+                  validation.message,
+                  "q10",
+                  userInfo,
+                )
+
                 setScanResult({
                   identificacion: q10Result.identificacion!,
                   student: q10Result.student,

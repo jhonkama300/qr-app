@@ -157,13 +157,8 @@ export function StudentStoreProvider({ children }: { children: React.ReactNode }
   const validateMesaAccess = useCallback(
     async (identificacion: string, mesaRequerida: number): Promise<{ valid: boolean; message: string }> => {
       try {
-        const hasAccessGranted = await checkAccessGranted(identificacion)
-        if (!hasAccessGranted) {
-          return {
-            valid: false,
-            message: "El estudiante debe pasar primero por control de acceso antes de reclamar comida.",
-          }
-        }
+        // Los bufetes deben poder procesar estudiantes que ya pasaron por control de acceso
+        // pero aún tienen cupos disponibles
 
         const mesaActiva = await checkMesaStatus(mesaRequerida)
         if (!mesaActiva) {
@@ -198,7 +193,7 @@ export function StudentStoreProvider({ children }: { children: React.ReactNode }
         return { valid: false, message: "Error al validar el acceso" }
       }
     },
-    [getStudentById, checkMesaStatus, checkAccessGranted],
+    [getStudentById, checkMesaStatus],
   )
 
   const markStudentAccess = useCallback(
@@ -221,37 +216,64 @@ export function StudentStoreProvider({ children }: { children: React.ReactNode }
             await updateDoc(doc(db, "personas", student.id), {
               cuposConsumidos: cuposConsumidos,
             })
-            console.log(`[v0] Cupo consumido para ${identificacion}. Total consumidos: ${cuposConsumidos}`)
+            console.log(`[v0] 1 comida consumida para ${identificacion}. Total acumulado: ${cuposConsumidos}`)
           }
         } else if (granted && !shouldConsumeCupo) {
           console.log(`[v0] Acceso registrado para ${identificacion} sin consumir cupo (rol admin/operativo)`)
         }
 
-        const log: AccessLog = {
-          identificacion,
-          timestamp: new Date().toISOString(),
-          status: granted ? "granted" : "denied",
-          details: details || (granted ? "Acceso concedido" : "Acceso denegado"),
-          source: source || "direct",
-          grantedByUserId: userInfo?.userId || "unknown",
-          grantedByUserName: userInfo?.userName || "Usuario desconocido",
-          grantedByUserEmail: userInfo?.userEmail || "sin-email@sistema.com",
-          grantedByUserRole: userInfo?.userRole || "Usuario",
-        }
+        if (granted) {
+          const log: AccessLog = {
+            identificacion,
+            timestamp: new Date().toISOString(),
+            status: "granted",
+            details: details || "Acceso concedido",
+            source: source || "direct",
+            grantedByUserId: userInfo?.userId || "unknown",
+            grantedByUserName: userInfo?.userName || "Usuario desconocido",
+            grantedByUserEmail: userInfo?.userEmail || "sin-email@sistema.com",
+            grantedByUserRole: userInfo?.userRole || "Usuario",
+          }
 
-        if (userInfo?.mesaAsignada !== undefined && userInfo?.mesaAsignada !== null) {
-          log.mesaUsada = userInfo.mesaAsignada
-        }
+          if (userInfo?.mesaAsignada !== undefined && userInfo?.mesaAsignada !== null) {
+            log.mesaUsada = userInfo.mesaAsignada
+          }
 
-        console.log("[v0] Log completo a guardar en Firebase:", log)
-        await addDoc(collection(db, "access_logs"), log)
-        console.log("[v0] Registro de acceso guardado exitosamente en Firebase")
+          console.log("[v0] Log completo a guardar en Firebase:", log)
+          await addDoc(collection(db, "access_logs"), log)
+          console.log("[v0] Registro de acceso guardado exitosamente en Firebase")
+        } else {
+          const hasAccessGranted = await checkAccessGranted(identificacion)
+          if (!hasAccessGranted) {
+            // Solo registrar el denegado si no hay un acceso concedido previo
+            const log: AccessLog = {
+              identificacion,
+              timestamp: new Date().toISOString(),
+              status: "denied",
+              details: details || "Acceso denegado",
+              source: source || "direct",
+              grantedByUserId: userInfo?.userId || "unknown",
+              grantedByUserName: userInfo?.userName || "Usuario desconocido",
+              grantedByUserEmail: userInfo?.userEmail || "sin-email@sistema.com",
+              grantedByUserRole: userInfo?.userRole || "Usuario",
+            }
+
+            if (userInfo?.mesaAsignada !== undefined && userInfo?.mesaAsignada !== null) {
+              log.mesaUsada = userInfo.mesaAsignada
+            }
+
+            console.log("[v0] Log de acceso denegado guardado:", log)
+            await addDoc(collection(db, "access_logs"), log)
+          } else {
+            console.log("[v0] No se registra el acceso denegado porque ya existe un acceso concedido previo")
+          }
+        }
       } catch (error) {
         console.error("Error al registrar acceso:", error)
         throw error
       }
     },
-    [getStudentById],
+    [getStudentById, checkAccessGranted],
   )
 
   const markQ10Access = useCallback(

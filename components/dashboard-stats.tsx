@@ -93,7 +93,8 @@ export function DashboardStats({ currentUserRole = "administrador" }: DashboardS
   })
   const [realTimeUpdates, setRealTimeUpdates] = useState(0)
   const [usersCache, setUsersCache] = useState<Map<string, UserData>>(new Map())
-  const [userStats, setUserStats] = useState<UserStats[]>([])
+  const [adminOperativoStats, setAdminOperativoStats] = useState<UserStats[]>([])
+  const [bufeteStats, setBuffeteStats] = useState<UserStats[]>([])
 
   useEffect(() => {
     loadInitialData()
@@ -244,32 +245,18 @@ export function DashboardStats({ currentUserRole = "administrador" }: DashboardS
   }
 
   const getFilteredLogs = () => {
-    // Filtrar según el rol del usuario actual
-    const filteredLogs = accessLogs.filter((log) => {
-      if (currentUserRole === "bufete") {
-        // Solo logs de bufete (tienen mesaUsada)
-        return log.mesaUsada !== undefined
-      } else {
-        // Solo logs de operativo/administrador (no tienen mesaUsada)
-        return log.mesaUsada === undefined
-      }
-    })
-
-    console.log("[v0] Logs filtrados por rol:", {
-      currentUserRole,
+    console.log("[v0] Mostrando todos los logs sin filtrar por rol:", {
       totalLogs: accessLogs.length,
-      filteredLogs: filteredLogs.length,
     })
 
-    return filteredLogs
+    return accessLogs
   }
 
-  const getUserStats = async (): Promise<UserStats[]> => {
-    const userStatsMap = new Map<string, UserStats>()
+  const getUserStats = async (): Promise<{ adminOperativo: UserStats[]; bufete: UserStats[] }> => {
+    const adminOperativoMap = new Map<string, UserStats>()
+    const bufeteMap = new Map<string, UserStats>()
 
     const filteredLogs = getFilteredLogs()
-
-    const userAccessMap = new Map<string, Set<string>>() // userId -> Set de identificaciones únicas accedidas
 
     for (const log of filteredLogs) {
       console.log("[v0] Procesando log en getUserStats:", {
@@ -294,27 +281,26 @@ export function DashboardStats({ currentUserRole = "administrador" }: DashboardS
           }
         }
 
-        const existing = userStatsMap.get(log.grantedByUserId)
+        const isBufete = userRole.toLowerCase() === "bufete"
+        const targetMap = isBufete ? bufeteMap : adminOperativoMap
+
+        const existing = targetMap.get(log.grantedByUserId)
         const isGranted = log.status === "granted" || log.status === "q10_success"
         const isDenied = log.status === "denied" || log.status === "q10_failed"
 
         if (existing) {
           if (isGranted) {
-            const userAccesses = userAccessMap.get(log.grantedByUserId) || new Set()
-            if (!userAccesses.has(log.identificacion)) {
-              userAccesses.add(log.identificacion)
-              userAccessMap.set(log.grantedByUserId, userAccesses)
-              existing.accedidos++
-            }
+            existing.accedidos++
           }
-          // Los denegados se cuentan siempre (cada intento fallido)
-          if (isDenied) existing.denegados++
+          if (isDenied) {
+            existing.denegados++
+          }
           existing.total = existing.accedidos + existing.denegados
         } else {
           const accedidos = isGranted ? 1 : 0
           const denegados = isDenied ? 1 : 0
 
-          userStatsMap.set(log.grantedByUserId, {
+          targetMap.set(log.grantedByUserId, {
             userId: log.grantedByUserId,
             userName: userName,
             userEmail: log.grantedByUserEmail || "",
@@ -323,28 +309,31 @@ export function DashboardStats({ currentUserRole = "administrador" }: DashboardS
             denegados,
             total: accedidos + denegados,
           })
-
-          if (isGranted) {
-            const userAccesses = new Set<string>()
-            userAccesses.add(log.identificacion)
-            userAccessMap.set(log.grantedByUserId, userAccesses)
-          }
         }
       }
     }
 
-    const stats = Array.from(userStatsMap.values())
+    const adminOperativoStats = Array.from(adminOperativoMap.values())
       .filter((stat) => stat.userName !== "Usuario desconocido")
       .sort((a, b) => b.total - a.total)
 
-    console.log("[v0] Estadísticas de usuarios calculadas:", stats)
-    return stats
+    const bufeteStatsArray = Array.from(bufeteMap.values())
+      .filter((stat) => stat.userName !== "Usuario desconocido")
+      .sort((a, b) => b.total - a.total)
+
+    console.log("[v0] Estadísticas separadas calculadas:", {
+      adminOperativo: adminOperativoStats,
+      bufete: bufeteStatsArray,
+    })
+
+    return { adminOperativo: adminOperativoStats, bufete: bufeteStatsArray }
   }
 
   useEffect(() => {
     const loadUserStats = async () => {
       const stats = await getUserStats()
-      setUserStats(stats)
+      setAdminOperativoStats(stats.adminOperativo)
+      setBuffeteStats(stats.bufete)
     }
     if (accessLogs.length > 0) {
       loadUserStats()
@@ -384,7 +373,22 @@ export function DashboardStats({ currentUserRole = "administrador" }: DashboardS
   }
 
   const uniqueAccessLogs = getUniqueAccessLogs()
-  const topUser = userStats[0]
+  const allUserStatsMap = new Map<string, UserStats>()
+
+  // Combinar estadísticas de admin/operativo y bufete para el mismo usuario
+  ;[...adminOperativoStats, ...bufeteStats].forEach((stat) => {
+    const existing = allUserStatsMap.get(stat.userId)
+    if (existing) {
+      existing.accedidos += stat.accedidos
+      existing.denegados += stat.denegados
+      existing.total += stat.total
+    } else {
+      allUserStatsMap.set(stat.userId, { ...stat })
+    }
+  })
+
+  const allUserStats = Array.from(allUserStatsMap.values())
+  const topUser = allUserStats.sort((a, b) => b.total - a.total)[0]
 
   const grantedAccessCount = uniqueAccessLogs.filter(
     (log) => log.status === "granted" || log.status === "q10_success",
@@ -544,7 +548,7 @@ export function DashboardStats({ currentUserRole = "administrador" }: DashboardS
                   <span className="font-medium text-xs md:text-base truncate">{topUser.userName}</span>
                 </div>
                 <p className="text-[10px] md:text-sm text-muted-foreground truncate">
-                  Rol: <span className="font-medium">{topUser.userRole}</span>
+                  Rol: <span className="font-medium capitalize">{topUser.userRole}</span>
                 </p>
                 <div className="grid grid-cols-2 gap-2 md:gap-3 mt-2">
                   <div className="text-center p-1.5 md:p-2 bg-green-50 rounded-lg">
@@ -573,49 +577,104 @@ export function DashboardStats({ currentUserRole = "administrador" }: DashboardS
             <CardTitle className="text-sm md:text-lg">Historial de Registros por Usuario</CardTitle>
           </CardHeader>
           <CardContent className="p-3 md:p-6 pt-0">
-            <div className="space-y-1.5 md:space-y-3">
-              {userStats.slice(0, 10).map((user, index) => (
-                <div
-                  key={user.userId}
-                  className="flex items-center justify-between p-2 md:p-3 border rounded-lg gap-1.5 md:gap-2"
-                >
-                  <div className="flex items-center gap-1.5 md:gap-3 flex-1 min-w-0">
-                    <div
-                      className={`flex items-center justify-center w-5 h-5 md:w-8 md:h-8 rounded-full text-[10px] md:text-sm flex-shrink-0 ${
-                        index === 0
-                          ? "bg-yellow-100 text-yellow-800"
-                          : index === 1
-                            ? "bg-gray-100 text-gray-800"
-                            : index === 2
-                              ? "bg-orange-100 text-orange-800"
-                              : "bg-blue-100 text-blue-800"
-                      }`}
-                    >
-                      {index + 1}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium text-[10px] sm:text-xs md:text-base truncate">{user.userName}</p>
-                      <p className="text-[8px] sm:text-[10px] md:text-sm text-muted-foreground truncate">
-                        Rol: {user.userRole}
-                      </p>
-                    </div>
+            <div className="space-y-3 md:space-y-4">
+              {/* Sección Administrador/Operativo */}
+              {adminOperativoStats.length > 0 && (
+                <div>
+                  <div className="flex items-center gap-2 mb-2 md:mb-3">
+                    <UserCheck className="w-3 h-3 md:w-4 md:h-4 text-blue-600 flex-shrink-0" />
+                    <h3 className="text-[10px] md:text-sm font-semibold text-blue-600">Administrador / Operativo</h3>
                   </div>
-                  <div className="flex items-center gap-1.5 md:gap-4 flex-shrink-0">
-                    <div className="text-center">
-                      <p className="font-bold text-[10px] sm:text-xs md:text-sm text-green-600">{user.accedidos}</p>
-                      <p className="text-[8px] sm:text-[9px] md:text-xs text-muted-foreground whitespace-nowrap">
-                        Accedidos
-                      </p>
-                    </div>
-                    <div className="text-center">
-                      <p className="font-bold text-[10px] sm:text-xs md:text-sm text-red-600">{user.denegados}</p>
-                      <p className="text-[8px] sm:text-[9px] md:text-xs text-muted-foreground whitespace-nowrap">
-                        Denegados
-                      </p>
-                    </div>
+                  <div className="space-y-1.5 md:space-y-2">
+                    {adminOperativoStats.slice(0, 5).map((user, index) => (
+                      <div
+                        key={user.userId}
+                        className="flex items-center justify-between p-2 md:p-3 border rounded-lg gap-1.5 md:gap-2 bg-blue-50/50"
+                      >
+                        <div className="flex items-center gap-1.5 md:gap-3 flex-1 min-w-0">
+                          <div className="flex items-center justify-center w-5 h-5 md:w-8 md:h-8 rounded-full text-[10px] md:text-sm flex-shrink-0 bg-blue-100 text-blue-800">
+                            {index + 1}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium text-[10px] sm:text-xs md:text-base truncate">{user.userName}</p>
+                            <p className="text-[8px] sm:text-[10px] md:text-sm text-muted-foreground truncate">
+                              Rol: <span className="capitalize">{user.userRole}</span>
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1.5 md:gap-4 flex-shrink-0">
+                          <div className="text-center">
+                            <p className="font-bold text-[10px] sm:text-xs md:text-sm text-green-600">
+                              {user.accedidos}
+                            </p>
+                            <p className="text-[8px] sm:text-[9px] md:text-xs text-muted-foreground whitespace-nowrap">
+                              Accedidos
+                            </p>
+                          </div>
+                          <div className="text-center">
+                            <p className="font-bold text-[10px] sm:text-xs md:text-sm text-red-600">{user.denegados}</p>
+                            <p className="text-[8px] sm:text-[9px] md:text-xs text-muted-foreground whitespace-nowrap">
+                              Denegados
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 </div>
-              ))}
+              )}
+
+              {/* Sección Bufete */}
+              {bufeteStats.length > 0 && (
+                <div>
+                  <div className="flex items-center gap-2 mb-2 md:mb-3">
+                    <ChefHat className="w-3 h-3 md:w-4 md:h-4 text-purple-600 flex-shrink-0" />
+                    <h3 className="text-[10px] md:text-sm font-semibold text-purple-600">Bufete</h3>
+                  </div>
+                  <div className="space-y-1.5 md:space-y-2">
+                    {bufeteStats.slice(0, 5).map((user, index) => (
+                      <div
+                        key={user.userId}
+                        className="flex items-center justify-between p-2 md:p-3 border rounded-lg gap-1.5 md:gap-2 bg-purple-50/50"
+                      >
+                        <div className="flex items-center gap-1.5 md:gap-3 flex-1 min-w-0">
+                          <div className="flex items-center justify-center w-5 h-5 md:w-8 md:h-8 rounded-full text-[10px] md:text-sm flex-shrink-0 bg-purple-100 text-purple-800">
+                            {index + 1}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium text-[10px] sm:text-xs md:text-base truncate">{user.userName}</p>
+                            <p className="text-[8px] sm:text-[10px] md:text-sm text-muted-foreground truncate">
+                              Rol: <span className="capitalize">{user.userRole}</span>
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1.5 md:gap-4 flex-shrink-0">
+                          <div className="text-center">
+                            <p className="font-bold text-[10px] sm:text-xs md:text-sm text-green-600">
+                              {user.accedidos}
+                            </p>
+                            <p className="text-[8px] sm:text-[9px] md:text-xs text-muted-foreground whitespace-nowrap">
+                              Accedidos
+                            </p>
+                          </div>
+                          <div className="text-center">
+                            <p className="font-bold text-[10px] sm:text-xs md:text-sm text-red-600">{user.denegados}</p>
+                            <p className="text-[8px] sm:text-[9px] md:text-xs text-muted-foreground whitespace-nowrap">
+                              Denegados
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {adminOperativoStats.length === 0 && bufeteStats.length === 0 && (
+                <p className="text-muted-foreground text-xs md:text-sm text-center py-4">
+                  No hay datos de usuarios disponibles
+                </p>
+              )}
             </div>
           </CardContent>
         </Card>
