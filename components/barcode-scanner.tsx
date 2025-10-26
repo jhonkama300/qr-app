@@ -200,6 +200,23 @@ export function BarcodeScanner() {
         const q10Result = await processQ10Url(scannedContent)
 
         if (q10Result.success && q10Result.student) {
+          const alreadyScanned = await checkIfAlreadyScanned(q10Result.identificacion!)
+
+          if (alreadyScanned) {
+            currentScanResult = {
+              type: "error",
+              identificacion: q10Result.identificacion!,
+              message: `❌ Este código ya fue escaneado anteriormente. No se permite el ingreso duplicado.`,
+              source: "q10",
+              timestamp: new Date().toISOString(),
+            }
+            setScanResultDisplay(currentScanResult)
+            setShowResult(true)
+            setIsScanning(false)
+            return
+          }
+          // Fin de la validación de escaneo duplicado para links Q10
+
           await markStudentAccess(q10Result.identificacion!, true, "Acceso concedido al evento", "q10", userInfo)
           currentScanResult = {
             type: "success",

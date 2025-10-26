@@ -310,6 +310,7 @@ export function OperativoScanner() {
             setProcessing(false)
             return
           }
+          // Fin de la validación de escaneo duplicado para links Q10
 
           await markStudentAccess(q10Result.identificacion!, true, "Acceso concedido al evento", "q10", userInfo)
           currentScanResult = {
