@@ -19,9 +19,8 @@ import {
   MapPin,
   BookOpen,
   CreditCard,
-  Users,
-  TrendingUp,
   UserPlus,
+  Briefcase,
 } from "lucide-react"
 import { checkIdType, validateLogin, changePassword } from "@/lib/auth-service"
 import { useAuth } from "@/components/auth-provider"
@@ -31,7 +30,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import QRCode from "qrcode"
 import Image from "next/image"
 import { db } from "@/lib/firebase"
-import { doc, onSnapshot } from "firebase/firestore"
+import { collection, query, where, onSnapshot } from "firebase/firestore"
 
 type LoginStep = "id" | "password"
 
@@ -39,9 +38,10 @@ export function UnifiedLogin() {
   const [step, setStep] = useState<LoginStep>("id")
   const [idNumber, setIdNumber] = useState("")
   const [password, setPassword] = useState("")
-  const [loading, setLoading] = useState(false)
+  const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState("")
-  const [userType, setUserType] = useState<"admin" | "student" | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [userType, setUserType] = useState<"admin" | "student" | "invitado" | null>(null)
   const [studentData, setStudentData] = useState<any>(null)
   const [showStudentModal, setShowStudentModal] = useState(false)
   const [qrCodeUrl, setQrCodeUrl] = useState("")
@@ -59,26 +59,33 @@ export function UnifiedLogin() {
 
   useEffect(() => {
     if (studentData?.identificacion && showStudentModal) {
-      console.log("[v0] Configurando listener para:", studentData.identificacion)
-      const studentRef = doc(db, "estudiantes", studentData.identificacion)
+      console.log("[v0] Configurando listener en tiempo real para:", studentData.identificacion)
+
+      // Determinar la colección según el tipo de usuario
+      const collectionName = studentData.esInvitado ? "invitados" : "personas"
+      const studentQuery = query(
+        collection(db, collectionName),
+        where("identificacion", "==", studentData.identificacion),
+      )
 
       const unsubscribe = onSnapshot(
-        studentRef,
-        (docSnap) => {
-          if (docSnap.exists()) {
+        studentQuery,
+        (querySnapshot) => {
+          if (!querySnapshot.empty) {
+            const docSnap = querySnapshot.docs[0]
             const updatedData = docSnap.data()
-            // Preservar la identificacion del documento
             const completeData = {
               ...updatedData,
-              identificacion: docSnap.id,
+              id: docSnap.id,
+              identificacion: updatedData.identificacion,
+              esInvitado: studentData.esInvitado,
             }
-            console.log("[v0] Snapshot recibido - Actualizando datos:", completeData)
-            // Forzar actualización creando un nuevo objeto
+            console.log("[v0] Datos actualizados en tiempo real:", completeData)
             setStudentData({ ...completeData })
           }
         },
         (error) => {
-          console.error("[v0] Error en listener:", error)
+          console.error("[v0] Error en listener tiempo real:", error)
         },
       )
 
@@ -87,7 +94,7 @@ export function UnifiedLogin() {
         unsubscribe()
       }
     }
-  }, [studentData?.identificacion, showStudentModal])
+  }, [studentData?.identificacion, showStudentModal, studentData?.esInvitado])
 
   useEffect(() => {
     if (studentData) {
@@ -119,6 +126,10 @@ export function UnifiedLogin() {
         setStep("password")
       } else if (result.type === "student") {
         setUserType("student")
+        setStudentData(result.userData)
+        setShowStudentModal(true)
+      } else if (result.type === "invitado") {
+        setUserType("invitado")
         setStudentData(result.userData)
         setShowStudentModal(true)
       }
@@ -228,6 +239,24 @@ export function UnifiedLogin() {
     setUserType(null)
   }
 
+  const calculateTotalCupos = () => {
+    if (!studentData) return 0
+    if (studentData.esInvitado) return 1
+    return 2 + (studentData.cuposExtras || 0)
+  }
+
+  const calculateCuposDisponibles = () => {
+    const total = calculateTotalCupos()
+    const consumidos = studentData?.cuposConsumidos || 0
+    return Math.max(0, total - consumidos)
+  }
+
+  const calculateAcompanantes = () => {
+    if (!studentData) return 0
+    if (studentData.esInvitado) return 0 // Invitados no tienen acompañantes
+    return 1 + (studentData.cuposExtras || 0)
+  }
+
   const cuposStats = useMemo(() => {
     if (!studentData) {
       return {
@@ -241,14 +270,14 @@ export function UnifiedLogin() {
       }
     }
 
-    const total = 2 + (studentData.cuposExtras || 0)
+    const total = calculateTotalCupos()
     const consumidos = studentData.cuposConsumidos || 0
-    const disponibles = total - consumidos
+    const disponibles = calculateCuposDisponibles()
     const porcentaje = total > 0 ? (consumidos / total) * 100 : 0
 
-    const acompanantesBase = 1 // Siempre tiene 1 acompañante base
+    const acompanantesBase = studentData.esInvitado ? 0 : 1 // Siempre tiene 1 acompañante base si es estudiante
     const extras = studentData.cuposExtras || 0
-    const totalAcompanantes = acompanantesBase + extras // Total de acompañantes (sin contar al graduando)
+    const totalAcompanantes = calculateAcompanantes() // Total de acompañantes (sin contar al graduando)
 
     return {
       cuposTotal: total,
@@ -366,7 +395,7 @@ export function UnifiedLogin() {
                     <Lock className="absolute left-2.5 sm:left-3 top-1/2 -translate-y-1/2 h-4 w-4 sm:h-5 sm:w-5 text-lime-600" />
                     <Input
                       id="password"
-                      type="password"
+                      type={showPassword ? "text" : "password"}
                       placeholder="Ingresa tu contraseña"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
@@ -374,6 +403,14 @@ export function UnifiedLogin() {
                       required
                       disabled={loading || !!successMessage}
                     />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                      disabled={loading || !!successMessage}
+                    >
+                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
                   </div>
                 </div>
 
@@ -429,143 +466,193 @@ export function UnifiedLogin() {
         </Card>
       </div>
 
+      {/* Modal para estudiantes/invitados */}
       <Dialog open={showStudentModal} onOpenChange={setShowStudentModal}>
-        <DialogContent
-          className="sm:max-w-2xl max-h-[95vh] overflow-y-auto p-0"
-          onInteractOutside={(e) => e.preventDefault()}
-        >
-          <DialogHeader className="px-4 pt-4 pb-2 space-y-1">
-            <div className="flex items-center justify-between">
-              <DialogTitle className="flex items-center gap-2 text-lime-700 text-base sm:text-lg">
-                <GraduationCap className="w-5 h-5" />
-                Información del Graduando
-              </DialogTitle>
-              <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 animate-pulse text-xs">
-                <span className="relative flex h-1.5 w-1.5 mr-1">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-green-500"></span>
-                </span>
-                En vivo
-              </Badge>
-            </div>
+        <DialogContent className="max-w-[95vw] sm:max-w-md max-h-[90vh] overflow-y-auto p-0">
+          <DialogHeader className="p-4 pb-2 bg-gradient-to-r from-lime-500 to-green-600 text-white rounded-t-lg">
+            <DialogTitle className="text-lg sm:text-xl font-bold flex items-center gap-2">
+              {studentData?.esInvitado ? (
+                <>
+                  <UserPlus className="w-5 h-5" />
+                  Invitado Verificado
+                </>
+              ) : (
+                <>
+                  <GraduationCap className="w-5 h-5" />
+                  Graduando Verificado
+                </>
+              )}
+            </DialogTitle>
+            <DialogDescription className="text-lime-100 text-sm">
+              {studentData?.esInvitado
+                ? "Información del invitado al evento"
+                : "Información del estudiante y estado de cupos"}
+            </DialogDescription>
           </DialogHeader>
 
           {studentData && (
             <div className="space-y-3 px-4 pb-4">
-              <div className="bg-gradient-to-br from-lime-50 via-green-50 to-emerald-50 rounded-lg p-3 space-y-2.5 border-2 border-lime-200">
+              <div
+                className={`rounded-lg p-3 space-y-2.5 border-2 ${
+                  studentData.esInvitado
+                    ? "bg-gradient-to-br from-purple-50 via-violet-50 to-purple-50 border-purple-200"
+                    : "bg-gradient-to-br from-lime-50 via-green-50 to-emerald-50 border-lime-200"
+                }`}
+              >
                 {/* Nombre y ID compactos */}
-                <div className="text-center pb-2 border-b border-lime-200">
+                <div
+                  className={`text-center pb-2 border-b ${studentData.esInvitado ? "border-purple-200" : "border-lime-200"}`}
+                >
                   <h3 className="text-lg sm:text-xl font-bold text-gray-900 leading-tight">{studentData.nombre}</h3>
                   <div className="flex items-center justify-center gap-1.5 text-xs text-gray-600 mt-0.5">
                     <CreditCard className="w-3.5 h-3.5" />
                     <span className="font-semibold">{studentData.identificacion}</span>
                   </div>
+                  {studentData.esInvitado && <Badge className="mt-1 bg-purple-600 text-white text-xs">Invitado</Badge>}
                 </div>
 
                 <div className="grid gap-2">
-                  {/* Programa */}
-                  <div className="flex items-start gap-2 bg-white/60 rounded-lg p-2 border border-lime-100">
-                    <div className="bg-lime-100 rounded-md p-1.5 mt-0.5">
-                      <BookOpen className="w-4 h-4 text-lime-700" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-[10px] font-medium text-gray-500 mb-0.5">Programa Académico</p>
-                      <p className="text-xs font-semibold text-gray-900 leading-tight">{studentData.programa}</p>
-                      <div className="flex items-center gap-1 mt-1 text-[10px] text-lime-700 bg-lime-50 px-1.5 py-0.5 rounded-md border border-lime-200 w-fit">
-                        <UserPlus className="w-3 h-3" />
-                        <span className="font-semibold">
-                          Graduando + {cuposStats.totalAcompanantes} acompañante
-                          {cuposStats.totalAcompanantes !== 1 ? "s" : ""}
-                        </span>
+                  {/* Programa o Puesto */}
+                  {studentData.esInvitado ? (
+                    <div className={`flex items-start gap-2 bg-white/60 rounded-lg p-2 border border-purple-100`}>
+                      <div className="bg-purple-100 rounded-md p-1.5 mt-0.5">
+                        <Briefcase className="w-4 h-4 text-purple-700" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[10px] font-medium text-gray-500 mb-0.5">Puesto</p>
+                        <p className="text-xs font-semibold text-gray-900 leading-tight">
+                          {studentData.puesto || "No especificado"}
+                        </p>
                       </div>
                     </div>
-                  </div>
+                  ) : (
+                    <div className="flex items-start gap-2 bg-white/60 rounded-lg p-2 border border-lime-100">
+                      <div className="bg-lime-100 rounded-md p-1.5 mt-0.5">
+                        <BookOpen className="w-4 h-4 text-lime-700" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[10px] font-medium text-gray-500 mb-0.5">Programa Académico</p>
+                        <p className="text-xs font-semibold text-gray-900 leading-tight">{studentData.programa}</p>
+                      </div>
+                    </div>
+                  )}
 
-                  <div className="flex items-center gap-2 bg-gradient-to-r from-lime-500 to-green-600 rounded-lg p-2.5 shadow-md">
-                    <div className="bg-white/20 rounded-md p-1.5">
-                      <MapPin className="w-5 h-5 text-white" />
+                  {/* Puesto (solo estudiantes) */}
+                  {!studentData.esInvitado && studentData.puesto && (
+                    <div className="flex items-start gap-2 bg-white/60 rounded-lg p-2 border border-lime-100">
+                      <div className="bg-green-100 rounded-md p-1.5 mt-0.5">
+                        <MapPin className="w-4 h-4 text-green-700" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[10px] font-medium text-gray-500 mb-0.5">Puesto Asignado</p>
+                        <p className="text-sm font-bold text-gray-900">{studentData.puesto}</p>
+                      </div>
                     </div>
-                    <div className="flex-1">
-                      <p className="text-[10px] font-medium text-lime-50 mb-0.5">Puesto Asignado</p>
-                      <p className="text-2xl sm:text-3xl font-bold text-white tracking-wider">{studentData.puesto}</p>
-                    </div>
-                  </div>
+                  )}
                 </div>
               </div>
 
-              <div
-                key={`bufetes-${cuposStats.cuposConsumidos}-${cuposStats.cuposTotal}`}
-                className="bg-white rounded-lg p-3 border-2 border-gray-200"
-              >
-                <div className="flex items-center gap-1.5 mb-2.5">
-                  <Users className="w-4 h-4 text-lime-600" />
-                  <h4 className="font-bold text-gray-900 text-sm">Estado de Bufetes</h4>
-                </div>
-
-                <div className="grid grid-cols-3 gap-2 mb-2.5">
-                  <div className="text-center p-2 bg-blue-50 rounded-md border border-blue-100">
-                    <p className="text-xl font-bold text-blue-600">{cuposStats.cuposTotal}</p>
-                    <p className="text-[10px] text-blue-700 font-medium mt-0.5">Total</p>
-                  </div>
-                  <div className="text-center p-2 bg-green-50 rounded-md border border-green-100">
-                    <p className="text-xl font-bold text-green-600">{cuposStats.cuposDisponibles}</p>
-                    <p className="text-[10px] text-green-700 font-medium mt-0.5">Disponibles</p>
-                  </div>
-                  <div className="text-center p-2 bg-orange-50 rounded-md border border-orange-100">
-                    <p className="text-xl font-bold text-orange-600">{cuposStats.cuposConsumidos}</p>
-                    <p className="text-[10px] text-orange-700 font-medium mt-0.5">Consumidos</p>
-                  </div>
-                </div>
-
-                <div className="space-y-1.5">
-                  <div className="flex items-center justify-between text-[10px] text-gray-600">
-                    <span className="font-medium">Progreso</span>
-                    <span className="font-bold">{Math.round(cuposStats.porcentajeConsumido)}%</span>
-                  </div>
-                  <div className="h-2 bg-gray-100 rounded-full overflow-hidden border border-gray-200">
-                    <div
-                      className={`h-full transition-all duration-500 rounded-full ${
-                        cuposStats.porcentajeConsumido >= 100
-                          ? "bg-gradient-to-r from-red-500 to-red-600"
-                          : cuposStats.porcentajeConsumido >= 75
-                            ? "bg-gradient-to-r from-orange-400 to-orange-500"
-                            : "bg-gradient-to-r from-lime-400 to-green-500"
-                      }`}
-                      style={{ width: `${Math.min(cuposStats.porcentajeConsumido, 100)}%` }}
-                    />
-                  </div>
-                </div>
-
-                {/* Cupos extras */}
-                {studentData.cuposExtras > 0 && (
-                  <div className="mt-2 flex items-center gap-1.5 text-[10px] bg-lime-50 text-lime-700 p-1.5 rounded-md border border-lime-200">
-                    <TrendingUp className="w-3.5 h-3.5" />
-                    <span className="font-medium">
-                      Incluye {studentData.cuposExtras} acompañante{studentData.cuposExtras !== 1 ? "s" : ""} extra
-                    </span>
-                  </div>
-                )}
-              </div>
-
+              {/* QR Code */}
               {qrCodeUrl && (
-                <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-lg p-3 flex flex-col items-center space-y-2 border-2 border-gray-200">
-                  <div className="flex items-center gap-1.5">
-                    <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" />
-                    <h4 className="font-bold text-gray-900 text-sm">Código QR Personal</h4>
-                  </div>
-                  <p className="text-[10px] text-gray-600 text-center max-w-xs leading-tight">
-                    Escanea este código en los puntos de control
-                  </p>
-                  <div className="bg-white p-2.5 rounded-lg border-2 border-gray-300 shadow-sm">
-                    <img src={qrCodeUrl || "/placeholder.svg"} alt="QR Code" className="w-32 h-32 sm:w-36 sm:h-36" />
+                <div className="flex justify-center">
+                  <div
+                    className={`p-2 rounded-xl border-2 shadow-sm ${
+                      studentData.esInvitado ? "bg-purple-50 border-purple-200" : "bg-lime-50 border-lime-200"
+                    }`}
+                  >
+                    <img src={qrCodeUrl || "/placeholder.svg"} alt="QR Code" className="w-28 h-28 sm:w-32 sm:h-32" />
+                    <p
+                      className={`text-center text-[10px] mt-1 font-medium ${
+                        studentData.esInvitado ? "text-purple-600" : "text-lime-600"
+                      }`}
+                    >
+                      Presenta este QR en el bufete
+                    </p>
                   </div>
                 </div>
               )}
 
+              {/* Estado de Bufete */}
+              <div
+                className={`rounded-xl p-3 border-2 ${
+                  studentData.esInvitado
+                    ? "bg-gradient-to-r from-purple-50 to-violet-50 border-purple-200"
+                    : "bg-gradient-to-r from-amber-50 to-orange-50 border-amber-200"
+                }`}
+              >
+                <div className="flex items-center gap-2 mb-2">
+                  <Briefcase className={`w-4 h-4 ${studentData.esInvitado ? "text-purple-600" : "text-amber-600"}`} />
+                  <h4 className={`text-sm font-bold ${studentData.esInvitado ? "text-purple-800" : "text-amber-800"}`}>
+                    Estado de Bufete
+                  </h4>
+                </div>
+
+                <div className="grid grid-cols-3 gap-2 text-center">
+                  <div className="bg-white/70 rounded-lg p-2">
+                    <p className="text-[10px] text-gray-500 font-medium">
+                      {studentData.esInvitado ? "Cupo Único" : "Graduando + Acompañantes"}
+                    </p>
+                    <p className={`text-lg font-bold ${studentData.esInvitado ? "text-purple-600" : "text-amber-600"}`}>
+                      {studentData.esInvitado ? "1" : `1 + ${calculateAcompanantes()}`}
+                    </p>
+                  </div>
+                  <div className="bg-white/70 rounded-lg p-2">
+                    <p className="text-[10px] text-gray-500 font-medium">Consumidos</p>
+                    <p className="text-lg font-bold text-red-500">{studentData.cuposConsumidos || 0}</p>
+                  </div>
+                  <div className="bg-white/70 rounded-lg p-2">
+                    <p className="text-[10px] text-gray-500 font-medium">Disponibles</p>
+                    <p className="text-lg font-bold text-green-600">{calculateCuposDisponibles()}</p>
+                  </div>
+                </div>
+
+                {/* Barra de progreso */}
+                <div className="mt-2">
+                  <div className="flex justify-between text-[10px] text-gray-500 mb-1">
+                    <span>Uso de cupos</span>
+                    <span>
+                      {studentData.cuposConsumidos || 0} / {calculateTotalCupos()}
+                    </span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div
+                      className={`h-2 rounded-full transition-all duration-500 ${
+                        studentData.esInvitado
+                          ? "bg-gradient-to-r from-purple-500 to-violet-500"
+                          : "bg-gradient-to-r from-amber-500 to-orange-500"
+                      }`}
+                      style={{
+                        width: `${Math.min(100, ((studentData.cuposConsumidos || 0) / calculateTotalCupos()) * 100)}%`,
+                      }}
+                    />
+                  </div>
+                </div>
+
+                {/* Info adicional para invitados */}
+                {studentData.esInvitado && (
+                  <p className="text-[10px] text-purple-600 mt-2 text-center">
+                    Los invitados tienen derecho a 1 comida sin acompañantes
+                  </p>
+                )}
+
+                {/* Info adicional para estudiantes */}
+                {!studentData.esInvitado && (studentData.cuposExtras || 0) > 0 && (
+                  <p className="text-[10px] text-amber-600 mt-2 text-center">
+                    Incluye {studentData.cuposExtras} cupo(s) extra(s) asignado(s)
+                  </p>
+                )}
+              </div>
+
               <Button
-                type="button"
-                className="w-full h-10 text-sm bg-gradient-to-r from-lime-500 to-green-600 hover:from-lime-600 hover:to-green-700 shadow-md font-semibold"
-                onClick={handleCloseModal}
+                onClick={() => {
+                  setShowStudentModal(false)
+                  setStudentData(null)
+                  setIdNumber("")
+                  setQrCodeUrl("")
+                }}
+                className={`w-full ${
+                  studentData.esInvitado ? "bg-purple-600 hover:bg-purple-700" : "bg-lime-600 hover:bg-lime-700"
+                } text-white`}
               >
                 Cerrar
               </Button>

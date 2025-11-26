@@ -7,7 +7,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { collection, query, where, onSnapshot, doc } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { useAuth } from "@/components/auth-provider"
-import { Utensils, Users, Activity, Scale, Package, AlertTriangle, TrendingDown } from "lucide-react"
+import { Utensils, Users, Activity, Scale, Package, AlertTriangle, TrendingDown, UserPlus } from "lucide-react"
 import { Progress } from "@/components/ui/progress"
 import type { MealInventory, TableMealInventory } from "@/lib/firestore-service"
 
@@ -24,6 +24,8 @@ export default function BufetesPage() {
   const [tableMealInventories, setTableMealInventories] = useState<TableMealInventory[]>([])
   const [loading, setLoading] = useState(true)
   const [totalComidasPorEntregar, setTotalComidasPorEntregar] = useState(0)
+  const [comidasEstudiantes, setComidasEstudiantes] = useState(0)
+  const [comidasInvitados, setComidasInvitados] = useState(0)
   const [mealInventory, setMealInventory] = useState<MealInventory | null>(null)
 
   useEffect(() => {
@@ -88,11 +90,33 @@ export default function BufetesPage() {
         totalBufetes += cuposDisponibles
       })
 
-      setTotalComidasPorEntregar(totalBufetes)
+      setComidasEstudiantes(totalBufetes)
     })
 
     return unsubscribe
   }, [])
+
+  useEffect(() => {
+    const invitadosQuery = query(collection(db, "invitados"))
+    const unsubscribe = onSnapshot(invitadosQuery, (snapshot) => {
+      let totalInvitados = 0
+
+      snapshot.forEach((doc) => {
+        const data = doc.data()
+        const cuposConsumidos = data.cuposConsumidos || 0
+        const cuposDisponibles = Math.max(0, 1 - cuposConsumidos)
+        totalInvitados += cuposDisponibles
+      })
+
+      setComidasInvitados(totalInvitados)
+    })
+
+    return unsubscribe
+  }, [])
+
+  useEffect(() => {
+    setTotalComidasPorEntregar(comidasEstudiantes + comidasInvitados)
+  }, [comidasEstudiantes, comidasInvitados])
 
   useEffect(() => {
     const inventoryRef = doc(db, "config", "meal_inventory")
@@ -227,69 +251,78 @@ export default function BufetesPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-orange-600">{totalComidasPorEntregar}</div>
-            <p className="text-xs text-muted-foreground">Cupos disponibles totales</p>
+            <div className="flex items-center gap-2 mt-1">
+              <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                <Users className="h-3 w-3" />
+                <span>{comidasEstudiantes}</span>
+              </div>
+              <span className="text-muted-foreground">+</span>
+              <div className="flex items-center gap-1 text-xs text-purple-600">
+                <UserPlus className="h-3 w-3" />
+                <span>{comidasInvitados}</span>
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">Estudiantes + Invitados</p>
           </CardContent>
         </Card>
       </div>
 
-      {tableMealInventories.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <TrendingDown className="h-5 w-5" />
-              Estado de Inventario por Mesa
-            </CardTitle>
-            <CardDescription>Visualiza el inventario disponible en cada mesa</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-4">
-              {tableMealInventories.map((table) => {
-                const percentage = (table.comidasDisponibles / table.totalComidas) * 100
-                const isLow = percentage < 20
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <TrendingDown className="h-5 w-5" />
+            Estado de Inventario por Mesa
+          </CardTitle>
+          <CardDescription>Visualiza el inventario disponible en cada mesa</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-4">
+            {tableMealInventories.map((table) => {
+              const percentage = (table.comidasDisponibles / table.totalComidas) * 100
+              const isLow = percentage < 20
 
-                return (
-                  <Card
-                    key={table.id}
-                    className={`${isLow && table.activa ? "border-orange-300 bg-orange-50" : ""} ${
-                      !table.activa ? "opacity-50" : ""
-                    }`}
-                  >
-                    <CardHeader className="pb-2 p-3">
-                      <div className="flex items-center justify-between">
-                        <CardTitle className="text-base">Mesa {table.numeroMesa}</CardTitle>
-                        <Badge variant={table.activa ? "default" : "secondary"} className="text-xs">
-                          {table.activa ? "Activa" : "Inactiva"}
-                        </Badge>
+              return (
+                <Card
+                  key={table.id}
+                  className={`${isLow && table.activa ? "border-orange-300 bg-orange-50" : ""} ${
+                    !table.activa ? "opacity-50" : ""
+                  }`}
+                >
+                  <CardHeader className="pb-2 p-3">
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="text-base">Mesa {table.numeroMesa}</CardTitle>
+                      <Badge variant={table.activa ? "default" : "secondary"} className="text-xs">
+                        {table.activa ? "Activa" : "Inactiva"}
+                      </Badge>
+                    </div>
+                    <p className="text-xs text-muted-foreground">{table.nombreMesa}</p>
+                  </CardHeader>
+                  <CardContent className="pt-0 p-3 space-y-2">
+                    <div className="grid grid-cols-3 gap-1 text-center">
+                      <div>
+                        <div className="text-sm font-bold text-blue-600">{table.totalComidas}</div>
+                        <p className="text-xs text-muted-foreground">Total</p>
                       </div>
-                      <p className="text-xs text-muted-foreground">{table.nombreMesa}</p>
-                    </CardHeader>
-                    <CardContent className="pt-0 p-3 space-y-2">
-                      <div className="grid grid-cols-3 gap-1 text-center">
-                        <div>
-                          <div className="text-sm font-bold text-blue-600">{table.totalComidas}</div>
-                          <p className="text-xs text-muted-foreground">Total</p>
-                        </div>
-                        <div>
-                          <div className="text-sm font-bold text-red-600">{table.comidasConsumidas}</div>
-                          <p className="text-xs text-muted-foreground">Usadas</p>
-                        </div>
-                        <div>
-                          <div className={`text-sm font-bold ${isLow ? "text-orange-600" : "text-green-600"}`}>
-                            {table.comidasDisponibles}
-                          </div>
-                          <p className="text-xs text-muted-foreground">Quedan</p>
-                        </div>
+                      <div>
+                        <div className="text-sm font-bold text-red-600">{table.comidasConsumidas}</div>
+                        <p className="text-xs text-muted-foreground">Usadas</p>
                       </div>
-                      <Progress value={percentage} className="h-1.5" />
-                      {isLow && table.activa && <p className="text-xs text-orange-600">⚠️ Stock bajo</p>}
-                    </CardContent>
-                  </Card>
-                )
-              })}
-            </div>
-          </CardContent>
-        </Card>
-      )}
+                      <div>
+                        <div className={`text-sm font-bold ${isLow ? "text-orange-600" : "text-green-600"}`}>
+                          {table.comidasDisponibles}
+                        </div>
+                        <p className="text-xs text-muted-foreground">Quedan</p>
+                      </div>
+                    </div>
+                    <Progress value={percentage} className="h-1.5" />
+                    {isLow && table.activa && <p className="text-xs text-orange-600">⚠️ Stock bajo</p>}
+                  </CardContent>
+                </Card>
+              )
+            })}
+          </div>
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>
