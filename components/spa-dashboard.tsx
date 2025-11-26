@@ -15,11 +15,12 @@ import {
 } from "@/components/ui/breadcrumb"
 import { useRouter } from "next/navigation"
 import { useEffect } from "react"
-import { collection, query, where, onSnapshot } from "firebase/firestore"
+import { collection, query, where, onSnapshot, doc } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Switch } from "@/components/ui/switch"
+import { Utensils } from "lucide-react"
+import type { TableMealInventory } from "@/lib/firestore-service"
 
 // Importar todos los componentes de las vistas
 import { DashboardStats } from "@/components/dashboard-stats"
@@ -30,11 +31,13 @@ import { DatabaseManagement } from "@/components/database-management"
 import { MesaControlAdmin } from "@/components/mesa-control-admin"
 import { BuffeteScanner } from "@/components/bufete-scanner"
 import { OperativoScanner } from "@/components/operativo-scanner"
+import { MealInventoryManagement } from "@/components/meal-inventory-management"
 
 export type ViewType =
   | "inicio"
   | "escanear"
   | "control-acceso"
+  | "inventario"
   | "bufetes-gestion"
   | "control-bufetes"
   | "usuarios"
@@ -54,14 +57,8 @@ export function SPADashboard({ initialView = "inicio" }: SPADashboardProps) {
   const [mesaActiva, setMesaActiva] = useState(true)
   const [totalComidasEntregadas, setTotalComidasEntregadas] = useState(0)
   const [mesasActivas, setMesasActivas] = useState(0)
-  const [totalMesas] = useState(10)
-  const [bufetesEstado, setBuffetesEstado] = useState<
-    Array<{
-      numero: number
-      activa: boolean
-      atendidos: number
-    }>
-  >([])
+  const [totalMesas, setTotalMesas] = useState(0)
+  const [mesasEstado, setMesasEstado] = useState<TableMealInventory[]>([])
 
   useEffect(() => {
     if (!loading && user && userRole === "operativo") {
@@ -80,8 +77,6 @@ export function SPADashboard({ initialView = "inicio" }: SPADashboardProps) {
       return
     }
 
-    console.log("[v0] Setting up real-time listener for mesa", mesaAsignada)
-
     const logsQuery = query(
       collection(db, "access_logs"),
       where("mesaUsada", "==", mesaAsignada),
@@ -90,7 +85,6 @@ export function SPADashboard({ initialView = "inicio" }: SPADashboardProps) {
 
     const unsubscribe = onSnapshot(logsQuery, (snapshot) => {
       const count = snapshot.size
-      console.log("[v0] Meals delivered count updated:", count)
       setEstudiantesAtendidos(count)
     })
 
@@ -102,16 +96,12 @@ export function SPADashboard({ initialView = "inicio" }: SPADashboardProps) {
       return
     }
 
-    console.log("[v0] Setting up real-time listener for mesa status", mesaAsignada)
+    const mesaRef = doc(db, "table_meal_inventory", `mesa_${mesaAsignada}`)
 
-    const mesaConfigQuery = query(collection(db, "mesas_config"), where("numero", "==", mesaAsignada))
-
-    const unsubscribe = onSnapshot(mesaConfigQuery, (snapshot) => {
-      if (!snapshot.empty) {
-        const mesaData = snapshot.docs[0].data()
-        const isActive = mesaData.activa ?? true
-        console.log("[v0] Mesa active status updated:", isActive)
-        setMesaActiva(isActive)
+    const unsubscribe = onSnapshot(mesaRef, (snapshot) => {
+      if (snapshot.exists()) {
+        const mesaData = snapshot.data() as TableMealInventory
+        setMesaActiva(mesaData.activa ?? true)
       }
     })
 
@@ -123,13 +113,10 @@ export function SPADashboard({ initialView = "inicio" }: SPADashboardProps) {
       return
     }
 
-    console.log("[v0] Setting up real-time listener for total meals delivered")
-
     const logsQuery = query(collection(db, "access_logs"), where("status", "==", "granted"))
 
     const unsubscribe = onSnapshot(logsQuery, (snapshot) => {
       const count = snapshot.size
-      console.log("[v0] Total meals delivered count updated:", count)
       setTotalComidasEntregadas(count)
     })
 
@@ -141,69 +128,27 @@ export function SPADashboard({ initialView = "inicio" }: SPADashboardProps) {
       return
     }
 
-    console.log("[v0] Setting up real-time listener for active mesas")
+    const tablesRef = collection(db, "table_meal_inventory")
 
-    const mesasConfigQuery = query(collection(db, "mesas_config"))
+    const unsubscribe = onSnapshot(tablesRef, (snapshot) => {
+      const tables: TableMealInventory[] = []
+      let activeCount = 0
 
-    const unsubscribe = onSnapshot(mesasConfigQuery, (snapshot) => {
-      const activeMesas = snapshot.docs.filter((doc) => {
-        const data = doc.data()
-        return data.activa === true
-      }).length
-      console.log("[v0] Active mesas count updated:", activeMesas)
-      setMesasActivas(activeMesas)
+      snapshot.forEach((docSnap) => {
+        const data = docSnap.data() as TableMealInventory
+        tables.push({ id: docSnap.id, ...data })
+        if (data.activa) {
+          activeCount++
+        }
+      })
+
+      tables.sort((a, b) => a.numeroMesa - b.numeroMesa)
+      setMesasEstado(tables)
+      setMesasActivas(activeCount)
+      setTotalMesas(tables.length)
     })
 
     return () => unsubscribe()
-  }, [isBufete])
-
-  useEffect(() => {
-    if (!isBufete) {
-      return
-    }
-
-    console.log("[v0] Setting up real-time listener for all bufetes status")
-
-    const mesasConfigQuery = query(collection(db, "mesas_config"))
-    const accessLogsQuery = query(collection(db, "access_logs"), where("status", "==", "granted"))
-
-    // Listener para configuración de mesas
-    const unsubscribeMesas = onSnapshot(mesasConfigQuery, (mesasSnapshot) => {
-      // Listener para logs de acceso
-      const unsubscribeLogs = onSnapshot(accessLogsQuery, (logsSnapshot) => {
-        const bufetesData: Array<{
-          numero: number
-          activa: boolean
-          atendidos: number
-        }> = []
-
-        // Procesar cada bufete del 1 al 10
-        for (let i = 1; i <= 10; i++) {
-          // Buscar configuración del bufete
-          const mesaDoc = mesasSnapshot.docs.find((doc) => doc.data().numero === i)
-          const activa = mesaDoc?.data().activa ?? true
-
-          // Contar estudiantes atendidos por este bufete
-          const atendidos = logsSnapshot.docs.filter((doc) => {
-            const data = doc.data()
-            return data.mesaUsada === i
-          }).length
-
-          bufetesData.push({
-            numero: i,
-            activa,
-            atendidos,
-          })
-        }
-
-        console.log("[v0] Bufetes status updated:", bufetesData)
-        setBuffetesEstado(bufetesData)
-      })
-
-      return () => unsubscribeLogs()
-    })
-
-    return () => unsubscribeMesas()
   }, [isBufete])
 
   if (loading) {
@@ -227,7 +172,7 @@ export function SPADashboard({ initialView = "inicio" }: SPADashboardProps) {
         return "Inicio"
       case "escanear":
         if (userRole === "bufete") {
-          return `Entrega de Comida - Bufete ${mesaAsignada}`
+          return `Entrega de Comida - Mesa ${mesaAsignada}`
         } else if (userRole === "operativo") {
           return "Control de Acceso al Evento"
         } else {
@@ -235,10 +180,12 @@ export function SPADashboard({ initialView = "inicio" }: SPADashboardProps) {
         }
       case "control-acceso":
         return "Control de Acceso"
+      case "inventario":
+        return "Inventario de Comidas"
       case "bufetes-gestion":
-        return `Gestión de Bufetes${mesaAsignada ? ` - Bufete ${mesaAsignada}` : ""}`
+        return `Gestión de Mesas${mesaAsignada ? ` - Mesa ${mesaAsignada}` : ""}`
       case "control-bufetes":
-        return "Control de Bufetes (Admin)"
+        return "Control de Mesas (Admin)"
       case "usuarios":
         return "Usuarios"
       case "base-datos":
@@ -249,11 +196,7 @@ export function SPADashboard({ initialView = "inicio" }: SPADashboardProps) {
   }
 
   const handleViewChange = (newView: ViewType) => {
-    console.log("[v0] Changing view from", currentView, "to", newView)
-
-    // Si estamos saliendo de una vista con escáner, incrementar la key
     if (currentView === "escanear" && newView !== "escanear") {
-      console.log("[v0] Leaving scanner view, forcing unmount")
       setScannerKey((prev) => prev + 1)
     }
 
@@ -306,6 +249,26 @@ export function SPADashboard({ initialView = "inicio" }: SPADashboardProps) {
           )
         }
         return <AccessControl />
+      case "inventario":
+        if (!isAdmin) {
+          return (
+            <div className="flex min-h-[calc(100vh-4rem)] flex-col items-center justify-center p-4">
+              <div className="text-center">
+                <h2 className="text-xl font-semibold mb-2">Acceso Restringido</h2>
+                <p className="text-muted-foreground">Solo administradores pueden acceder a esta sección.</p>
+              </div>
+            </div>
+          )
+        }
+        return (
+          <div className="flex-1 space-y-6 p-6">
+            <div>
+              <h1 className="text-3xl font-bold tracking-tight">Gestión de Inventario</h1>
+              <p className="text-muted-foreground">Administra el inventario global de comidas del evento</p>
+            </div>
+            <MealInventoryManagement />
+          </div>
+        )
       case "bufetes-gestion":
         if (!isBufete) {
           setCurrentView("inicio")
@@ -315,8 +278,8 @@ export function SPADashboard({ initialView = "inicio" }: SPADashboardProps) {
           <div className="flex flex-col gap-3 p-3 md:p-4">
             <div className="grid gap-3 grid-cols-2 md:grid-cols-3">
               <div className="rounded-lg bg-muted/50 p-3">
-                <h3 className="text-xs font-semibold mb-1 text-muted-foreground">Bufete Asignado</h3>
-                <div className="text-xl md:text-2xl font-bold text-primary">Bufete {mesaAsignada || "N/A"}</div>
+                <h3 className="text-xs font-semibold mb-1 text-muted-foreground">Mesa Asignada</h3>
+                <div className="text-xl md:text-2xl font-bold text-primary">Mesa {mesaAsignada || "N/A"}</div>
               </div>
               <div className="rounded-lg bg-muted/50 p-3">
                 <h3 className="text-xs font-semibold mb-1 text-muted-foreground">Estado</h3>
@@ -331,7 +294,7 @@ export function SPADashboard({ initialView = "inicio" }: SPADashboardProps) {
             </div>
             <div className="grid gap-3 grid-cols-2">
               <div className="rounded-lg bg-blue-50 border border-blue-200 p-3">
-                <h3 className="text-xs font-semibold mb-1 text-blue-900">Bufetes Activos</h3>
+                <h3 className="text-xs font-semibold mb-1 text-blue-900">Mesas Activas</h3>
                 <div className="text-lg md:text-xl font-bold text-blue-600">
                   {mesasActivas}/{totalMesas}
                 </div>
@@ -344,57 +307,69 @@ export function SPADashboard({ initialView = "inicio" }: SPADashboardProps) {
 
             <Card>
               <CardHeader className="pb-3 sm:pb-4">
-                <CardTitle className="text-lg sm:text-xl">Estado de los Bufetes</CardTitle>
+                <CardTitle className="text-lg sm:text-xl">Estado de las Mesas</CardTitle>
                 <CardDescription className="text-sm">
-                  Habilita o deshabilita bufetes individualmente. Solo los bufetes activos pueden atender estudiantes.
+                  Visualiza el estado de cada mesa registrada en el inventario de comidas.
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-5">
-                  {bufetesEstado.map((bufete) => (
-                    <Card
-                      key={bufete.numero}
-                      className={`transition-all ${
-                        bufete.activa ? "border-green-200 bg-green-50" : "border-gray-200 bg-gray-50"
-                      }`}
-                    >
-                      <CardHeader className="pb-2 p-3">
-                        <div className="flex items-center justify-between">
-                          <CardTitle className="text-sm sm:text-base">Bufete {bufete.numero}</CardTitle>
-                          <Switch
-                            checked={bufete.activa}
-                            disabled={true}
-                            className="scale-75 sm:scale-90"
-                            aria-label={`Estado Bufete ${bufete.numero}`}
-                          />
-                        </div>
-                      </CardHeader>
-                      <CardContent className="pt-0 p-3 space-y-1">
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs text-muted-foreground">Estado:</span>
-                          <Badge variant={bufete.activa ? "default" : "secondary"} className="text-xs px-1.5 py-0.5">
-                            {bufete.activa ? "Activo" : "Inactivo"}
-                          </Badge>
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs text-muted-foreground">Atendidos:</span>
-                          <span className="text-sm font-semibold">{bufete.atendidos}</span>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
+                {mesasEstado.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <Utensils className="h-12 w-12 mx-auto mb-3 opacity-30" />
+                    <p>No hay mesas configuradas</p>
+                    <p className="text-sm">Las mesas se configuran desde el Inventario de Comidas</p>
+                  </div>
+                ) : (
+                  <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-5">
+                    {mesasEstado.map((mesa) => {
+                      const percentage = mesa.totalComidas > 0 ? (mesa.comidasDisponibles / mesa.totalComidas) * 100 : 0
+                      const isLow = percentage < 20
+
+                      return (
+                        <Card
+                          key={mesa.id}
+                          className={`transition-all ${
+                            mesa.activa ? "border-green-200 bg-green-50" : "border-gray-200 bg-gray-50"
+                          } ${isLow && mesa.activa ? "ring-2 ring-orange-300" : ""}`}
+                        >
+                          <CardHeader className="pb-2 p-3">
+                            <div className="flex items-center justify-between">
+                              <CardTitle className="text-sm sm:text-base">Mesa {mesa.numeroMesa}</CardTitle>
+                              <Badge variant={mesa.activa ? "default" : "secondary"} className="text-xs px-1.5 py-0.5">
+                                {mesa.activa ? "Activa" : "Inactiva"}
+                              </Badge>
+                            </div>
+                            <p className="text-xs text-muted-foreground truncate">{mesa.nombreMesa}</p>
+                          </CardHeader>
+                          <CardContent className="pt-0 p-3 space-y-1">
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs text-muted-foreground">Disponibles:</span>
+                              <span className={`text-sm font-semibold ${isLow ? "text-orange-600" : "text-green-600"}`}>
+                                {mesa.comidasDisponibles}
+                              </span>
+                            </div>
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs text-muted-foreground">Total:</span>
+                              <span className="text-sm font-semibold">{mesa.totalComidas}</span>
+                            </div>
+                            {isLow && mesa.activa && <p className="text-xs text-orange-600 font-medium">Stock bajo</p>}
+                          </CardContent>
+                        </Card>
+                      )
+                    })}
+                  </div>
+                )}
               </CardContent>
             </Card>
 
             <div className="min-h-[100vh] flex-1 rounded-xl bg-muted/50 p-4">
-              <h3 className="font-semibold mb-4">Instrucciones para Bufete {mesaAsignada}</h3>
+              <h3 className="font-semibold mb-4">Instrucciones para Mesa {mesaAsignada}</h3>
               <div className="space-y-2 text-sm text-muted-foreground">
-                <p>• Solo puedes entregar comida a estudiantes autenticados</p>
-                <p>• Cada estudiante tiene 2 cupos predeterminados + cupos extras</p>
-                <p>• Al escanear exitosamente, se consume 1 cupo automáticamente</p>
-                <p>• No se puede entregar comida a estudiantes ya escaneados</p>
-                <p>• Usa la vista "Escanear" para procesar entregas de comida</p>
+                <p>- Solo puedes entregar comida a estudiantes autenticados</p>
+                <p>- Cada estudiante tiene 2 cupos predeterminados + cupos extras</p>
+                <p>- Al escanear exitosamente, se consume 1 cupo automáticamente</p>
+                <p>- No se puede entregar comida a estudiantes ya escaneados</p>
+                <p>- Usa la vista "Escanear" para procesar entregas de comida</p>
               </div>
             </div>
           </div>

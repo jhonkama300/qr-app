@@ -235,6 +235,8 @@ export function UnifiedLogin() {
         cuposConsumidos: 0,
         cuposDisponibles: 0,
         porcentajeConsumido: 0,
+        acompanantesBase: 0,
+        cuposExtras: 0,
         totalAcompanantes: 0,
       }
     }
@@ -243,23 +245,19 @@ export function UnifiedLogin() {
     const consumidos = studentData.cuposConsumidos || 0
     const disponibles = total - consumidos
     const porcentaje = total > 0 ? (consumidos / total) * 100 : 0
-    const acompanantes = total // Total de acompañantes = base (2) + extras
 
-    console.log("[v0] Cupos recalculados:", {
-      total,
-      consumidos,
-      disponibles,
-      porcentaje,
-      acompanantes,
-      timestamp: new Date().toISOString(),
-    })
+    const acompanantesBase = 1 // Siempre tiene 1 acompañante base
+    const extras = studentData.cuposExtras || 0
+    const totalAcompanantes = acompanantesBase + extras // Total de acompañantes (sin contar al graduando)
 
     return {
       cuposTotal: total,
       cuposConsumidos: consumidos,
       cuposDisponibles: disponibles,
       porcentajeConsumido: porcentaje,
-      totalAcompanantes: acompanantes,
+      acompanantesBase,
+      cuposExtras: extras,
+      totalAcompanantes,
     }
   }, [studentData, studentData?.cuposConsumidos, studentData?.cuposExtras])
 
@@ -473,11 +471,11 @@ export function UnifiedLogin() {
                     <div className="flex-1 min-w-0">
                       <p className="text-[10px] font-medium text-gray-500 mb-0.5">Programa Académico</p>
                       <p className="text-xs font-semibold text-gray-900 leading-tight">{studentData.programa}</p>
-                      {/* Mostrar acompañantes */}
                       <div className="flex items-center gap-1 mt-1 text-[10px] text-lime-700 bg-lime-50 px-1.5 py-0.5 rounded-md border border-lime-200 w-fit">
                         <UserPlus className="w-3 h-3" />
                         <span className="font-semibold">
-                          {cuposStats.totalAcompanantes} acompañante{cuposStats.totalAcompanantes !== 1 ? "s" : ""}
+                          Graduando + {cuposStats.totalAcompanantes} acompañante
+                          {cuposStats.totalAcompanantes !== 1 ? "s" : ""}
                         </span>
                       </div>
                     </div>
@@ -543,8 +541,7 @@ export function UnifiedLogin() {
                   <div className="mt-2 flex items-center gap-1.5 text-[10px] bg-lime-50 text-lime-700 p-1.5 rounded-md border border-lime-200">
                     <TrendingUp className="w-3.5 h-3.5" />
                     <span className="font-medium">
-                      Incluye {studentData.cuposExtras} bufete{studentData.cuposExtras !== 1 ? "s" : ""} extra
-                      {studentData.cuposExtras !== 1 ? "s" : ""}
+                      Incluye {studentData.cuposExtras} acompañante{studentData.cuposExtras !== 1 ? "s" : ""} extra
                     </span>
                   </div>
                 )}

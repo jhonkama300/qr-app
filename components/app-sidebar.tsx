@@ -1,6 +1,6 @@
 "use client"
 
-import { Home, Scan, Shield, Database, Users, LogOut, User, ChevronUp, Settings, Utensils } from "lucide-react"
+import { Home, Scan, Shield, Database, Users, LogOut, User, ChevronUp, Settings, Utensils, Package } from "lucide-react"
 import { useState } from "react"
 import {
   Sidebar,
@@ -57,6 +57,14 @@ const items = [
     bufeteOnly: false,
     operativoOnly: false,
     adminOrOperativo: true, // Nueva propiedad para indicar que necesita ser admin o operativo
+  },
+  {
+    title: "Inventario de Comidas",
+    view: "inventario" as ViewType,
+    icon: Package,
+    adminOnly: true,
+    bufeteOnly: false,
+    operativoOnly: false,
   },
   {
     title: "Gestión de Bufetes", // Cambiar "Gestión de Mesas" por "Gestión de Bufetes"
@@ -262,7 +270,7 @@ export function AppSidebar({ currentView = "inicio", onViewChange }: AppSidebarP
                   </SidebarMenuButton>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent
-                  className="w-[--radix-dropdown-menu-trigger-width] min-w-56 rounded-lg"
+                  className="w-(--radix-dropdown-menu-trigger-width) min-w-56 rounded-lg"
                   side="bottom"
                   align="end"
                   sideOffset={4}

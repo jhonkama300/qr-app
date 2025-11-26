@@ -3,10 +3,13 @@
 import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { collection, query, where, onSnapshot } from "firebase/firestore"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { collection, query, where, onSnapshot, doc } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { useAuth } from "@/components/auth-provider"
-import { Utensils, Users, TrendingUp, Activity, Scale } from "lucide-react"
+import { Utensils, Users, Activity, Scale, Package, AlertTriangle, TrendingDown } from "lucide-react"
+import { Progress } from "@/components/ui/progress"
+import type { MealInventory, TableMealInventory } from "@/lib/firestore-service"
 
 interface MesaStats {
   numero: number
@@ -15,66 +18,62 @@ interface MesaStats {
   ultimoAcceso?: string
 }
 
-interface MesaConfig {
-  id?: string
-  numero: number
-  activa: boolean
-  nombre: string
-}
-
 export default function BufetesPage() {
   const { user, activeRole } = useAuth()
   const [mesas, setMesas] = useState<MesaStats[]>([])
-  const [mesasConfig, setMesasConfig] = useState<MesaConfig[]>([])
+  const [tableMealInventories, setTableMealInventories] = useState<TableMealInventory[]>([])
   const [loading, setLoading] = useState(true)
   const [totalComidasPorEntregar, setTotalComidasPorEntregar] = useState(0)
+  const [mealInventory, setMealInventory] = useState<MealInventory | null>(null)
 
   useEffect(() => {
-    const mesasQuery = query(collection(db, "mesas_config"))
-    const unsubscribe = onSnapshot(mesasQuery, (snapshot) => {
-      const mesasData: MesaConfig[] = []
+    const tablesRef = collection(db, "table_meal_inventory")
+    const unsubscribe = onSnapshot(tablesRef, (snapshot) => {
+      const tables: TableMealInventory[] = []
       snapshot.forEach((doc) => {
-        mesasData.push({ id: doc.id, ...doc.data() } as MesaConfig)
+        tables.push({ id: doc.id, ...doc.data() } as TableMealInventory)
       })
-      mesasData.sort((a, b) => a.numero - b.numero)
-      setMesasConfig(mesasData)
+      setTableMealInventories(tables.sort((a, b) => a.numeroMesa - b.numeroMesa))
     })
 
-    return unsubscribe
+    return () => unsubscribe()
   }, [])
 
   useEffect(() => {
-    if (mesasConfig.length === 0) return
+    if (tableMealInventories.length === 0) {
+      setMesas([])
+      setLoading(false)
+      return
+    }
 
     const accessLogsQuery = query(collection(db, "access_logs"), where("status", "==", "granted"))
 
     const unsubscribe = onSnapshot(accessLogsQuery, (snapshot) => {
       const mesasStats: MesaStats[] = []
 
-      for (let i = 1; i <= 10; i++) {
+      tableMealInventories.forEach((tableInventory) => {
         const mesaLogs = snapshot.docs.filter((doc) => {
           const data = doc.data()
-          return data.mesaUsada === i
+          return data.mesaUsada === tableInventory.numeroMesa
         })
 
         const estudiantesAtendidos = mesaLogs.length
         const ultimoAcceso = mesaLogs.length > 0 ? mesaLogs[mesaLogs.length - 1].data().timestamp : undefined
-        const mesaConfig = mesasConfig.find((m) => m.numero === i)
 
         mesasStats.push({
-          numero: i,
-          activa: mesaConfig?.activa ?? true,
+          numero: tableInventory.numeroMesa,
+          activa: tableInventory.activa,
           estudiantesAtendidos,
           ultimoAcceso,
         })
-      }
+      })
 
       setMesas(mesasStats)
       setLoading(false)
     })
 
     return unsubscribe
-  }, [mesasConfig])
+  }, [tableMealInventories])
 
   useEffect(() => {
     const estudiantesQuery = query(collection(db, "personas"))
@@ -95,16 +94,31 @@ export default function BufetesPage() {
     return unsubscribe
   }, [])
 
+  useEffect(() => {
+    const inventoryRef = doc(db, "config", "meal_inventory")
+    const unsubscribe = onSnapshot(inventoryRef, (docSnapshot) => {
+      if (docSnapshot.exists()) {
+        setMealInventory(docSnapshot.data() as MealInventory)
+      }
+    })
+
+    return unsubscribe
+  }, [])
+
   const totalEstudiantes = mesas.reduce((sum, mesa) => sum + mesa.estudiantesAtendidos, 0)
   const mesasActivas = mesas.filter((mesa) => mesa.activa).length
-  const promedioEstudiantes = mesas.length > 0 ? Math.round(totalEstudiantes / mesas.length) : 0
+
+  const inventoryPercentage = mealInventory
+    ? (mealInventory.comidasDisponibles / mealInventory.totalComidas) * 100
+    : 100
+  const isLowInventory = inventoryPercentage < 20
 
   if (loading) {
     return (
       <div className="flex items-center justify-center p-6 sm:p-8">
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto"></div>
-          <p className="mt-2 text-sm sm:text-base text-muted-foreground">Cargando estadísticas de bufetes...</p>
+          <p className="mt-2 text-sm sm:text-base text-muted-foreground">Cargando estadísticas de mesas...</p>
         </div>
       </div>
     )
@@ -114,13 +128,64 @@ export default function BufetesPage() {
     <div className="flex-1 space-y-6 p-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Gestión de Bufetes</h1>
-          <p className="text-muted-foreground">Monitorea el estado y estadísticas de los bufetes en tiempo real</p>
+          <h1 className="text-3xl font-bold tracking-tight">Gestión de Mesas</h1>
+          <p className="text-muted-foreground">Monitorea el estado y estadísticas de las mesas en tiempo real</p>
         </div>
         <Badge variant="outline" className="text-sm">
           Rol: {activeRole}
         </Badge>
       </div>
+
+      {isLowInventory && mealInventory && (
+        <Alert variant="destructive">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertDescription>
+            ¡Advertencia! El inventario de comidas está bajo ({inventoryPercentage.toFixed(1)}% disponible). Solo quedan{" "}
+            {mealInventory.comidasDisponibles} de {mealInventory.totalComidas} comidas.
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {mealInventory && (
+        <Card className="bg-gradient-to-br from-orange-50 to-orange-100 border-orange-200">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-orange-800">
+              <Package className="h-5 w-5" />
+              Inventario Global de Comidas
+            </CardTitle>
+            <CardDescription className="text-orange-700">
+              Control centralizado del stock de comidas disponibles
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-3 gap-4">
+              <div className="text-center p-3 bg-white/50 rounded-lg">
+                <div className="text-2xl font-bold text-orange-900">{mealInventory.totalComidas}</div>
+                <p className="text-xs text-orange-700">Total Asignado</p>
+              </div>
+              <div className="text-center p-3 bg-white/50 rounded-lg">
+                <div className="text-2xl font-bold text-red-700">{mealInventory.comidasConsumidas}</div>
+                <p className="text-xs text-red-600">Ya Entregadas</p>
+              </div>
+              <div className="text-center p-3 bg-white/50 rounded-lg">
+                <div className={`text-2xl font-bold ${isLowInventory ? "text-red-700" : "text-green-700"}`}>
+                  {mealInventory.comidasDisponibles}
+                </div>
+                <p className={`text-xs ${isLowInventory ? "text-red-600" : "text-green-600"}`}>Disponibles</p>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-orange-800">Progreso de entregas</span>
+                <span className="font-medium text-orange-900">
+                  {mealInventory.comidasConsumidas} / {mealInventory.totalComidas}
+                </span>
+              </div>
+              <Progress value={(mealInventory.comidasConsumidas / mealInventory.totalComidas) * 100} className="h-3" />
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card>
@@ -135,22 +200,24 @@ export default function BufetesPage() {
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Bufetes Activos</CardTitle>
+            <CardTitle className="text-sm font-medium">Mesas Activas</CardTitle>
             <Activity className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{mesasActivas}/10</div>
-            <p className="text-xs text-muted-foreground">Bufetes habilitados</p>
+            <div className="text-2xl font-bold">
+              {mesasActivas}/{tableMealInventories.length}
+            </div>
+            <p className="text-xs text-muted-foreground">Mesas habilitadas</p>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Promedio por Bufete</CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium text-blue-700">Inventario Total Asignado</CardTitle>
+            <Package className="h-4 w-4 text-blue-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{promedioEstudiantes}</div>
-            <p className="text-xs text-muted-foreground">Estudiantes por bufete</p>
+            <div className="text-2xl font-bold text-blue-900">{mealInventory ? mealInventory.totalComidas : 0}</div>
+            <p className="text-xs text-blue-600">Comidas en sistema</p>
           </CardContent>
         </Card>
         <Card>
@@ -165,43 +232,110 @@ export default function BufetesPage() {
         </Card>
       </div>
 
+      {tableMealInventories.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <TrendingDown className="h-5 w-5" />
+              Estado de Inventario por Mesa
+            </CardTitle>
+            <CardDescription>Visualiza el inventario disponible en cada mesa</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-4">
+              {tableMealInventories.map((table) => {
+                const percentage = (table.comidasDisponibles / table.totalComidas) * 100
+                const isLow = percentage < 20
+
+                return (
+                  <Card
+                    key={table.id}
+                    className={`${isLow && table.activa ? "border-orange-300 bg-orange-50" : ""} ${
+                      !table.activa ? "opacity-50" : ""
+                    }`}
+                  >
+                    <CardHeader className="pb-2 p-3">
+                      <div className="flex items-center justify-between">
+                        <CardTitle className="text-base">Mesa {table.numeroMesa}</CardTitle>
+                        <Badge variant={table.activa ? "default" : "secondary"} className="text-xs">
+                          {table.activa ? "Activa" : "Inactiva"}
+                        </Badge>
+                      </div>
+                      <p className="text-xs text-muted-foreground">{table.nombreMesa}</p>
+                    </CardHeader>
+                    <CardContent className="pt-0 p-3 space-y-2">
+                      <div className="grid grid-cols-3 gap-1 text-center">
+                        <div>
+                          <div className="text-sm font-bold text-blue-600">{table.totalComidas}</div>
+                          <p className="text-xs text-muted-foreground">Total</p>
+                        </div>
+                        <div>
+                          <div className="text-sm font-bold text-red-600">{table.comidasConsumidas}</div>
+                          <p className="text-xs text-muted-foreground">Usadas</p>
+                        </div>
+                        <div>
+                          <div className={`text-sm font-bold ${isLow ? "text-orange-600" : "text-green-600"}`}>
+                            {table.comidasDisponibles}
+                          </div>
+                          <p className="text-xs text-muted-foreground">Quedan</p>
+                        </div>
+                      </div>
+                      <Progress value={percentage} className="h-1.5" />
+                      {isLow && table.activa && <p className="text-xs text-orange-600">⚠️ Stock bajo</p>}
+                    </CardContent>
+                  </Card>
+                )
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       <Card>
         <CardHeader>
-          <CardTitle>Estado de los Bufetes en Tiempo Real</CardTitle>
+          <CardTitle>Estado de las Mesas en Tiempo Real</CardTitle>
           <CardDescription>
-            Visualiza el estado actual de cada bufete y cuántos estudiantes han sido atendidos
+            Visualiza el estado actual de cada mesa y cuántos estudiantes han sido atendidos
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-5">
-            {mesas.map((mesa) => (
-              <Card
-                key={mesa.numero}
-                className={`transition-all ${mesa.activa ? "border-green-200 bg-green-50" : "border-red-200 bg-red-50"}`}
-              >
-                <CardHeader className="pb-2 p-3">
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="text-base">Bufete {mesa.numero}</CardTitle>
-                    <Badge variant={mesa.activa ? "default" : "secondary"} className="text-xs">
-                      {mesa.activa ? "Activo" : "Inactivo"}
-                    </Badge>
-                  </div>
-                </CardHeader>
-                <CardContent className="pt-0 p-3 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs text-muted-foreground">Comidas:</span>
-                    <span className="text-lg font-bold text-primary">{mesa.estudiantesAtendidos}</span>
-                  </div>
-                  {mesa.activa && (
-                    <div className="flex items-center gap-1">
-                      <div className="h-2 w-2 rounded-full bg-green-500 animate-pulse"></div>
-                      <span className="text-xs text-green-700">En servicio</span>
+          {mesas.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              <Utensils className="h-12 w-12 mx-auto mb-3 opacity-30" />
+              <p>No hay mesas configuradas</p>
+              <p className="text-sm">Agrega mesas en la sección de Inventario de Comidas</p>
+            </div>
+          ) : (
+            <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-5">
+              {mesas.map((mesa) => (
+                <Card
+                  key={mesa.numero}
+                  className={`transition-all ${mesa.activa ? "border-green-200 bg-green-50" : "border-red-200 bg-red-50"}`}
+                >
+                  <CardHeader className="pb-2 p-3">
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="text-base">Mesa {mesa.numero}</CardTitle>
+                      <Badge variant={mesa.activa ? "default" : "secondary"} className="text-xs">
+                        {mesa.activa ? "Activa" : "Inactiva"}
+                      </Badge>
                     </div>
-                  )}
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+                  </CardHeader>
+                  <CardContent className="pt-0 p-3 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-muted-foreground">Comidas:</span>
+                      <span className="text-lg font-bold text-primary">{mesa.estudiantesAtendidos}</span>
+                    </div>
+                    {mesa.activa && (
+                      <div className="flex items-center gap-1">
+                        <div className="h-2 w-2 rounded-full bg-green-500 animate-pulse"></div>
+                        <span className="text-xs text-green-700">En servicio</span>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -215,16 +349,16 @@ export default function BufetesPage() {
         <CardContent>
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
-              <h3 className="font-semibold text-sm">Bufetes Operativos</h3>
+              <h3 className="font-semibold text-sm">Mesas Operativas</h3>
               <p className="text-sm text-muted-foreground">
-                Actualmente hay <span className="font-bold text-primary">{mesasActivas}</span> bufetes activos de un
-                total de 10 disponibles.
+                Actualmente hay <span className="font-bold text-primary">{mesasActivas}</span> mesas activas de un total
+                de {tableMealInventories.length} configuradas.
               </p>
             </div>
             <div className="space-y-2">
               <h3 className="font-semibold text-sm">Actualización en Tiempo Real</h3>
               <p className="text-sm text-muted-foreground">
-                Los contadores se actualizan automáticamente cuando se registra un nuevo acceso en cualquier bufete.
+                Los contadores se actualizan automáticamente cuando se registra un nuevo acceso en cualquier mesa.
               </p>
             </div>
           </div>
