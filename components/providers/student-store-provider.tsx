@@ -55,7 +55,10 @@ interface StudentStoreContextType {
     userInfo?: UserInfo,
   ) => Promise<void>
   checkIfAlreadyScanned: (identificacion: string) => Promise<boolean>
-  validateMesaAccess: (identificacion: string, mesaRequerida: number) => Promise<{ valid: boolean; message: string }>
+  validateMesaAccess: (
+    identificacion: string,
+    mesaRequerida: number,
+  ) => Promise<{ valid: boolean; message: string; noAccessLog?: boolean }>
   checkMesaStatus: (mesaNumero: number) => Promise<boolean>
   checkAccessGranted: (identificacion: string) => Promise<boolean>
   getMealInventory: () => Promise<MealInventory>
@@ -208,13 +211,17 @@ export function StudentStoreProvider({ children }: { children: React.ReactNode }
   }, [])
 
   const validateMesaAccess = useCallback(
-    async (identificacion: string, mesaRequerida: number): Promise<{ valid: boolean; message: string }> => {
+    async (
+      identificacion: string,
+      mesaRequerida: number,
+    ): Promise<{ valid: boolean; message: string; noAccessLog?: boolean }> => {
       try {
         const hasEventAccess = await checkAccessGranted(identificacion)
         if (!hasEventAccess) {
           return {
             valid: false,
             message: `❌ Estudiante sin acceso al evento. Debe registrarse primero con el rol Operativo.`,
+            noAccessLog: true, // Indica que no debe registrar log, queda en espera
           }
         }
 
