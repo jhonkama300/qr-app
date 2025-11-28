@@ -47,7 +47,7 @@ interface ScanResult {
 }
 
 interface ScanResultDisplay {
-  type: "success" | "denied" | "error" | "info"
+  type: "success" | "denied" | "error" | "info" | "already_scanned"
   identificacion: string
   person?: any
   message: string
@@ -300,9 +300,10 @@ export function OperativoScanner() {
 
           if (alreadyScanned) {
             currentScanResult = {
-              type: "error",
+              type: "already_scanned",
               identificacion: q10Result.identificacion!,
-              message: `❌ Este código ya fue escaneado anteriormente. No se permite el ingreso duplicado.`,
+              person: q10Result.student,
+              message: `Este código ya fue escaneado anteriormente. Mostrando información del estudiante.`,
               source: "q10",
               timestamp: new Date().toISOString(),
             }
@@ -310,7 +311,6 @@ export function OperativoScanner() {
             setProcessing(false)
             return
           }
-          // Fin de la validación de escaneo duplicado para links Q10
 
           await markStudentAccess(q10Result.identificacion!, true, "Acceso concedido al evento", "q10", userInfo)
           currentScanResult = {
@@ -338,10 +338,14 @@ export function OperativoScanner() {
         const alreadyScanned = await checkIfAlreadyScanned(scannedContent)
 
         if (alreadyScanned) {
+          const student = await getStudentById(scannedContent)
           currentScanResult = {
-            type: "error",
+            type: "already_scanned",
             identificacion: scannedContent,
-            message: `❌ Este código ya fue escaneado anteriormente. No se permite el ingreso duplicado.`,
+            person: student,
+            message: student
+              ? `Este código ya fue escaneado anteriormente. Mostrando información del estudiante.`
+              : `Este código ya fue escaneado anteriormente. No se encontró información adicional.`,
             source: source,
             timestamp: new Date().toISOString(),
           }
@@ -624,6 +628,7 @@ export function OperativoScanner() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-lg">
               {scanResultDisplay?.type === "success" && <CheckCircle className="w-6 h-6 text-green-600" />}
+              {scanResultDisplay?.type === "already_scanned" && <AlertTriangle className="w-6 h-6 text-yellow-600" />}
               {scanResultDisplay?.type === "denied" && <XCircle className="w-6 h-6 text-red-600" />}
               {scanResultDisplay?.type === "error" && <AlertTriangle className="w-6 h-6 text-orange-600" />}
               {scanResultDisplay?.type === "info" && <Loader2Icon className="w-6 h-6 animate-spin text-blue-600" />}
@@ -718,7 +723,7 @@ export function OperativoScanner() {
                           </div>
                           <div className="bg-orange-50 rounded p-2">
                             <p className="text-orange-600">Usados</p>
-                            <p className="font-bold text-orange-700">{displayPerson.cuposConsumidos || 0}</p>
+                            <p className="font-bold text-orange-800">{displayPerson.cuposConsumidos || 0}</p>
                           </div>
                         </div>
 
@@ -737,6 +742,93 @@ export function OperativoScanner() {
                       </div>
                     </CardContent>
                   </Card>
+                )}
+
+                {scanResultDisplay.type === "already_scanned" && displayPerson && (
+                  <Card className="border-yellow-300 bg-gradient-to-br from-yellow-50 to-amber-50 shadow-lg">
+                    <CardHeader className="pb-3 bg-gradient-to-r from-yellow-500 to-amber-500 text-white rounded-t-lg">
+                      <h2 className="text-base flex items-center gap-2">
+                        <AlertTriangle className="w-5 h-5" />
+                        Ya Registrado Anteriormente
+                      </h2>
+                    </CardHeader>
+                    <CardContent className="space-y-4 pt-4">
+                      <div className="space-y-3">
+                        <div className="flex items-start gap-3">
+                          <GraduationCap className="w-5 h-5 text-yellow-600 mt-0.5" />
+                          <div className="flex-1">
+                            <p className="text-xs text-yellow-700 font-medium">Nombre Completo</p>
+                            <p className="text-sm font-bold text-yellow-900">{displayPerson.nombre}</p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-start gap-3">
+                          <MapPin className="w-5 h-5 text-yellow-600 mt-0.5" />
+                          <div className="flex-1">
+                            <p className="text-xs text-yellow-700 font-medium">Programa Académico</p>
+                            <p className="text-sm font-semibold text-yellow-800">{displayPerson.programa}</p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-start gap-3">
+                          <Award className="w-5 h-5 text-yellow-600 mt-0.5" />
+                          <div className="flex-1">
+                            <p className="text-xs text-yellow-700 font-medium">Puesto Asignado</p>
+                            <Badge className="bg-yellow-600 hover:bg-yellow-700 text-white font-bold">
+                              Silla {displayPerson.puesto}
+                            </Badge>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="bg-white rounded-lg p-4 border-2 border-yellow-300 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <Ticket className="w-4 h-4 text-yellow-600" />
+                            <span className="text-sm font-semibold text-yellow-800">Bufetes Disponibles</span>
+                          </div>
+                          <span className="text-2xl font-bold text-yellow-600">{cuposDisponibles}</span>
+                        </div>
+
+                        <div className="grid grid-cols-3 gap-2 text-xs">
+                          <div className="bg-yellow-50 rounded p-2">
+                            <p className="text-yellow-700">Total</p>
+                            <p className="font-bold text-yellow-900">{2 + (displayPerson.cuposExtras || 0)}</p>
+                          </div>
+                          <div className="bg-yellow-100 rounded p-2">
+                            <p className="text-yellow-700">Extras</p>
+                            <p className="font-bold text-yellow-800">{displayPerson.cuposExtras || 0}</p>
+                          </div>
+                          <div className="bg-amber-100 rounded p-2">
+                            <p className="text-amber-700">Usados</p>
+                            <p className="font-bold text-amber-800">{displayPerson.cuposConsumidos || 0}</p>
+                          </div>
+                        </div>
+
+                        <div className="w-full bg-yellow-200 rounded-full h-2 mt-2">
+                          <div
+                            className="bg-gradient-to-r from-yellow-500 to-amber-500 h-2 rounded-full transition-all duration-500"
+                            style={{
+                              width: `${(cuposDisponibles / (2 + (displayPerson.cuposExtras || 0))) * 100}%`,
+                            }}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="text-xs text-yellow-800 bg-yellow-100 p-3 rounded-lg font-medium text-center border border-yellow-300">
+                        Este estudiante ya ingresó al evento previamente
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+
+                {scanResultDisplay.type === "already_scanned" && !displayPerson && (
+                  <Alert className="border-yellow-300 bg-yellow-50">
+                    <AlertTriangle className="h-5 w-5 text-yellow-600" />
+                    <AlertDescription className="text-sm font-medium text-yellow-800">
+                      {scanResultDisplay.message}
+                    </AlertDescription>
+                  </Alert>
                 )}
 
                 {scanResultDisplay.type === "error" && (

@@ -1,6 +1,19 @@
 "use client"
 
-import { Home, Scan, Shield, Database, Users, LogOut, User, ChevronUp, Settings, Utensils, Package } from "lucide-react"
+import {
+  Home,
+  Scan,
+  Shield,
+  Database,
+  Users,
+  LogOut,
+  User,
+  ChevronUp,
+  Settings,
+  Utensils,
+  Package,
+  Eye,
+} from "lucide-react"
 import { useState } from "react"
 import {
   Sidebar,
@@ -75,8 +88,17 @@ const items = [
     operativoOnly: false,
   },
   {
-    title: "Control de Bufetes", // Cambiar "Control de Mesas" por "Control de Bufetes"
-    view: "control-bufetes" as ViewType, // Cambiar view name
+    title: "Estado de Mesas",
+    view: "estado-mesas" as ViewType,
+    icon: Eye,
+    adminOnly: false,
+    bufeteOnly: false,
+    operativoOnly: true, // Solo para operativos
+    description: "Vista de solo lectura",
+  },
+  {
+    title: "Control de Bufetes",
+    view: "control-bufetes" as ViewType,
     icon: Settings,
     adminOnly: true,
     bufeteOnly: false,
@@ -215,6 +237,9 @@ export function AppSidebar({ currentView = "inicio", onViewChange }: AppSidebarP
                             <span className="text-xs text-muted-foreground">
                               {item.getDescription(activeRole || "")}
                             </span>
+                          )}
+                          {item.view === "estado-mesas" && (
+                            <span className="text-xs text-muted-foreground">Vista de solo lectura</span>
                           )}
                         </div>
                         {item.adminOnly && isAdmin && (

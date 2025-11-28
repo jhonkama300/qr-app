@@ -19,8 +19,11 @@ import { collection, query, where, onSnapshot, doc } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Utensils } from "lucide-react"
-import type { TableMealInventory } from "@/lib/firestore-service"
+import { Utensils, Eye, Package, Users, Activity } from "lucide-react"
+import { Progress } from "@/components/ui/progress"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { AlertTriangle } from "lucide-react"
+import type { TableMealInventory, MealInventory } from "@/lib/firestore-service"
 
 // Importar todos los componentes de las vistas
 import { DashboardStats } from "@/components/dashboard-stats"
@@ -42,6 +45,7 @@ export type ViewType =
   | "control-bufetes"
   | "usuarios"
   | "base-datos"
+  | "estado-mesas"
 
 interface SPADashboardProps {
   initialView?: ViewType
@@ -59,6 +63,9 @@ export function SPADashboard({ initialView = "inicio" }: SPADashboardProps) {
   const [mesasActivas, setMesasActivas] = useState(0)
   const [totalMesas, setTotalMesas] = useState(0)
   const [mesasEstado, setMesasEstado] = useState<TableMealInventory[]>([])
+
+  const [operativoMesasEstado, setOperativoMesasEstado] = useState<TableMealInventory[]>([])
+  const [operativoMealInventory, setOperativoMealInventory] = useState<MealInventory | null>(null)
 
   useEffect(() => {
     if (!loading && user && userRole === "operativo") {
@@ -151,6 +158,35 @@ export function SPADashboard({ initialView = "inicio" }: SPADashboardProps) {
     return () => unsubscribe()
   }, [isBufete])
 
+  useEffect(() => {
+    if (userRole !== "operativo" || currentView !== "estado-mesas") {
+      return
+    }
+
+    const tablesRef = collection(db, "table_meal_inventory")
+    const unsubscribeTables = onSnapshot(tablesRef, (snapshot) => {
+      const tables: TableMealInventory[] = []
+      snapshot.forEach((docSnap) => {
+        const data = docSnap.data() as TableMealInventory
+        tables.push({ id: docSnap.id, ...data })
+      })
+      tables.sort((a, b) => a.numeroMesa - b.numeroMesa)
+      setOperativoMesasEstado(tables)
+    })
+
+    const inventoryRef = doc(db, "config", "meal_inventory")
+    const unsubscribeInventory = onSnapshot(inventoryRef, (docSnapshot) => {
+      if (docSnapshot.exists()) {
+        setOperativoMealInventory(docSnapshot.data() as MealInventory)
+      }
+    })
+
+    return () => {
+      unsubscribeTables()
+      unsubscribeInventory()
+    }
+  }, [userRole, currentView])
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -190,6 +226,8 @@ export function SPADashboard({ initialView = "inicio" }: SPADashboardProps) {
         return "Usuarios"
       case "base-datos":
         return "Base de Datos"
+      case "estado-mesas":
+        return "Estado de Mesas (Solo Lectura)"
       default:
         return "Dashboard"
     }
@@ -392,6 +430,219 @@ export function SPADashboard({ initialView = "inicio" }: SPADashboardProps) {
           return <DashboardStats currentUserRole={userRole} />
         }
         return <DatabaseManagement />
+      case "estado-mesas":
+        if (userRole !== "operativo") {
+          setCurrentView("escanear")
+          return <OperativoScanner key={`operativo-${scannerKey}`} />
+        }
+
+        const operativoMesasActivas = operativoMesasEstado.filter((m) => m.activa).length
+        const inventoryPercentage = operativoMealInventory
+          ? (operativoMealInventory.comidasDisponibles / operativoMealInventory.totalComidas) * 100
+          : 100
+        const isLowInventory = inventoryPercentage < 20
+
+        return (
+          <div className="flex-1 space-y-6 p-4 md:p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <h1 className="text-2xl md:text-3xl font-bold tracking-tight flex items-center gap-2">
+                  <Eye className="h-6 w-6 md:h-8 md:w-8" />
+                  Estado de Mesas
+                </h1>
+                <p className="text-muted-foreground">Vista de solo lectura del estado de las mesas del bufete</p>
+              </div>
+              <Badge variant="outline" className="text-sm">
+                Solo Lectura
+              </Badge>
+            </div>
+
+            {isLowInventory && operativoMealInventory && (
+              <Alert variant="destructive">
+                <AlertTriangle className="h-4 w-4" />
+                <AlertDescription>
+                  Inventario bajo ({inventoryPercentage.toFixed(1)}% disponible). Quedan{" "}
+                  {operativoMealInventory.comidasDisponibles} de {operativoMealInventory.totalComidas} comidas.
+                </AlertDescription>
+              </Alert>
+            )}
+
+            {operativoMealInventory && (
+              <Card className="bg-gradient-to-br from-orange-50 to-orange-100 border-orange-200">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-orange-800">
+                    <Package className="h-5 w-5" />
+                    Inventario Global de Comidas
+                  </CardTitle>
+                  <CardDescription className="text-orange-700">Estado actual del stock de comidas</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-3 gap-4">
+                    <div className="text-center p-3 bg-white/50 rounded-lg">
+                      <div className="text-xl md:text-2xl font-bold text-orange-900">
+                        {operativoMealInventory.totalComidas}
+                      </div>
+                      <p className="text-xs text-orange-700">Total Asignado</p>
+                    </div>
+                    <div className="text-center p-3 bg-white/50 rounded-lg">
+                      <div className="text-xl md:text-2xl font-bold text-red-700">
+                        {operativoMealInventory.comidasConsumidas}
+                      </div>
+                      <p className="text-xs text-red-600">Ya Entregadas</p>
+                    </div>
+                    <div className="text-center p-3 bg-white/50 rounded-lg">
+                      <div
+                        className={`text-xl md:text-2xl font-bold ${isLowInventory ? "text-red-700" : "text-green-700"}`}
+                      >
+                        {operativoMealInventory.comidasDisponibles}
+                      </div>
+                      <p className={`text-xs ${isLowInventory ? "text-red-600" : "text-green-600"}`}>Disponibles</p>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-orange-800">Progreso de entregas</span>
+                      <span className="font-medium text-orange-900">
+                        {operativoMealInventory.comidasConsumidas} / {operativoMealInventory.totalComidas}
+                      </span>
+                    </div>
+                    <Progress
+                      value={(operativoMealInventory.comidasConsumidas / operativoMealInventory.totalComidas) * 100}
+                      className="h-3"
+                    />
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            <div className="grid gap-4 grid-cols-2 md:grid-cols-4">
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Mesas Activas</CardTitle>
+                  <Activity className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">
+                    {operativoMesasActivas}/{operativoMesasEstado.length}
+                  </div>
+                  <p className="text-xs text-muted-foreground">Mesas habilitadas</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Comidas Totales</CardTitle>
+                  <Utensils className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">
+                    {operativoMesasEstado.reduce((sum, m) => sum + m.totalComidas, 0)}
+                  </div>
+                  <p className="text-xs text-muted-foreground">En todas las mesas</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Comidas Entregadas</CardTitle>
+                  <Users className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold text-red-600">
+                    {operativoMesasEstado.reduce((sum, m) => sum + m.comidasConsumidas, 0)}
+                  </div>
+                  <p className="text-xs text-muted-foreground">Total consumidas</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Comidas Disponibles</CardTitle>
+                  <Package className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold text-green-600">
+                    {operativoMesasEstado.reduce((sum, m) => sum + m.comidasDisponibles, 0)}
+                  </div>
+                  <p className="text-xs text-muted-foreground">Por entregar</p>
+                </CardContent>
+              </Card>
+            </div>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Utensils className="h-5 w-5" />
+                  Estado de las Mesas en Tiempo Real
+                </CardTitle>
+                <CardDescription>Visualiza el inventario disponible en cada mesa (solo lectura)</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {operativoMesasEstado.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <Utensils className="h-12 w-12 mx-auto mb-3 opacity-30" />
+                    <p>No hay mesas configuradas</p>
+                  </div>
+                ) : (
+                  <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-5">
+                    {operativoMesasEstado.map((mesa) => {
+                      const percentage = mesa.totalComidas > 0 ? (mesa.comidasDisponibles / mesa.totalComidas) * 100 : 0
+                      const isLow = percentage < 20
+
+                      return (
+                        <Card
+                          key={mesa.id}
+                          className={`transition-all ${
+                            mesa.activa ? "border-green-200 bg-green-50" : "border-gray-200 bg-gray-50"
+                          } ${isLow && mesa.activa ? "ring-2 ring-orange-300" : ""}`}
+                        >
+                          <CardHeader className="pb-2 p-3">
+                            <div className="flex items-center justify-between">
+                              <CardTitle className="text-sm sm:text-base">Mesa {mesa.numeroMesa}</CardTitle>
+                              <Badge variant={mesa.activa ? "default" : "secondary"} className="text-xs px-1.5 py-0.5">
+                                {mesa.activa ? "Activa" : "Inactiva"}
+                              </Badge>
+                            </div>
+                            <p className="text-xs text-muted-foreground truncate">{mesa.nombreMesa}</p>
+                          </CardHeader>
+                          <CardContent className="pt-0 p-3 space-y-2">
+                            <div className="grid grid-cols-3 gap-1 text-center">
+                              <div>
+                                <div className="text-sm font-bold text-blue-600">{mesa.totalComidas}</div>
+                                <p className="text-xs text-muted-foreground">Total</p>
+                              </div>
+                              <div>
+                                <div className="text-sm font-bold text-red-600">{mesa.comidasConsumidas}</div>
+                                <p className="text-xs text-muted-foreground">Usadas</p>
+                              </div>
+                              <div>
+                                <div className={`text-sm font-bold ${isLow ? "text-orange-600" : "text-green-600"}`}>
+                                  {mesa.comidasDisponibles}
+                                </div>
+                                <p className="text-xs text-muted-foreground">Quedan</p>
+                              </div>
+                            </div>
+                            <Progress value={percentage} className="h-1.5" />
+                            {isLow && mesa.activa && <p className="text-xs text-orange-600 text-center">Stock bajo</p>}
+                          </CardContent>
+                        </Card>
+                      )
+                    })}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card className="bg-blue-50 border-blue-200">
+              <CardHeader>
+                <CardTitle className="text-blue-800 text-sm">Información</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-blue-700">
+                  Esta es una vista de solo lectura. Los datos se actualizan en tiempo real pero no puedes modificar
+                  ningún valor. Para realizar cambios, contacta a un administrador.
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+        )
       default:
         return <DashboardStats currentUserRole={userRole} />
     }

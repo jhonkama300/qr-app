@@ -8,35 +8,34 @@ import type { MealInventory } from "@/lib/firestore-service"
 import { consumeTableMeal } from "@/lib/firestore-service"
 
 interface Student {
-  id: string // Corresponde a la identificación en Firestore
+  id: string
   puesto: string
   identificacion: string
   nombre: string
   programa: string
   cuposExtras: number
-  cuposConsumidos?: number // Agregado campo para cupos consumidos
+  cuposConsumidos?: number
 }
 
 export interface AccessLog {
-  // Exportar la interfaz
   identificacion: string
   timestamp: string
   status: "granted" | "denied" | "q10_success" | "q10_failed"
   details?: string
-  source?: "direct" | "q10" | "manual" // Nuevo campo para el origen del escaneo/entrada
-  grantedByUserId?: string // ID del usuario que otorgó el acceso
-  grantedByUserName?: string // Nombre del usuario que otorgó el acceso
-  grantedByUserEmail?: string // Email del usuario que otorgó el acceso
-  grantedByUserRole?: string // Agregado campo de rol del usuario que otorga el acceso
-  mesaUsada?: number // Agregado campo para la mesa donde se escaneó
+  source?: "direct" | "q10" | "manual"
+  grantedByUserId?: string
+  grantedByUserName?: string
+  grantedByUserEmail?: string
+  grantedByUserRole?: string
+  mesaUsada?: number
 }
 
 interface UserInfo {
   userId?: string
   userName?: string
   userEmail?: string
-  userRole?: string // Agregado campo de rol
-  mesaAsignada?: number // Agregado campo para mesa del usuario
+  userRole?: string
+  mesaAsignada?: number
 }
 
 interface StudentStoreContextType {
@@ -56,11 +55,12 @@ interface StudentStoreContextType {
     userInfo?: UserInfo,
   ) => Promise<void>
   checkIfAlreadyScanned: (identificacion: string) => Promise<boolean>
-  validateMesaAccess: (identificacion: string, mesaRequerida: number) => Promise<{ valid: boolean; message: string }> // Nueva función para validar mesa
-  checkMesaStatus: (mesaNumero: number) => Promise<boolean> // Nueva función para verificar si una mesa está activa
+  validateMesaAccess: (identificacion: string, mesaRequerida: number) => Promise<{ valid: boolean; message: string }>
+  checkMesaStatus: (mesaNumero: number) => Promise<boolean>
   checkAccessGranted: (identificacion: string) => Promise<boolean>
   getMealInventory: () => Promise<MealInventory>
   decrementMealInventory: () => Promise<boolean>
+  isSystemUser: (identificacion: string) => Promise<boolean>
 }
 
 const StudentStoreContext = createContext<StudentStoreContextType | undefined>(undefined)
@@ -218,7 +218,6 @@ export function StudentStoreProvider({ children }: { children: React.ReactNode }
           }
         }
 
-        // Verificar inventario global
         const inventory = await getMealInventory()
         if (inventory.comidasDisponibles <= 0) {
           return {
@@ -227,7 +226,6 @@ export function StudentStoreProvider({ children }: { children: React.ReactNode }
           }
         }
 
-        // Verificar si la mesa está activa
         const mesaActiva = await checkMesaStatus(mesaRequerida)
         if (!mesaActiva) {
           return {
@@ -318,7 +316,6 @@ export function StudentStoreProvider({ children }: { children: React.ReactNode }
         } else {
           const hasAccessGranted = await checkAccessGranted(identificacion)
           if (!hasAccessGranted) {
-            // Solo registrar el denegado si no hay un acceso concedido previo
             const log: AccessLog = {
               identificacion,
               timestamp: new Date().toISOString(),
@@ -385,6 +382,21 @@ export function StudentStoreProvider({ children }: { children: React.ReactNode }
     [],
   )
 
+  const isSystemUser = useCallback(async (identificacion: string): Promise<boolean> => {
+    try {
+      console.log("[v0] Verificando si la identificación es de un usuario del sistema:", identificacion)
+      const q = query(collection(db, "users"), where("idNumber", "==", identificacion))
+      const querySnapshot = await getDocs(q)
+
+      const isUser = !querySnapshot.empty
+      console.log("[v0] Es usuario del sistema:", isUser)
+      return isUser
+    } catch (error) {
+      console.error("Error al verificar si es usuario del sistema:", error)
+      return false
+    }
+  }, [])
+
   return (
     <StudentStoreContext.Provider
       value={{
@@ -397,6 +409,7 @@ export function StudentStoreProvider({ children }: { children: React.ReactNode }
         checkAccessGranted,
         getMealInventory,
         decrementMealInventory,
+        isSystemUser,
       }}
     >
       {children}
