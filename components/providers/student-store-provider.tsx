@@ -210,6 +210,14 @@ export function StudentStoreProvider({ children }: { children: React.ReactNode }
   const validateMesaAccess = useCallback(
     async (identificacion: string, mesaRequerida: number): Promise<{ valid: boolean; message: string }> => {
       try {
+        const hasEventAccess = await checkAccessGranted(identificacion)
+        if (!hasEventAccess) {
+          return {
+            valid: false,
+            message: `❌ Estudiante sin acceso al evento. Debe registrarse primero con el rol Operativo.`,
+          }
+        }
+
         const tableMealSuccess = await consumeTableMeal(mesaRequerida)
         if (!tableMealSuccess) {
           return {
@@ -259,7 +267,7 @@ export function StudentStoreProvider({ children }: { children: React.ReactNode }
         return { valid: false, message: "Error al validar el acceso" }
       }
     },
-    [getStudentById, checkMesaStatus, getMealInventory],
+    [getStudentById, checkMesaStatus, getMealInventory, checkAccessGranted],
   )
 
   const markStudentAccess = useCallback(

@@ -33,6 +33,7 @@ import {
   RotateCcw,
   Utensils,
   UserPlus,
+  Gift,
 } from "lucide-react"
 import * as XLSX from "xlsx"
 
@@ -88,6 +89,15 @@ export function DatabaseManagement() {
   const [isImportInvitadosDialogOpen, setIsImportInvitadosDialogOpen] = useState(false)
   const [selectedInvitadosFileName, setSelectedInvitadosFileName] = useState<string>("")
   const [importingInvitados, setImportingInvitados] = useState(false)
+
+  // New states for importing extra cupos
+  const [isImportCuposExtrasDialogOpen, setIsImportCuposExtrasDialogOpen] = useState(false)
+  const [selectedCuposExtrasFileName, setSelectedCuposExtrasFileName] = useState<string>("")
+  const [importingCuposExtras, setImportingCuposExtras] = useState(false)
+  const [cuposExtrasImportResult, setCuposExtrasImportResult] = useState<{
+    actualizados: number
+    noEncontrados: string[]
+  } | null>(null)
 
   const totalPages = Math.ceil(filteredPersons.length / itemsPerPage)
   const startIndex = (currentPage - 1) * itemsPerPage
@@ -210,6 +220,7 @@ export function DatabaseManagement() {
 
   const fileInputRef = useRef<HTMLInputElement>(null)
   const invitadosFileInputRef = useRef<HTMLInputElement>(null) // Ref para invitados
+  const cuposExtrasFileInputRef = useRef<HTMLInputElement>(null) // New ref for extra cupos
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
@@ -240,7 +251,8 @@ export function DatabaseManagement() {
         const identificacion = String(row["identificacion"] || row["Identificacion"] || row["ID"] || "")
         const nombre = String(row["nombre"] || row["Nombre"] || "")
         const programa = String(row["programa"] || row["Programa"] || "")
-        const cuposExtras = Number(row["cuposExtras"] || row["CuposExtras"] || row["cupos_extras"] || 0)
+        // Removed cuposExtras from normal import - always 0 now
+        // const cuposExtras = Number(row["cuposExtras"] || row["CuposExtras"] || row["cupos_extras"] || 0)
 
         if (identificacion && nombre) {
           const docRef = doc(collection(db, "personas"))
@@ -249,7 +261,7 @@ export function DatabaseManagement() {
             identificacion,
             nombre,
             programa,
-            cuposExtras,
+            cuposExtras: 0, // Always 0 in normal import
             cuposConsumidos: 0,
             fechaImportacion: new Date().toISOString(),
           })
@@ -268,6 +280,78 @@ export function DatabaseManagement() {
       setImporting(false)
       if (fileInputRef.current) {
         fileInputRef.current.value = ""
+      }
+    }
+  }
+
+  // New function to import extra cupos and assign them to existing students
+  const handleCuposExtrasFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    setSelectedCuposExtrasFileName(file.name)
+    setImportingCuposExtras(true)
+    setError("")
+    setSuccess("")
+    setCuposExtrasImportResult(null)
+
+    try {
+      const data = await file.arrayBuffer()
+      const workbook = XLSX.read(data)
+      const sheetName = workbook.SheetNames[0]
+      const worksheet = workbook.Sheets[sheetName]
+      const jsonData = XLSX.utils.sheet_to_json(worksheet) as any[]
+
+      if (jsonData.length === 0) {
+        setError("El archivo está vacío o no tiene el formato correcto")
+        return
+      }
+
+      let actualizados = 0
+      const noEncontrados: string[] = []
+
+      for (const row of jsonData) {
+        const identificacion = String(row["identificacion"] || row["Identificacion"] || row["ID"] || "").trim()
+        const nombre = String(row["nombre"] || row["Nombre"] || "").trim()
+        const cuposExtras = Number(row["cuposExtras"] || row["CuposExtras"] || row["cupos_extras"] || 0)
+
+        if (!identificacion) continue
+
+        // Buscar el estudiante por identificación
+        const q = query(collection(db, "personas"), where("identificacion", "==", identificacion))
+        const querySnapshot = await getDocs(q)
+
+        if (querySnapshot.empty) {
+          noEncontrados.push(`${identificacion} - ${nombre || "Sin nombre"}`)
+          continue
+        }
+
+        // Actualizar el estudiante con los cupos extras
+        const studentDoc = querySnapshot.docs[0]
+        await updateDoc(doc(db, "personas", studentDoc.id), {
+          cuposExtras: cuposExtras,
+        })
+        actualizados++
+      }
+
+      setCuposExtrasImportResult({ actualizados, noEncontrados })
+
+      if (actualizados > 0) {
+        setSuccess(`Se actualizaron ${actualizados} estudiantes con cupos extras`)
+      }
+
+      if (noEncontrados.length > 0) {
+        setError(`${noEncontrados.length} estudiantes no fueron encontrados en la base de datos`)
+      }
+
+      loadPersons()
+    } catch (error) {
+      console.error("Error importing cupos extras file:", error)
+      setError("Error al importar el archivo de cupos extras")
+    } finally {
+      setImportingCuposExtras(false)
+      if (cuposExtrasFileInputRef.current) {
+        cuposExtrasFileInputRef.current.value = ""
       }
     }
   }
@@ -688,6 +772,21 @@ export function DatabaseManagement() {
               Importar Excel
             </Button>
 
+            {/* New button to assign extra cupos */}
+            <Button
+              onClick={() => {
+                setIsImportCuposExtrasDialogOpen(true)
+                setCuposExtrasImportResult(null)
+                setSelectedCuposExtrasFileName("")
+              }}
+              disabled={importingCuposExtras}
+              variant="outline"
+              className="border-amber-300 text-amber-600 hover:bg-amber-50"
+            >
+              <Gift className="mr-2 h-4 w-4" />
+              Asignar Cupos Extras
+            </Button>
+
             <Button
               onClick={handleDeleteAll}
               disabled={importing}
@@ -1055,8 +1154,13 @@ export function DatabaseManagement() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Importar Estudiantes desde Excel</DialogTitle>
+            {/* Updated description without cuposExtras */}
             <DialogDescription>
-              Selecciona un archivo Excel con las columnas: puesto, identificacion, nombre, programa, cuposExtras
+              Selecciona un archivo Excel con las columnas: puesto, identificacion, nombre, programa
+              <br />
+              <span className="text-xs text-muted-foreground mt-2 block">
+                Los cupos extras se asignan por separado usando el botón "Asignar Cupos Extras".
+              </span>
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
@@ -1076,6 +1180,97 @@ export function DatabaseManagement() {
             </Button>
             {selectedFileName && <p className="text-sm text-muted-foreground">Archivo: {selectedFileName}</p>}
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* New dialog for importing extra cupos */}
+      <Dialog open={isImportCuposExtrasDialogOpen} onOpenChange={setIsImportCuposExtrasDialogOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Gift className="h-5 w-5 text-amber-500" />
+              Asignar Cupos Extras desde Excel
+            </DialogTitle>
+            <DialogDescription>
+              Selecciona un archivo Excel con las columnas: <strong>identificacion</strong>, <strong>nombre</strong>,{" "}
+              <strong>cuposExtras</strong>
+              <br />
+              <span className="text-xs text-muted-foreground mt-2 block">
+                Solo se actualizarán los estudiantes que ya existen en la base de datos.
+              </span>
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <input
+              ref={cuposExtrasFileInputRef}
+              type="file"
+              accept=".xlsx,.xls"
+              onChange={handleCuposExtrasFileUpload}
+              className="hidden"
+            />
+            <Button
+              onClick={() => cuposExtrasFileInputRef.current?.click()}
+              disabled={importingCuposExtras}
+              className="w-full"
+            >
+              {importingCuposExtras ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Procesando...
+                </>
+              ) : (
+                <>
+                  <Upload className="mr-2 h-4 w-4" />
+                  Seleccionar archivo
+                </>
+              )}
+            </Button>
+            {selectedCuposExtrasFileName && (
+              <p className="text-sm text-muted-foreground">Archivo: {selectedCuposExtrasFileName}</p>
+            )}
+
+            {/* Show import results */}
+            {cuposExtrasImportResult && (
+              <div className="space-y-3 pt-2 border-t">
+                <div className="flex items-center gap-2 text-sm">
+                  <Badge variant="default" className="bg-green-500">
+                    {cuposExtrasImportResult.actualizados}
+                  </Badge>
+                  <span>estudiantes actualizados correctamente</span>
+                </div>
+
+                {cuposExtrasImportResult.noEncontrados.length > 0 && (
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2 text-sm text-amber-600">
+                      <Badge variant="outline" className="border-amber-300 text-amber-600">
+                        {cuposExtrasImportResult.noEncontrados.length}
+                      </Badge>
+                      <span>estudiantes no encontrados:</span>
+                    </div>
+                    <div className="max-h-32 overflow-y-auto bg-muted/50 rounded-md p-2">
+                      {cuposExtrasImportResult.noEncontrados.map((item, index) => (
+                        <p key={index} className="text-xs text-muted-foreground">
+                          {item}
+                        </p>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setIsImportCuposExtrasDialogOpen(false)
+                setCuposExtrasImportResult(null)
+                setSelectedCuposExtrasFileName("")
+              }}
+            >
+              Cerrar
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
