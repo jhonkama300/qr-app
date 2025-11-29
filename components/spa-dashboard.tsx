@@ -120,7 +120,12 @@ export function SPADashboard({ initialView = "inicio" }: SPADashboardProps) {
       return
     }
 
-    const logsQuery = query(collection(db, "access_logs"), where("status", "==", "granted"))
+    // Solo contar accesos granted que fueron registrados por rol bufete (entrega de comidas)
+    const logsQuery = query(
+      collection(db, "access_logs"),
+      where("status", "==", "granted"),
+      where("grantedByUserRole", "==", "bufete"),
+    )
 
     const unsubscribe = onSnapshot(logsQuery, (snapshot) => {
       const count = snapshot.size

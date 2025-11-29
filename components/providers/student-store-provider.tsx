@@ -288,7 +288,8 @@ export function StudentStoreProvider({ children }: { children: React.ReactNode }
       try {
         console.log("[v0] UserInfo recibido en markStudentAccess:", userInfo)
 
-        const shouldConsumeCupo = userInfo?.mesaAsignada !== undefined && userInfo?.mesaAsignada !== null
+        const shouldConsumeCupo =
+          userInfo?.userRole === "bufete" && userInfo?.mesaAsignada !== undefined && userInfo?.mesaAsignada !== null
 
         if (granted && shouldConsumeCupo) {
           const inventorySuccess = await decrementMealInventory()
@@ -305,7 +306,9 @@ export function StudentStoreProvider({ children }: { children: React.ReactNode }
             console.log(`[v0] 1 comida consumida para ${identificacion}. Total acumulado: ${cuposConsumidos}`)
           }
         } else if (granted && !shouldConsumeCupo) {
-          console.log(`[v0] Acceso registrado para ${identificacion} sin consumir cupo (rol admin/operativo)`)
+          console.log(
+            `[v0] Acceso registrado para ${identificacion} sin consumir cupo (rol: ${userInfo?.userRole || "desconocido"})`,
+          )
         }
 
         if (granted) {
