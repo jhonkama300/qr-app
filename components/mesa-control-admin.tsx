@@ -178,7 +178,7 @@ export function MesaControlAdmin() {
       <section className="grid gap-3 sm:gap-4 grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-xs sm:text-sm font-medium">Total Comidas Entregadas</CardTitle>
+            <CardTitle className="text-xs sm:text-sm font-medium">Total de platos entregados</CardTitle>
             <Users className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -213,7 +213,7 @@ export function MesaControlAdmin() {
 
         <Card>
           <CardHeader className="pb-2 p-3">
-            <CardTitle className="text-sm sm:text-base">Comidas por Entregar</CardTitle>
+            <CardTitle className="text-sm sm:text-base">Platos por Entregar</CardTitle>
             <Utensils className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>

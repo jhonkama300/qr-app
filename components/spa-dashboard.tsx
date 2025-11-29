@@ -343,7 +343,7 @@ export function SPADashboard({ initialView = "inicio" }: SPADashboardProps) {
                 </div>
               </div>
               <div className="rounded-lg bg-green-50 border border-green-200 p-3">
-                <h3 className="text-xs font-semibold mb-1 text-green-900">Total Comidas</h3>
+                <h3 className="text-xs font-semibold mb-1 text-green-900">Total de platos</h3>
                 <div className="text-lg md:text-xl font-bold text-green-600">{totalComidasEntregadas}</div>
               </div>
             </div>

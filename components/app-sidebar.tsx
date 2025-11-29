@@ -63,7 +63,7 @@ const items = [
     },
   },
   {
-    title: "Control de Acceso",
+    title: "Control Acceso",
     view: "control-acceso" as ViewType, // Permitir acceso a administradores y operativos
     icon: Shield,
     adminOnly: false,
@@ -72,7 +72,7 @@ const items = [
     adminOrOperativo: true, // Nueva propiedad para indicar que necesita ser admin o operativo
   },
   {
-    title: "Inventario de Comidas",
+    title: "Inventario de Platos",
     view: "inventario" as ViewType,
     icon: Package,
     adminOnly: true,
@@ -97,7 +97,7 @@ const items = [
     description: "Vista de solo lectura",
   },
   {
-    title: "Control de Bufetes",
+    title: "Control platos",
     view: "control-bufetes" as ViewType,
     icon: Settings,
     adminOnly: true,

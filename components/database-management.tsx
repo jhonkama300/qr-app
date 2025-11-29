@@ -988,7 +988,7 @@ export function DatabaseManagement() {
             </Card>
             <Card className="bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200">
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-purple-700">Comidas por Entregar</CardTitle>
+                <CardTitle className="text-sm font-medium text-purple-700">Platos por Entregar</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold text-purple-600">
