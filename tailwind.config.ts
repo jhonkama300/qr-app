@@ -11,6 +11,19 @@ const config: Config = {
   theme: {
   	extend: {
   		colors: {
+  			uparsistem: {
+  				'50': '#f0f7e6',
+  				'100': '#dceec2',
+  				'200': '#c1e09a',
+  				'300': '#a8cf45',
+  				'400': '#8fb82e',
+  				'500': '#7fa61e',
+  				'600': '#4aaa16',
+  				'700': '#286b04',
+  				'800': '#1a4a03',
+  				'900': '#0d2a01',
+  				DEFAULT: '#286b04',
+  			},
   			background: 'hsl(var(--background))',
   			foreground: 'hsl(var(--foreground))',
   			card: {

@@ -11,7 +11,7 @@ import {
 import { Shield, Users, Scale, ChevronDown, Check } from "lucide-react"
 
 const roleConfig: Record<string, { icon: React.ElementType; label: string; gradient: string }> = {
-  administrador: { icon: Shield, label: "Administrador", gradient: "from-rose-500 to-pink-600" },
+  administrador: { icon: Shield, label: "Administrador", gradient: "from-green-600 to-green-700" },
   operativo: { icon: Users, label: "Operativo", gradient: "from-blue-500 to-indigo-600" },
   bufete: { icon: Scale, label: "Bufete", gradient: "from-emerald-500 to-green-600" },
 }

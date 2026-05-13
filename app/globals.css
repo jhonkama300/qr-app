@@ -78,6 +78,17 @@
   }
 
   @theme inline {
+    --color-uparsistem-50: #f0f7e6;
+    --color-uparsistem-100: #dceec2;
+    --color-uparsistem-200: #c1e09a;
+    --color-uparsistem-300: #a8cf45;
+    --color-uparsistem-400: #8fb82e;
+    --color-uparsistem-500: #7fa61e;
+    --color-uparsistem-600: #4aaa16;
+    --color-uparsistem-700: #286b04;
+    --color-uparsistem-800: #1a4a03;
+    --color-uparsistem-900: #0d2a01;
+    --color-uparsistem: #286b04;
     /* optional: --font-sans, --font-serif, --font-mono if they are applied in the layout.tsx */
     --color-background: var(--background);
     --color-foreground: var(--foreground);

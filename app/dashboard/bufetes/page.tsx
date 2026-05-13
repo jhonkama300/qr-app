@@ -1,5 +1,6 @@
 "use client"
 
+import { DashboardLayout } from "@/components/dashboard-layout"
 import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -139,16 +140,19 @@ export default function BufetesPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center p-6 sm:p-8">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto"></div>
-          <p className="mt-2 text-sm sm:text-base text-muted-foreground">Cargando estadísticas de mesas...</p>
+      <DashboardLayout>
+        <div className="flex items-center justify-center p-6 sm:p-8">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto"></div>
+            <p className="mt-2 text-sm sm:text-base text-muted-foreground">Cargando estadísticas de mesas...</p>
+          </div>
         </div>
-      </div>
+      </DashboardLayout>
     )
   }
 
   return (
+    <DashboardLayout>
     <div className="flex-1 space-y-6 p-6">
       <div className="flex items-center justify-between">
         <div>
@@ -398,5 +402,6 @@ export default function BufetesPage() {
         </CardContent>
       </Card>
     </div>
+    </DashboardLayout>
   )
 }

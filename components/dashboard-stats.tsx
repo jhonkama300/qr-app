@@ -79,9 +79,10 @@ interface UserData {
 
 interface DashboardStatsProps {
   currentUserRole?: string
+  userName?: string
 }
 
-export function DashboardStats({ currentUserRole = "administrador" }: DashboardStatsProps) {
+export function DashboardStats({ currentUserRole = "administrador", userName = "" }: DashboardStatsProps) {
   const [allPersons, setAllPersons] = useState<PersonData[]>([])
   const [accessLogs, setAccessLogs] = useState<AccessLog[]>([])
   const [loading, setLoading] = useState(true)
@@ -433,17 +434,36 @@ export function DashboardStats({ currentUserRole = "administrador" }: DashboardS
   }
 
   return (
-    <div className="flex flex-1 flex-col gap-3 md:gap-6 p-2 md:p-4">
-      <div className="flex flex-col items-start justify-between gap-2 md:gap-4">
-        <div>
-          <h1 className="text-lg md:text-2xl font-bold">Dashboard Principal</h1>
-          <p className="text-xs md:text-base text-muted-foreground">
-            Resumen general del sistema de control de acceso
-            <span className="ml-2 inline-flex items-center gap-1 text-green-600">
-              <Activity className="w-3 h-3 md:w-4 md:h-4 text-green-600 flex-shrink-0" />
-              <span className="text-[10px] md:text-xs">Tiempo Real</span>
+    <div className="flex flex-1 flex-col gap-1 md:gap-6 p-1 md:p-4 bg-gray-50/80 dark:bg-gray-950/50">
+      <div className="relative overflow-hidden rounded-xl border border-uparsistem-200 dark:border-uparsistem-800/30 bg-gradient-to-br from-uparsistem-50/80 via-white to-uparsistem-50/50 dark:from-uparsistem-950/20 dark:via-gray-900 dark:to-uparsistem-950/10 p-3 md:p-5 shadow-sm">
+        <div className="absolute top-0 right-0 w-32 h-32 bg-uparsistem-200/20 dark:bg-uparsistem-800/10 rounded-full -translate-y-1/2 translate-x-1/2 blur-2xl" />
+        <div className="relative flex items-center gap-3 md:gap-4">
+          <div className="flex size-9 md:size-12 shrink-0 items-center justify-center rounded-xl bg-uparsistem-600 dark:bg-uparsistem-700 shadow-sm shadow-uparsistem-600/20">
+            <span className="text-base md:text-xl font-bold text-white">
+              {(userName || "D")[0].toUpperCase()}
             </span>
-          </p>
+          </div>
+          <div className="flex-1 min-w-0">
+            {userName ? (
+              <>
+                <h1 className="text-sm md:text-xl font-bold text-uparsistem-800 dark:text-uparsistem-200 leading-tight">
+                  Hola, <span className="text-uparsistem-700 dark:text-uparsistem-400">{userName}</span>
+                </h1>
+                <p className="text-[10px] md:text-sm text-uparsistem-600/70 dark:text-uparsistem-400/70 leading-tight mt-0.5">
+                  Este es el resumen general del sistema
+                </p>
+              </>
+            ) : (
+              <>
+                <h1 className="text-sm md:text-xl font-bold text-uparsistem-800 dark:text-uparsistem-200">Dashboard Principal</h1>
+                <p className="text-[10px] md:text-sm text-uparsistem-600/70 dark:text-uparsistem-400/70">Resumen general del sistema de control de acceso</p>
+              </>
+            )}
+          </div>
+          <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-uparsistem-100 dark:bg-uparsistem-900/30 ring-1 ring-uparsistem-300 dark:ring-uparsistem-700">
+            <span className="flex size-1.5 rounded-full bg-uparsistem-500 animate-pulse" />
+            <span className="text-[10px] md:text-xs text-uparsistem-700 dark:text-uparsistem-300 font-medium">Tiempo real</span>
+          </div>
         </div>
       </div>
 
@@ -464,172 +484,170 @@ export function DashboardStats({ currentUserRole = "administrador" }: DashboardS
       )}
 
       {mealInventory && (
-        <Card className="bg-gradient-to-br from-orange-50 to-orange-100 border-orange-200">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm md:text-base flex items-center gap-2 text-orange-800">
-              <Package className="h-4 w-4 md:h-5 md:w-5" />
+        <Card className="bg-gradient-to-br from-orange-50 to-amber-50 border-orange-200 !p-0 md:!p-0">
+          <CardHeader className="pb-1 md:pb-2 p-2 md:p-6">
+            <CardTitle className="text-[11px] md:text-base flex items-center gap-1 md:gap-2 text-uparsistem-700">
+              <Package className="h-3 w-3 md:h-5 md:w-5 text-uparsistem-600" />
               Inventario Global de Comidas
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="grid grid-cols-3 gap-2 md:gap-4">
+          <CardContent className="space-y-1 md:space-y-3 p-2 md:p-6 pt-0 md:pt-0">
+            <div className="grid grid-cols-3 gap-1 md:gap-4">
               <div className="text-center">
-                <div className="text-lg md:text-2xl font-bold text-orange-900">{mealInventory.totalComidas}</div>
-                <p className="text-[9px] md:text-xs text-orange-700">Total</p>
+                <div className="text-sm md:text-2xl font-bold text-uparsistem-800">{mealInventory.totalComidas}</div>
+                <p className="text-[8px] md:text-xs text-uparsistem-600">Total</p>
               </div>
               <div className="text-center">
-                <div className="text-lg md:text-2xl font-bold text-red-700">{mealInventory.comidasConsumidas}</div>
-                <p className="text-[9px] md:text-xs text-red-600">Entregadas</p>
+                <div className="text-sm md:text-2xl font-bold text-red-700">{mealInventory.comidasConsumidas}</div>
+                <p className="text-[8px] md:text-xs text-red-600">Entregadas</p>
               </div>
               <div className="text-center">
-                <div className={`text-lg md:text-2xl font-bold ${isLowInventory ? "text-red-700" : "text-green-700"}`}>
+                <div className={`text-sm md:text-2xl font-bold ${isLowInventory ? "text-red-700" : "text-uparsistem-700"}`}>
                   {mealInventory.comidasDisponibles}
                 </div>
-                <p className={`text-[9px] md:text-xs ${isLowInventory ? "text-red-600" : "text-green-600"}`}>
+                <p className={`text-[8px] md:text-xs ${isLowInventory ? "text-red-600" : "text-uparsistem-600"}`}>
                   Disponibles
                 </p>
               </div>
             </div>
-            <div className="space-y-1">
-              <div className="flex items-center justify-between text-xs">
-                <span className="text-orange-800">Progreso</span>
-                <span className="font-medium text-orange-900">
+            <div className="space-y-0.5 md:space-y-1">
+              <div className="flex items-center justify-between text-[10px] md:text-xs">
+                <span className="text-orange-700">Progreso</span>
+                <span className="font-medium text-orange-800">
                   {((mealInventory.comidasConsumidas / mealInventory.totalComidas) * 100).toFixed(1)}%
                 </span>
               </div>
-              <Progress value={(mealInventory.comidasConsumidas / mealInventory.totalComidas) * 100} className="h-2" />
+              <Progress value={(mealInventory.comidasConsumidas / mealInventory.totalComidas) * 100} className="h-1.5 md:h-2 [&>div]:bg-gradient-to-r [&>div]:from-orange-400 [&>div]:to-amber-600" />
             </div>
           </CardContent>
         </Card>
       )}
 
-      <div className="grid gap-2 md:gap-3 grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-        <Card className="p-1.5 md:p-2">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-0.5 p-1.5 md:p-2">
-            <CardTitle className="text-[9px] sm:text-[10px] md:text-xs font-medium text-blue-600 leading-tight">
-              Graduandos Registrados
+      <div className="grid gap-1 md:gap-3 grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+        <Card className="p-1 md:p-2 shadow-sm md:shadow-sm border-blue-300/60 dark:border-blue-800/40 bg-blue-100/70 dark:bg-blue-950/20">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-0 p-1 md:p-2">
+            <CardTitle className="text-[8px] sm:text-[10px] md:text-xs font-medium text-blue-800 leading-tight">
+              Graduandos
             </CardTitle>
-            <GraduationCap className="h-3 w-3 md:h-4 md:w-4 text-blue-600 flex-shrink-0" />
+            <GraduationCap className="h-2.5 w-2.5 md:h-4 md:w-4 text-blue-700 flex-shrink-0" />
           </CardHeader>
-          <CardContent className="p-1.5 md:p-2 pt-0">
-            <div className="text-sm sm:text-base md:text-lg font-bold text-blue-800">{graduandosRegistrados}</div>
-            <p className="text-[8px] sm:text-[9px] md:text-xs text-muted-foreground leading-tight">
-              Total de graduandos registrados
+          <CardContent className="p-1 md:p-2 pt-0">
+            <div className="text-[11px] sm:text-sm md:text-lg font-bold text-blue-900">{graduandosRegistrados}</div>
+            <p className="hidden md:block text-[8px] sm:text-[9px] md:text-xs text-muted-foreground leading-tight">
+              Total registrados
             </p>
           </CardContent>
         </Card>
 
-        <Card className="p-1.5 md:p-2">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-0.5 p-1.5 md:p-2">
-            <CardTitle className="text-[9px] sm:text-[10px] md:text-xs font-medium text-green-600 leading-tight">
-              Accesos Concedidos
+        <Card className="p-1 md:p-2 shadow-sm md:shadow-sm bg-uparsistem-100/70 dark:bg-uparsistem-950/20 border-uparsistem-300/60 dark:border-uparsistem-800/40">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-0 p-1 md:p-2">
+            <CardTitle className="text-[8px] sm:text-[10px] md:text-xs font-medium text-uparsistem-800 leading-tight">
+              Accesos
             </CardTitle>
-            <CheckCircle className="h-3 w-3 md:h-4 md:w-4 text-green-600 flex-shrink-0" />
+            <CheckCircle className="h-2.5 w-2.5 md:h-4 md:w-4 text-uparsistem-700 flex-shrink-0" />
           </CardHeader>
-          <CardContent className="p-1.5 md:p-2 pt-0">
-            <div className="text-sm sm:text-base md:text-lg font-bold text-green-800">{grantedAccessCount}</div>
-            <p className="text-[8px] sm:text-[9px] md:text-xs text-muted-foreground leading-tight">
-              Personas con acceso permitido
+          <CardContent className="p-1 md:p-2 pt-0">
+            <div className="text-[11px] sm:text-sm md:text-lg font-bold text-uparsistem-800">{grantedAccessCount}</div>
+            <p className="hidden md:block text-[8px] sm:text-[9px] md:text-xs text-muted-foreground leading-tight">
+              Con acceso permitido
             </p>
           </CardContent>
         </Card>
 
-        <Card className="p-1.5 md:p-2">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-0.5 p-1.5 md:p-2">
-            <CardTitle className="text-[9px] sm:text-[10px] md:text-xs font-medium text-red-600 leading-tight">
-              Accesos Denegados
+        <Card className="p-1 md:p-2 shadow-sm md:shadow-sm bg-red-100/70 dark:bg-red-950/20 border-red-300/60 dark:border-red-800/40">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-0 p-1 md:p-2">
+            <CardTitle className="text-[8px] sm:text-[10px] md:text-xs font-medium text-red-800 leading-tight">
+              Denegados
             </CardTitle>
-            <XCircle className="h-3 w-3 md:h-4 md:w-4 text-red-600 flex-shrink-0" />
+            <XCircle className="h-2.5 w-2.5 md:h-4 md:w-4 text-red-700 flex-shrink-0" />
           </CardHeader>
-          <CardContent className="p-1.5 md:p-2 pt-0">
-            <div className="text-sm sm:text-base md:text-lg font-bold text-red-800">{deniedAccessCount}</div>
-            <p className="text-[8px] sm:text-[9px] md:text-xs text-muted-foreground leading-tight">
-              Personas con acceso denegado
+          <CardContent className="p-1 md:p-2 pt-0">
+            <div className="text-[11px] sm:text-sm md:text-lg font-bold text-red-900">{deniedAccessCount}</div>
+            <p className="hidden md:block text-[8px] sm:text-[9px] md:text-xs text-muted-foreground leading-tight">
+              Acceso denegado
             </p>
           </CardContent>
         </Card>
 
-        <Card className="p-1.5 md:p-2">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-0.5 p-1.5 md:p-2">
-            <CardTitle className="text-[9px] sm:text-[10px] md:text-xs font-medium text-orange-600 leading-tight">
-              En Espera
+        <Card className="p-1 md:p-2 shadow-sm md:shadow-sm bg-amber-100/70 dark:bg-amber-950/20 border-amber-300/60 dark:border-amber-800/40">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-0 p-1 md:p-2">
+            <CardTitle className="text-[8px] sm:text-[10px] md:text-xs font-medium text-amber-800 leading-tight">
+              Espera
             </CardTitle>
-            <Clock className="h-3 w-3 md:h-4 md:w-4 text-orange-600 flex-shrink-0" />
+            <Clock className="h-2.5 w-2.5 md:h-4 md:w-4 text-amber-700 flex-shrink-0" />
           </CardHeader>
-          <CardContent className="p-1.5 md:p-2 pt-0">
-            <div className="text-sm sm:text-base md:text-lg font-bold text-orange-800">{waitingPersonsCount}</div>
-            <p className="text-[8px] sm:text-[9px] md:text-xs text-muted-foreground leading-tight">
-              Personas sin procesar
+          <CardContent className="p-1 md:p-2 pt-0">
+            <div className="text-[11px] sm:text-sm md:text-lg font-bold text-amber-900">{waitingPersonsCount}</div>
+            <p className="hidden md:block text-[8px] sm:text-[9px] md:text-xs text-muted-foreground leading-tight">
+              Sin procesar
             </p>
           </CardContent>
         </Card>
 
-        <Card className="p-1.5 md:p-2">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-0.5 p-1.5 md:p-2">
-            <CardTitle className="text-[9px] sm:text-[10px] md:text-xs font-medium text-blue-600 leading-tight">
-              Mesas Activas
+        <Card className="p-1 md:p-2 shadow-sm md:shadow-sm bg-cyan-100/70 dark:bg-cyan-950/20 border-cyan-300/60 dark:border-cyan-800/40">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-0 p-1 md:p-2">
+            <CardTitle className="text-[8px] sm:text-[10px] md:text-xs font-medium text-cyan-800 leading-tight">
+              Mesas
             </CardTitle>
-            <Utensils className="h-3 w-3 md:h-4 md:w-4 text-blue-600 flex-shrink-0" />
+            <Utensils className="h-2.5 w-2.5 md:h-4 md:w-4 text-cyan-700 flex-shrink-0" />
           </CardHeader>
-          <CardContent className="p-1.5 md:p-2 pt-0">
-            <div className="text-sm sm:text-base md:text-lg font-bold text-blue-800">
+          <CardContent className="p-1 md:p-2 pt-0">
+            <div className="text-[11px] sm:text-sm md:text-lg font-bold text-cyan-900">
               {buffetStats.mesasActivas}/{buffetStats.totalMesas}
             </div>
-            <p className="text-[8px] sm:text-[9px] md:text-xs text-muted-foreground leading-tight">
-              Mesas de bufete operativas
+            <p className="hidden md:block text-[8px] sm:text-[9px] md:text-xs text-muted-foreground leading-tight">
+              Bufete operativas
             </p>
           </CardContent>
         </Card>
 
-        <Card className="p-1.5 md:p-2">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-0.5 p-1.5 md:p-2">
-            <CardTitle className="text-[9px] sm:text-[10px] md:text-xs font-medium text-purple-600 leading-tight">
-              Comidas Entregadas
+        <Card className="p-1 md:p-2 shadow-sm md:shadow-sm bg-violet-100/70 dark:bg-violet-950/20 border-violet-300/60 dark:border-violet-800/40">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-0 p-1 md:p-2">
+            <CardTitle className="text-[8px] sm:text-[10px] md:text-xs font-medium text-violet-800 leading-tight">
+              Comidas
             </CardTitle>
-            <ChefHat className="h-3 w-3 md:h-4 md:w-4 text-purple-600 flex-shrink-0" />
+            <ChefHat className="h-2.5 w-2.5 md:h-4 md:w-4 text-violet-700 flex-shrink-0" />
           </CardHeader>
-          <CardContent className="p-1.5 md:p-2 pt-0">
-            <div className="text-sm sm:text-base md:text-lg font-bold text-purple-800">
+          <CardContent className="p-1 md:p-2 pt-0">
+            <div className="text-[11px] sm:text-sm md:text-lg font-bold text-violet-900">
               {buffetStats.comidasEntregadas}
             </div>
-            <p className="text-[8px] sm:text-[9px] md:text-xs text-muted-foreground leading-tight">
-              Total de entregas realizadas
+            <p className="hidden md:block text-[8px] sm:text-[9px] md:text-xs text-muted-foreground leading-tight">
+              Entregas realizadas
             </p>
           </CardContent>
         </Card>
       </div>
 
-      <div className="grid gap-2 md:gap-4 grid-cols-1 lg:grid-cols-2">
-        <Card>
-          <CardHeader className="p-3 md:p-6 pb-2 md:pb-4">
-            <CardTitle className="flex items-center gap-2 text-sm md:text-lg">
-              <TrendingUp className="w-4 h-4 md:w-5 md:h-5 text-blue-600" />
+      <div className="grid gap-1 md:gap-4 grid-cols-1 lg:grid-cols-2">
+        <Card className="shadow-sm md:shadow-sm border-uparsistem-200/50 dark:border-uparsistem-800/30">
+          <CardHeader className="p-2 md:p-6 pb-1 md:pb-4">
+            <CardTitle className="flex items-center gap-1 md:gap-2 text-[11px] md:text-lg">
+              <TrendingUp className="w-3 h-3 md:w-5 md:h-5 text-uparsistem-600" />
               Usuario Más Activo
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-2 md:space-y-3">
+          <CardContent className="p-2 md:p-6 pt-0 md:pt-0">
             {topUser ? (
-              <div className="space-y-2 md:space-y-3">
-                <div className="flex items-center gap-2">
-                  <UserCheck className="w-3 h-3 md:w-4 md:h-4 text-blue-600 flex-shrink-0" />
-                  <span className="font-medium text-xs md:text-base truncate">{topUser.userName}</span>
+              <div className="flex items-center gap-1 md:gap-3 p-1 md:p-3 rounded border bg-uparsistem-50 border-uparsistem-200">
+                <div className="flex size-5 md:size-9 shrink-0 items-center justify-center rounded bg-uparsistem-600 text-white text-[9px] md:text-base font-bold">
+                  1
                 </div>
-                <p className="text-[10px] md:text-sm text-muted-foreground truncate">
-                  Rol: <span className="font-medium capitalize">{topUser.userRole}</span>
-                </p>
-                <div className="grid grid-cols-2 gap-2 md:gap-3 mt-2">
-                  <div className="text-center p-1.5 md:p-2 bg-green-50 rounded-lg">
-                    <div className="text-base md:text-xl font-bold text-green-800">{topUser.accedidos}</div>
-                    <p className="text-[9px] md:text-xs text-green-600">Accedidos</p>
-                  </div>
-                  <div className="text-center p-1.5 md:p-2 bg-red-50 rounded-lg">
-                    <div className="text-base md:text-xl font-bold text-red-800">{topUser.denegados}</div>
-                    <p className="text-[9px] md:text-xs text-red-600">Denegados</p>
-                  </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-[10px] md:text-sm font-semibold truncate leading-tight">{topUser.userName}</p>
+                  <p className="text-[8px] md:text-xs text-muted-foreground truncate capitalize leading-tight">
+                    {topUser.userRole} · {topUser.total} registros
+                  </p>
                 </div>
-                <div className="text-center mt-1 md:mt-2">
-                  <div className="text-[10px] md:text-sm text-muted-foreground">
-                    Total: <span className="font-semibold">{topUser.total}</span> registros
+                <div className="flex items-center gap-0.5 md:gap-3 shrink-0">
+                  <div className="text-center px-0.5">
+                    <p className="text-[13px] md:text-sm font-bold text-uparsistem-600 tabular-nums leading-tight">{topUser.accedidos}</p>
+                    <p className="text-[6px] md:text-[10px] text-muted-foreground leading-tight">A</p>
+                  </div>
+                  <div className="w-px h-4 md:h-7 bg-gray-200 dark:bg-gray-700" />
+                  <div className="text-center px-0.5">
+                    <p className="text-[13px] md:text-sm font-bold text-red-600 tabular-nums leading-tight">{topUser.denegados}</p>
+                    <p className="text-[6px] md:text-[10px] text-muted-foreground leading-tight">D</p>
                   </div>
                 </div>
               </div>
@@ -639,48 +657,48 @@ export function DashboardStats({ currentUserRole = "administrador" }: DashboardS
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="p-3 md:p-6 pb-2 md:pb-4">
-            <CardTitle className="text-sm md:text-lg">Historial de Registros por Usuario</CardTitle>
+        <Card className="shadow-sm md:shadow-sm border-uparsistem-200/50 dark:border-uparsistem-800/30">
+          <CardHeader className="p-2 md:p-6 pb-1 md:pb-4">
+            <CardTitle className="text-[11px] md:text-lg">Historial por Usuario</CardTitle>
           </CardHeader>
-          <CardContent className="p-3 md:p-6 pt-0">
-            <div className="space-y-3 md:space-y-4">
+          <CardContent className="p-2 md:p-6 pt-0 md:pt-0">
+            <div className="space-y-2 md:space-y-4">
               {adminOperativoStats.length > 0 && (
                 <div>
-                  <div className="flex items-center gap-2 mb-2 md:mb-3">
-                    <UserCheck className="w-3 h-3 md:w-4 md:h-4 text-blue-600 flex-shrink-0" />
-                    <h3 className="text-[10px] md:text-sm font-semibold text-blue-600">Administrador / Operativo</h3>
+                  <div className="flex items-center gap-1 mb-1 md:mb-3">
+                    <UserCheck className="w-2.5 h-2.5 md:w-4 md:h-4 text-blue-600 flex-shrink-0" />
+                    <h3 className="text-[9px] md:text-sm font-semibold text-blue-700">Admin / Operativo</h3>
                   </div>
-                  <div className="space-y-1.5 md:space-y-2">
+                  <div className="space-y-px md:space-y-2">
                     {adminOperativoStats.slice(0, 5).map((user, index) => (
                       <div
                         key={user.userId}
-                        className="flex items-center justify-between p-2 md:p-3 border rounded-lg gap-1.5 md:gap-2 bg-blue-50/50"
+                        className="flex items-center justify-between p-1 md:p-3 border rounded gap-0.5 md:gap-2 bg-blue-50/50 border-blue-100"
                       >
-                        <div className="flex items-center gap-1.5 md:gap-3 flex-1 min-w-0">
-                          <div className="flex items-center justify-center w-5 h-5 md:w-8 md:h-8 rounded-full text-[10px] md:text-sm flex-shrink-0 bg-blue-100 text-blue-800">
+                        <div className="flex items-center gap-1 md:gap-3 flex-1 min-w-0">
+                          <div className="flex items-center justify-center w-3.5 h-3.5 md:w-8 md:h-8 rounded-full text-[7px] md:text-sm flex-shrink-0 bg-blue-100 text-blue-700">
                             {index + 1}
                           </div>
                           <div className="flex-1 min-w-0">
-                            <p className="font-medium text-[10px] sm:text-xs md:text-base truncate">{user.userName}</p>
-                            <p className="text-[8px] sm:text-[10px] md:text-sm text-muted-foreground truncate">
+                            <p className="font-medium text-[9px] sm:text-xs md:text-base truncate leading-tight">{user.userName}</p>
+                            <p className="hidden md:block text-[8px] sm:text-[10px] md:text-sm text-muted-foreground truncate">
                               Rol: <span className="capitalize">{user.userRole}</span>
                             </p>
                           </div>
                         </div>
-                        <div className="flex items-center gap-1.5 md:gap-4 flex-shrink-0">
-                          <div className="text-center">
-                            <p className="font-bold text-[10px] sm:text-xs md:text-sm text-green-600">
+                        <div className="flex items-center gap-0.5 md:gap-4 flex-shrink-0">
+                          <div className="text-center px-0.5">
+                            <p className="font-bold text-[12px] sm:text-xs md:text-sm text-uparsistem-600 leading-tight">
                               {user.accedidos}
                             </p>
-                            <p className="text-[8px] sm:text-[9px] md:text-xs text-muted-foreground whitespace-nowrap">
-                              Accedidos
+                            <p className="text-[6px] sm:text-[9px] md:text-xs text-muted-foreground whitespace-nowrap leading-tight">
+                              Acc
                             </p>
                           </div>
-                          <div className="text-center">
-                            <p className="font-bold text-[10px] sm:text-xs md:text-sm text-red-600">{user.denegados}</p>
-                            <p className="text-[8px] sm:text-[9px] md:text-xs text-muted-foreground whitespace-nowrap">
-                              Denegados
+                          <div className="text-center px-0.5">
+                            <p className="font-bold text-[12px] sm:text-xs md:text-sm text-red-600 leading-tight">{user.denegados}</p>
+                            <p className="text-[6px] sm:text-[9px] md:text-xs text-muted-foreground whitespace-nowrap leading-tight">
+                              Den
                             </p>
                           </div>
                         </div>
@@ -692,40 +710,40 @@ export function DashboardStats({ currentUserRole = "administrador" }: DashboardS
 
               {bufeteStats.length > 0 && (
                 <div>
-                  <div className="flex items-center gap-2 mb-2 md:mb-3">
-                    <ChefHat className="w-3 h-3 md:w-4 md:h-4 text-purple-600 flex-shrink-0" />
-                    <h3 className="text-[10px] md:text-sm font-semibold text-purple-600">Bufete</h3>
+                  <div className="flex items-center gap-1 mb-1 md:mb-3">
+                    <ChefHat className="w-2.5 h-2.5 md:w-4 md:h-4 text-violet-600 flex-shrink-0" />
+                    <h3 className="text-[9px] md:text-sm font-semibold text-violet-600">Bufete</h3>
                   </div>
-                  <div className="space-y-1.5 md:space-y-2">
+                  <div className="space-y-px md:space-y-2">
                     {bufeteStats.slice(0, 5).map((user, index) => (
                       <div
                         key={user.userId}
-                        className="flex items-center justify-between p-2 md:p-3 border rounded-lg gap-1.5 md:gap-2 bg-purple-50/50"
+                        className="flex items-center justify-between p-1 md:p-3 border rounded gap-0.5 md:gap-2 bg-violet-50/50 border-violet-100"
                       >
-                        <div className="flex items-center gap-1.5 md:gap-3 flex-1 min-w-0">
-                          <div className="flex items-center justify-center w-5 h-5 md:w-8 md:h-8 rounded-full text-[10px] md:text-sm flex-shrink-0 bg-purple-100 text-purple-800">
+                        <div className="flex items-center gap-1 md:gap-3 flex-1 min-w-0">
+                          <div className="flex items-center justify-center w-3.5 h-3.5 md:w-8 md:h-8 rounded-full text-[7px] md:text-sm flex-shrink-0 bg-violet-100 text-violet-700">
                             {index + 1}
                           </div>
                           <div className="flex-1 min-w-0">
-                            <p className="font-medium text-[10px] sm:text-xs md:text-base truncate">{user.userName}</p>
-                            <p className="text-[8px] sm:text-[10px] md:text-sm text-muted-foreground truncate">
+                            <p className="font-medium text-[9px] sm:text-xs md:text-base truncate leading-tight">{user.userName}</p>
+                            <p className="hidden md:block text-[8px] sm:text-[10px] md:text-sm text-muted-foreground truncate">
                               Rol: <span className="capitalize">{user.userRole}</span>
                             </p>
                           </div>
                         </div>
-                        <div className="flex items-center gap-1.5 md:gap-4 flex-shrink-0">
-                          <div className="text-center">
-                            <p className="font-bold text-[10px] sm:text-xs md:text-sm text-green-600">
+                        <div className="flex items-center gap-0.5 md:gap-4 flex-shrink-0">
+                          <div className="text-center px-0.5">
+                            <p className="font-bold text-[12px] sm:text-xs md:text-sm text-uparsistem-600 leading-tight">
                               {user.accedidos}
                             </p>
-                            <p className="text-[8px] sm:text-[9px] md:text-xs text-muted-foreground whitespace-nowrap">
-                              Accedidos
+                            <p className="text-[6px] sm:text-[9px] md:text-xs text-muted-foreground whitespace-nowrap leading-tight">
+                              Acc
                             </p>
                           </div>
-                          <div className="text-center">
-                            <p className="font-bold text-[10px] sm:text-xs md:text-sm text-red-600">{user.denegados}</p>
-                            <p className="text-[8px] sm:text-[9px] md:text-xs text-muted-foreground whitespace-nowrap">
-                              Denegados
+                          <div className="text-center px-0.5">
+                            <p className="font-bold text-[12px] sm:text-xs md:text-sm text-red-600 leading-tight">{user.denegados}</p>
+                            <p className="text-[6px] sm:text-[9px] md:text-xs text-muted-foreground whitespace-nowrap leading-tight">
+                              Den
                             </p>
                           </div>
                         </div>

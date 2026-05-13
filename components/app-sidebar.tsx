@@ -125,8 +125,8 @@ const items: NavItem[] = [
 const roleStyles: Record<string, { label: string; gradient: string; badge: string }> = {
   administrador: {
     label: "Admin",
-    gradient: "from-rose-500 to-pink-600",
-    badge: "bg-rose-100 text-rose-700 border-rose-200",
+    gradient: "from-green-600 to-green-700",
+    badge: "bg-green-100 text-green-700 border-green-200",
   },
   operativo: {
     label: "Operativo",
@@ -181,9 +181,7 @@ export function AppSidebar() {
       <Sidebar collapsible="icon" variant="inset">
         <SidebarHeader className="relative p-3 group-data-[collapsible=icon]:p-2">
           <div className="flex items-center gap-3 px-1 group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:justify-center">
-            <div className={`flex size-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br ${roleInfo.gradient} shadow-md`}>
-              <User className="size-4 text-white" />
-            </div>
+            <img src="/logo.webp" alt="Uparsistem" className="h-10 w-auto shrink-0 group-data-[collapsible=icon]:h-8" />
             <div className="flex-1 min-w-0 group-data-[collapsible=icon]:hidden">
               <p className="text-sm font-semibold truncate text-sidebar-foreground">Uparsistem</p>
               <p className="text-[11px] truncate text-sidebar-foreground/60">Control de Acceso</p>
