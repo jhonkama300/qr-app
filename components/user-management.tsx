@@ -406,7 +406,7 @@ export function UserManagement() {
   }
 
   return (
-    <main className="flex flex-1 flex-col gap-4 p-4">
+    <main className="flex flex-1 flex-col gap-2 md:gap-4 p-2 md:p-4 w-full min-w-0 overflow-hidden">
       {error && (
         <Alert variant="destructive">
           <AlertDescription>{error}</AlertDescription>
@@ -682,153 +682,40 @@ export function UserManagement() {
               </CardContent>
             </Card>
           ) : (
-            <div className="space-y-3">
+            <div className="space-y-1.5 md:space-y-2">
               {filteredUsers.map((user) => (
-                <Card key={user.id}>
-                  <CardContent className="p-4">
-                    <div className="space-y-3">
-                      <div className="flex items-start gap-3">
-                        <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center shrink-0">
-                          {getRoleIcon(user.roles[0])}
+                <div key={user.id} className="flex items-start gap-1.5 md:gap-3 p-1.5 md:p-3 rounded-lg border border-uparsistem-100/50 dark:border-uparsistem-900/20 bg-white dark:bg-gray-900">
+                  <div className="flex size-7 md:size-10 shrink-0 items-center justify-center rounded-full bg-uparsistem-100 dark:bg-uparsistem-900/30 mt-0.5">
+                    {getRoleIcon(user.roles[0])}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-start justify-between gap-1">
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[10px] md:text-sm font-semibold truncate">{user.fullName}</p>
+                        <div className="flex items-center gap-1 text-[8px] md:text-xs text-muted-foreground mt-0.5 flex-wrap">
+                          <span className="font-mono font-bold text-foreground">{user.idNumber}</span>
+                          <span className="opacity-50">·</span>
+                          <span>{new Date(user.createdAt).toLocaleDateString()}</span>
                         </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 mb-1">
-                            <p className="font-medium text-sm truncate">{user.fullName}</p>
-                          </div>
-                          <div className="flex items-center gap-2 text-xs text-muted-foreground mb-2">
-                            <span>ID: {user.idNumber}</span>
-                            <span>•</span>
-                            <span>{new Date(user.createdAt).toLocaleDateString()}</span>
-                          </div>
-                          <div className="flex items-center gap-2 flex-wrap">
-                            {user.roles.map((role) => (
-                              <span
-                                key={role}
-                                className={`px-2 py-1 rounded-full text-xs font-medium ${getRoleBadge(role)}`}
-                              >
-                                {role === "administrador"
-                                  ? "Administrador"
-                                  : role === "bufete"
-                                    ? "Bufete"
-                                    : "Operativo"}
-                              </span>
-                            ))}
-                            {user.roles.includes("bufete") && user.mesaAsignada && (
-                              <span className="px-2 py-1 bg-green-100 text-green-700 rounded-full text-xs font-medium">
-                                Mesa {user.mesaAsignada}
-                              </span>
-                            )}
-                          </div>
+                        <div className="flex items-center gap-0.5 mt-0.5 flex-wrap">
+                          {user.roles.map((role) => (
+                            <span key={role} className={`text-[8px] md:text-[10px] px-1.5 py-0.5 rounded-full font-medium ${getRoleBadge(role)}`}>
+                              {role === "administrador" ? "Admin" : role === "bufete" ? "Bufete" : "Operativo"}
+                            </span>
+                          ))}
                         </div>
                       </div>
-
-                      <div className="flex flex-col gap-2 pt-2 border-t">
-                        <div className="space-y-2">
-                          <Label className="text-xs text-muted-foreground">Roles</Label>
-                          <div className="space-y-2 border rounded-lg p-2">
-                            <div className="flex items-center space-x-2">
-                              <Checkbox
-                                id={`${user.id}-operativo`}
-                                checked={user.roles.includes("operativo")}
-                                onCheckedChange={() => handleRoleToggle(user.id, "operativo", user.roles)}
-                              />
-                              <label
-                                htmlFor={`${user.id}-operativo`}
-                                className="flex items-center gap-2 text-xs cursor-pointer"
-                              >
-                                <User className="w-3 h-3" />
-                                Operativo
-                              </label>
-                            </div>
-                            <div className="flex items-center space-x-2">
-                              <Checkbox
-                                id={`${user.id}-administrador`}
-                                checked={user.roles.includes("administrador")}
-                                onCheckedChange={() => handleRoleToggle(user.id, "administrador", user.roles)}
-                              />
-                              <label
-                                htmlFor={`${user.id}-administrador`}
-                                className="flex items-center gap-2 text-xs cursor-pointer"
-                              >
-                                <Shield className="w-3 h-3" />
-                                Administrador
-                              </label>
-                            </div>
-                            <div className="flex items-center space-x-2">
-                              <Checkbox
-                                id={`${user.id}-bufete`}
-                                checked={user.roles.includes("bufete")}
-                                onCheckedChange={() => handleRoleToggle(user.id, "bufete", user.roles)}
-                              />
-                              <label
-                                htmlFor={`${user.id}-bufete`}
-                                className="flex items-center gap-2 text-xs cursor-pointer"
-                              >
-                                <Scale className="w-3 h-3" />
-                                Bufete
-                              </label>
-                            </div>
-                          </div>
-                        </div>
-
-                        {user.roles.includes("bufete") && (
-                          <div className="space-y-1">
-                            <Label className="text-xs text-muted-foreground">Mesa</Label>
-                            <Select
-                              value={user.mesaAsignada?.toString() || ""}
-                              onValueChange={(value) => handleMesaChange(user.id, Number.parseInt(value))}
-                            >
-                              <SelectTrigger className="h-8 text-xs">
-                                <SelectValue placeholder="Seleccionar mesa" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {mesasActivas.map((mesa) => (
-                                  <SelectItem key={mesa} value={mesa.toString()}>
-                                    Mesa {mesa}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
-                        )}
-
-                        <div className="flex gap-2 pt-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleOpenEditDialog(user)}
-                            className="flex-1 h-8 text-xs"
-                          >
-                            <Edit className="w-3 h-3 mr-1" />
-                            Editar
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleResetPassword(user.id, user.fullName)}
-                            disabled={resettingPassword === user.id}
-                            className="flex-1 h-8 text-xs"
-                          >
-                            {resettingPassword === user.id ? (
-                              <Loader2 className="w-3 h-3 mr-1 animate-spin" />
-                            ) : (
-                              <KeyRound className="w-3 h-3 mr-1" />
-                            )}
-                            {resettingPassword === user.id ? "Restaurando..." : "Restaurar"}
-                          </Button>
-                          <Button
-                            variant="destructive"
-                            size="sm"
-                            onClick={() => handleDeleteUser(user.id, user.fullName)}
-                            className="h-8 px-3"
-                          >
-                            <Trash2 className="w-3.5 h-3.5 text-white" />
-                          </Button>
-                        </div>
+                      <div className="flex items-center gap-0.5 shrink-0 mt-0.5">
+                        <button className="size-6 md:size-7 flex items-center justify-center rounded-md hover:bg-uparsistem-50 text-muted-foreground hover:text-uparsistem-700 transition-colors" onClick={() => handleEditClick(user)}>
+                          <Edit className="size-3 md:size-3.5" />
+                        </button>
+                        <button className="size-6 md:size-7 flex items-center justify-center rounded-md hover:bg-red-50 text-muted-foreground hover:text-red-600 transition-colors" onClick={() => handleDeleteClick(user)}>
+                          <Trash2 className="size-3 md:size-3.5" />
+                        </button>
                       </div>
                     </div>
-                  </CardContent>
-                </Card>
+                  </div>
+                </div>
               ))}
             </div>
           )}

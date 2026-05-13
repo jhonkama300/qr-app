@@ -113,6 +113,7 @@ export function DatabaseManagement() {
   const totalRegistros = filteredPersons.length
   const programasUnicos = Array.from(new Set(filteredPersons.map((p) => p.programa))).length
   const totalCuposExtras = filteredPersons.reduce((sum, p) => sum + (p.cuposExtras || 0), 0)
+  const promedioCupos = totalRegistros > 0 ? (totalCuposExtras / totalRegistros).toFixed(1) : "0"
   const bufeteDisponible = totalRegistros * 2 + totalCuposExtras
 
   useEffect(() => {
@@ -695,7 +696,7 @@ export function DatabaseManagement() {
   }
 
   return (
-    <div className="space-y-3 md:space-y-6">
+    <div className="space-y-3 md:space-y-6 w-full min-w-0 overflow-hidden">
       {error && (
         <Alert variant="destructive">
           <AlertDescription>{error}</AlertDescription>
@@ -707,256 +708,195 @@ export function DatabaseManagement() {
         </Alert>
       )}
 
-      <div className="flex gap-1 md:gap-2 border-b overflow-x-auto">
-        <Button
-          variant={activeSection === "estudiantes" ? "default" : "ghost"}
+      <div className="flex gap-1 p-1 rounded-xl bg-uparsistem-50/50 dark:bg-uparsistem-950/10 border border-uparsistem-100 dark:border-uparsistem-900/20 w-fit">
+        <button
           onClick={() => setActiveSection("estudiantes")}
-          className="rounded-b-none text-xs md:text-sm"
+          className={`flex items-center gap-1.5 px-3 md:px-4 py-1.5 md:py-2 rounded-lg text-xs md:text-sm font-medium transition-all ${
+            activeSection === "estudiantes"
+              ? "bg-uparsistem-600 text-white shadow-sm"
+              : "text-uparsistem-700/70 dark:text-uparsistem-300/70 hover:text-uparsistem-700 dark:hover:text-uparsistem-300"
+          }`}
         >
-          <GraduationCap className="mr-1 md:mr-2 h-3 w-3 md:h-4 md:w-4" />
-          <span className="whitespace-nowrap">Estudiantes ({persons.length})</span>
-        </Button>
-        <Button
-          variant={activeSection === "invitados" ? "default" : "ghost"}
+          <GraduationCap className="size-3.5 md:size-4" />
+          <span>Estudiantes <span className="opacity-70">({persons.length})</span></span>
+        </button>
+        <button
           onClick={() => setActiveSection("invitados")}
-          className="rounded-b-none text-xs md:text-sm"
+          className={`flex items-center gap-1.5 px-3 md:px-4 py-1.5 md:py-2 rounded-lg text-xs md:text-sm font-medium transition-all ${
+            activeSection === "invitados"
+              ? "bg-uparsistem-600 text-white shadow-sm"
+              : "text-uparsistem-700/70 dark:text-uparsistem-300/70 hover:text-uparsistem-700 dark:hover:text-uparsistem-300"
+          }`}
         >
-          <UserPlus className="mr-1 md:mr-2 h-3 w-3 md:h-4 md:w-4" />
-          <span className="whitespace-nowrap">Invitados ({invitados.length})</span>
-        </Button>
+          <UserPlus className="size-3.5 md:size-4" />
+          <span>Invitados <span className="opacity-70">({invitados.length})</span></span>
+        </button>
       </div>
 
       {/* Sección de Estudiantes */}
       {activeSection === "estudiantes" && (
         <>
           {/* Estadísticas */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium">Total Registros</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{totalRegistros}</div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium">Programas</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{programasUnicos}</div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium">Cupos Extras</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{totalCuposExtras}</div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium">Bufete Disponible</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{bufeteDisponible}</div>
-              </CardContent>
-            </Card>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-1.5 md:gap-3">
+            <div className="relative overflow-hidden rounded-xl bg-gradient-to-b from-blue-100 to-blue-200 dark:from-blue-950/30 dark:to-blue-900/20 border border-blue-200 dark:border-blue-800/30 p-2 md:p-3">
+              <span className="text-[8px] md:text-xs font-semibold text-blue-700 dark:text-blue-300 uppercase tracking-wider">Total Registros</span>
+              <div className="text-base md:text-xl font-bold text-blue-800 dark:text-blue-200 mt-0.5">{totalRegistros}</div>
+            </div>
+            <div className="relative overflow-hidden rounded-xl bg-gradient-to-b from-violet-100 to-violet-200 dark:from-violet-950/30 dark:to-violet-900/20 border border-violet-200 dark:border-violet-800/30 p-2 md:p-3">
+              <span className="text-[8px] md:text-xs font-semibold text-violet-700 dark:text-violet-300 uppercase tracking-wider">Programas</span>
+              <div className="text-base md:text-xl font-bold text-violet-800 dark:text-violet-200 mt-0.5">{programasUnicos}</div>
+            </div>
+            <div className="relative overflow-hidden rounded-xl bg-gradient-to-b from-amber-100 to-amber-200 dark:from-amber-950/30 dark:to-amber-900/20 border border-amber-200 dark:border-amber-800/30 p-2 md:p-3">
+              <span className="text-[8px] md:text-xs font-semibold text-amber-700 dark:text-amber-300 uppercase tracking-wider">Cupos Extras</span>
+              <div className="text-base md:text-xl font-bold text-amber-800 dark:text-amber-200 mt-0.5">{totalCuposExtras}</div>
+            </div>
+            <div className="relative overflow-hidden rounded-xl bg-gradient-to-b from-emerald-100 to-emerald-200 dark:from-emerald-950/30 dark:to-emerald-900/20 border border-emerald-200 dark:border-emerald-800/30 p-2 md:p-3">
+              <span className="text-[8px] md:text-xs font-semibold text-emerald-700 dark:text-emerald-300 uppercase tracking-wider">Bufetes Disponibles</span>
+              <div className="text-base md:text-xl font-bold text-emerald-800 dark:text-emerald-200 mt-0.5">{bufeteDisponible}</div>
+            </div>
           </div>
 
           {/* Acciones */}
-          <div className="flex flex-wrap gap-2">
-            <Button onClick={() => setIsImportDialogOpen(true)} disabled={importing}>
-              <Upload className="mr-2 h-4 w-4" />
-              Importar Excel
+          <div className="flex flex-wrap gap-1.5 md:gap-2">
+            <Button onClick={() => setIsImportDialogOpen(true)} disabled={importing} size="sm" className="h-8 md:h-9 text-[10px] md:text-xs gap-1 bg-uparsistem-600 hover:bg-uparsistem-700 text-white px-2 md:px-3">
+              <Upload className="h-3 w-3 md:h-4 md:w-4 shrink-0" />
+              <span className="truncate">Importar Excel</span>
             </Button>
-
-            {/* New button to assign extra cupos */}
-            <Button
-              onClick={() => {
-                setIsImportCuposExtrasDialogOpen(true)
-                setCuposExtrasImportResult(null)
-                setSelectedCuposExtrasFileName("")
-              }}
-              disabled={importingCuposExtras}
-              variant="outline"
-              className="border-amber-300 text-amber-600 hover:bg-amber-50"
-            >
-              <Gift className="mr-2 h-4 w-4" />
-              Asignar Cupos Extras
+            <Button onClick={() => { setIsImportCuposExtrasDialogOpen(true); setCuposExtrasImportResult(null); setSelectedCuposExtrasFileName("") }} disabled={importingCuposExtras} variant="outline" size="sm" className="h-8 md:h-9 text-[10px] md:text-xs gap-1 border-amber-300 text-amber-700 hover:bg-amber-50 px-2 md:px-3">
+              <Gift className="h-3 w-3 md:h-4 md:w-4 shrink-0" />
+              <span className="truncate">Cupos Extras</span>
             </Button>
-
-            <Button
-              onClick={handleDeleteAll}
-              disabled={importing}
-              variant="outline"
-              className="border-red-300 text-red-600 hover:bg-red-50 bg-transparent"
-            >
-              <RotateCcw className="mr-2 h-4 w-4" />
-              Eliminar Todo
+            <Button onClick={handleDeleteAll} disabled={importing} variant="outline" size="sm" className="h-8 md:h-9 text-[10px] md:text-xs gap-1 border-red-300 text-red-700 hover:bg-red-50 px-2 md:px-3">
+              <RotateCcw className="h-3 w-3 md:h-4 md:w-4 shrink-0" />
+              <span className="truncate">Eliminar Todo</span>
             </Button>
-
-            <Button
-              onClick={handleResetMetrics}
-              disabled={importing}
-              variant="outline"
-              className="border-red-300 text-red-600 hover:bg-red-50 bg-transparent"
-            >
-              <RotateCcw className="mr-2 h-4 w-4" />
-              Reiniciar Métricas
+            <Button onClick={handleResetMetrics} disabled={importing} variant="outline" size="sm" className="h-8 md:h-9 text-[10px] md:text-xs gap-1 border-red-300 text-red-700 hover:bg-red-50 px-2 md:px-3">
+              <RotateCcw className="h-3 w-3 md:h-4 md:w-4 shrink-0" />
+              <span className="truncate">Reiniciar Métricas</span>
             </Button>
-
-            <Button
-              onClick={() => setIsResetBufetesDialogOpen(true)}
-              disabled={resetting}
-              variant="outline"
-              className="border-teal-300 text-teal-600 hover:bg-teal-50"
-            >
-              <Utensils className="mr-2 h-4 w-4" />
-              Reiniciar Bufetes
+            <Button onClick={() => setIsResetBufetesDialogOpen(true)} disabled={resetting} variant="outline" size="sm" className="h-8 md:h-9 text-[10px] md:text-xs gap-1 border-teal-300 text-teal-700 hover:bg-teal-50 px-2 md:px-3">
+              <Utensils className="h-3 w-3 md:h-4 md:w-4 shrink-0" />
+              <span className="truncate">Reiniciar Bufetes</span>
             </Button>
           </div>
 
           {/* Búsqueda y filtros */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Users className="h-5 w-5" />
-                Personas Registradas
-              </CardTitle>
-              <CardDescription>
-                Mostrando {startIndex + 1} - {Math.min(endIndex, filteredPersons.length)} de {filteredPersons.length}{" "}
-                personas
-              </CardDescription>
+          <Card className="border-uparsistem-100/50 dark:border-uparsistem-900/20 shadow-sm">
+            <CardHeader className="p-3 md:p-5 pb-2 md:pb-3">
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center gap-2 text-sm md:text-base">
+                  <Users className="h-4 w-4 md:h-5 md:w-5 text-uparsistem-600" />
+                  Personas Registradas
+                </CardTitle>
+                <span className="text-[10px] md:text-xs text-muted-foreground">
+                  {startIndex + 1}-{Math.min(endIndex, filteredPersons.length)} de {filteredPersons.length}
+                </span>
+              </div>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex flex-col md:flex-row gap-4">
-                <div className="relative flex-1">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <CardContent className="p-3 md:p-5 pt-0 md:pt-0 space-y-3 md:space-y-4">
+              <div className="flex flex-col md:flex-row gap-2 md:gap-3">
+                <div className="relative flex-1 min-w-0">
+                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 md:h-4 md:w-4 text-muted-foreground" />
                   <Input
-                    placeholder="Buscar por nombre, identificación, puesto o programa..."
+                    placeholder="Buscar por nombre, ID, puesto o programa..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-10"
+                    className="pl-8 md:pl-9 h-9 md:h-10 text-xs md:text-sm w-full"
                   />
                 </div>
-
-                <Select value={selectedPrograma} onValueChange={setSelectedPrograma}>
-                  <SelectTrigger className="w-full md:w-[200px]">
-                    <SelectValue placeholder="Filtrar por programa" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="todos">Todos los programas</SelectItem>
-                    {uniquePrograms.map((programa) => (
-                      <SelectItem key={programa} value={programa}>
-                        {programa}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-
-                <Select value={selectedCuposExtras} onValueChange={setSelectedCuposExtras}>
-                  <SelectTrigger className="w-full md:w-[180px]">
-                    <SelectValue placeholder="Cupos extras" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="todos">Todos</SelectItem>
-                    <SelectItem value="con-extras">Con extras</SelectItem>
-                    <SelectItem value="sin-extras">Sin extras</SelectItem>
-                  </SelectContent>
-                </Select>
-
-                <Select value={String(itemsPerPage)} onValueChange={(v) => setItemsPerPage(Number(v))}>
-                  <SelectTrigger className="w-full md:w-[100px]">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="10">10</SelectItem>
-                    <SelectItem value="25">25</SelectItem>
-                    <SelectItem value="50">50</SelectItem>
-                    <SelectItem value="100">100</SelectItem>
-                  </SelectContent>
-                </Select>
+                <div className="flex flex-col md:flex-row gap-1.5 md:gap-3">
+                  <Select value={selectedPrograma} onValueChange={setSelectedPrograma}>
+                    <SelectTrigger className="h-9 md:h-10 text-xs md:text-sm w-full md:w-auto md:min-w-[180px]">
+                      <SelectValue placeholder="Programa" className="truncate" />
+                    </SelectTrigger>
+                    <SelectContent className="max-w-[90vw] md:max-w-none">
+                      <SelectItem value="todos" className="text-xs md:text-sm">Todos los programas</SelectItem>
+                      {uniquePrograms.map((programa) => (
+                        <SelectItem key={programa} value={programa} className="text-xs md:text-sm break-words whitespace-normal">{programa}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Select value={selectedCuposExtras} onValueChange={setSelectedCuposExtras}>
+                    <SelectTrigger className="h-9 md:h-10 text-xs md:text-sm w-full md:w-auto md:min-w-[140px]">
+                      <SelectValue placeholder="Cupos" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="todos">Todos</SelectItem>
+                      <SelectItem value="con-extras">Con extras</SelectItem>
+                      <SelectItem value="sin-extras">Sin extras</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Select value={String(itemsPerPage)} onValueChange={(v) => setItemsPerPage(Number(v))}>
+                    <SelectTrigger className="h-9 md:h-10 text-xs md:text-sm w-full md:w-[80px]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="10">10</SelectItem>
+                      <SelectItem value="25">25</SelectItem>
+                      <SelectItem value="50">50</SelectItem>
+                      <SelectItem value="100">100</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
 
               {/* Lista de personas */}
-              <div className="space-y-3">
+              <div className="space-y-1.5 md:space-y-2">
                 {currentPersons.map((person) => {
                   const cupos = calculateCuposDisplay(person)
                   return (
-                    <Card key={person.id} className="p-4">
-                      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                        <div className="flex items-center gap-4">
-                          <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center">
-                            <GraduationCap className="h-6 w-6 text-primary" />
+                    <div key={person.id} className="flex items-start gap-1.5 md:gap-3 p-1.5 md:p-3 rounded-lg border border-uparsistem-100/50 dark:border-uparsistem-900/20 bg-white dark:bg-gray-900">
+                      <div className="flex size-7 md:size-10 shrink-0 items-center justify-center rounded-full bg-uparsistem-100 dark:bg-uparsistem-900/30 mt-0.5">
+                        <GraduationCap className="size-3.5 md:size-5 text-uparsistem-600 dark:text-uparsistem-400" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-start justify-between gap-1">
+                          <div className="min-w-0 flex-1">
+                            <p className="text-[10px] md:text-sm font-semibold leading-tight">{person.nombre}</p>
+                            <div className="flex items-center gap-1 mt-0.5 flex-wrap">
+                              <span className="text-xs md:text-sm font-bold text-foreground">{person.identificacion}</span>
+                            </div>
                           </div>
-                          <div>
-                            <h3 className="font-semibold">{person.nombre}</h3>
-                            <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-                              <span className="flex items-center gap-1">
-                                <Briefcase className="h-3 w-3" />
-                                Puesto {person.puesto}
+                          <div className="flex flex-col items-end gap-0.5 shrink-0 mt-0.5">
+                            <span className="text-[9px] md:text-xs font-bold text-uparsistem-700 dark:text-uparsistem-300 text-right leading-tight">{person.puesto}</span>
+                            <div className="flex items-center gap-0.5">
+                              <span className="text-[8px] md:text-[10px] font-semibold text-uparsistem-700 dark:text-uparsistem-300 bg-uparsistem-50 dark:bg-uparsistem-950/20 px-1.5 py-0.5 rounded-md whitespace-nowrap">
+                                {cupos.total} cupos
                               </span>
-                              <span>•</span>
-                              <span>ID: {person.identificacion}</span>
+                              {cupos.extras > 0 && (
+                                <span className="text-[8px] md:text-[10px] font-semibold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/20 px-1.5 py-0.5 rounded-md whitespace-nowrap">
+                                  +{cupos.extras}
+                                </span>
+                              )}
                             </div>
                           </div>
                         </div>
-                        <div className="flex flex-wrap items-center gap-2">
-                          <Badge variant="outline">{person.programa}</Badge>
-                          <Badge variant="secondary" className="bg-blue-100 text-blue-800">
-                            Graduando + {cupos.acompanantes} acompañante{cupos.acompanantes !== 1 ? "s" : ""}
-                            {cupos.extras > 0 && (
-                              <span className="ml-1 text-xs opacity-75">
-                                (1 + {cupos.extras} extra{cupos.extras !== 1 ? "s" : ""})
-                              </span>
-                            )}
-                          </Badge>
-                          {(person.cuposConsumidos || 0) > 0 && (
-                            <Badge variant="outline" className="bg-orange-100 text-orange-800 border-orange-300">
-                              {person.cuposConsumidos} consumido{(person.cuposConsumidos || 0) !== 1 ? "s" : ""}
-                            </Badge>
-                          )}
-                        </div>
+                        {person.programa && (
+                          <p className="text-[9px] md:text-xs text-muted-foreground leading-tight mt-0.5">{person.programa}</p>
+                        )}
                       </div>
-                    </Card>
+                    </div>
                   )
                 })}
               </div>
 
               {/* Paginación */}
               {totalPages > 1 && (
-                <div className="flex items-center justify-center gap-2">
-                  <Button variant="outline" size="icon" onClick={() => setCurrentPage(1)} disabled={currentPage === 1}>
-                    <ChevronsLeft className="h-4 w-4" />
+                <div className="flex items-center justify-center gap-1 pt-1 md:pt-2">
+                  <Button variant="ghost" size="icon" onClick={() => setCurrentPage(1)} disabled={currentPage === 1} className="size-7 md:size-8">
+                    <ChevronsLeft className="size-3 md:size-3.5" />
                   </Button>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                    disabled={currentPage === 1}
-                  >
-                    <ChevronLeft className="h-4 w-4" />
+                  <Button variant="ghost" size="icon" onClick={() => setCurrentPage((p) => Math.max(1, p - 1))} disabled={currentPage === 1} className="size-7 md:size-8">
+                    <ChevronLeft className="size-3 md:size-3.5" />
                   </Button>
-                  <span className="text-sm">
-                    Página {currentPage} de {totalPages}
+                  <span className="text-[10px] md:text-xs text-muted-foreground px-2 min-w-[80px] text-center">
+                    {currentPage} / {totalPages}
                   </span>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                    disabled={currentPage === totalPages}
-                  >
-                    <ChevronRight className="h-4 w-4" />
+                  <Button variant="ghost" size="icon" onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages} className="size-7 md:size-8">
+                    <ChevronRight className="size-3 md:size-3.5" />
                   </Button>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={() => setCurrentPage(totalPages)}
-                    disabled={currentPage === totalPages}
-                  >
-                    <ChevronsRight className="h-4 w-4" />
+                  <Button variant="ghost" size="icon" onClick={() => setCurrentPage(totalPages)} disabled={currentPage === totalPages} className="size-7 md:size-8">
+                    <ChevronsRight className="size-3 md:size-3.5" />
                   </Button>
                 </div>
               )}
@@ -967,89 +907,59 @@ export function DatabaseManagement() {
 
       {activeSection === "invitados" && (
         <>
-          {/* Estadísticas de invitados */}
-          <div className="grid grid-cols-3 gap-4">
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium">Total Invitados</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{invitados.length}</div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium">Cupos</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{invitados.length}</div>
-                <p className="text-xs text-muted-foreground">1 cupo por invitado</p>
-              </CardContent>
-            </Card>
-            <Card className="bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-purple-700">Platos por Entregar</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-purple-600">
-                  {invitados.reduce((sum, inv) => {
-                    const consumidos = inv.cuposConsumidos || 0
-                    return sum + Math.max(0, 1 - consumidos)
-                  }, 0)}
-                </div>
-                <p className="text-xs text-purple-600">
-                  {invitados.filter((inv) => (inv.cuposConsumidos || 0) >= 1).length} ya consumieron
-                </p>
-              </CardContent>
-            </Card>
+          <div className="grid grid-cols-3 gap-2 md:gap-4">
+            <div className="relative overflow-hidden rounded-xl bg-gradient-to-b from-blue-100 to-blue-200 dark:from-blue-950/30 dark:to-blue-900/20 border border-blue-200 dark:border-blue-800/30 p-2.5 md:p-4">
+              <span className="text-[9px] md:text-xs font-semibold text-blue-700 dark:text-blue-300 uppercase tracking-wider">Total Invitados</span>
+              <div className="text-lg md:text-2xl font-bold text-blue-800 dark:text-blue-200 mt-0.5">{invitados.length}</div>
+            </div>
+            <div className="relative overflow-hidden rounded-xl bg-gradient-to-b from-amber-100 to-amber-200 dark:from-amber-950/30 dark:to-amber-900/20 border border-amber-200 dark:border-amber-800/30 p-2.5 md:p-4">
+              <span className="text-[9px] md:text-xs font-semibold text-amber-700 dark:text-amber-300 uppercase tracking-wider">Cupos</span>
+              <div className="text-lg md:text-2xl font-bold text-amber-800 dark:text-amber-200 mt-0.5">{invitados.length}</div>
+              <p className="text-[8px] md:text-[10px] text-amber-600/70 dark:text-amber-400/70">1 cupo por invitado</p>
+            </div>
+            <div className="relative overflow-hidden rounded-xl bg-gradient-to-b from-purple-100 to-purple-200 dark:from-purple-950/30 dark:to-purple-900/20 border border-purple-200 dark:border-purple-800/30 p-2.5 md:p-4">
+              <span className="text-[9px] md:text-xs font-semibold text-purple-700 dark:text-purple-300 uppercase tracking-wider">Por Entregar</span>
+              <div className="text-lg md:text-2xl font-bold text-purple-800 dark:text-purple-200 mt-0.5">
+                {invitados.reduce((sum, inv) => { const consumidos = inv.cuposConsumidos || 0; return sum + Math.max(0, 1 - consumidos) }, 0)}
+              </div>
+              <p className="text-[8px] md:text-[10px] text-purple-600/70 dark:text-purple-400/70">{invitados.filter((inv) => (inv.cuposConsumidos || 0) >= 1).length} ya consumieron</p>
+            </div>
           </div>
 
-          {/* Acciones de invitados */}
-          <div className="flex flex-wrap gap-2">
-            <Button onClick={() => setIsImportInvitadosDialogOpen(true)} disabled={importingInvitados}>
-              <Upload className="mr-2 h-4 w-4" />
+          <div className="flex flex-wrap gap-1.5 md:gap-2">
+            <Button onClick={() => setIsImportInvitadosDialogOpen(true)} disabled={importingInvitados} size="sm" className="h-8 md:h-9 text-[10px] md:text-xs gap-1 bg-uparsistem-600 hover:bg-uparsistem-700 text-white">
+              <Upload className="h-3 w-3 md:h-4 md:w-4" />
               Importar Invitados
             </Button>
-
-            <Button
-              onClick={handleDeleteAllInvitados}
-              disabled={importing}
-              variant="outline"
-              className="border-red-300 text-red-600 hover:bg-red-50 bg-transparent"
-            >
-              <RotateCcw className="mr-2 h-4 w-4" />
-              Eliminar Todos los Invitados
+            <Button onClick={handleDeleteAllInvitados} disabled={importing} variant="outline" size="sm" className="h-8 md:h-9 text-[10px] md:text-xs gap-1 border-red-300 text-red-700 hover:bg-red-50">
+              <RotateCcw className="h-3 w-3 md:h-4 md:w-4" />
+              Eliminar Todos
             </Button>
           </div>
 
           {/* Lista de invitados */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <UserPlus className="h-5 w-5" />
-                Invitados Registrados
-              </CardTitle>
-              <CardDescription>
-                Mostrando {invitadosStartIndex + 1} - {Math.min(invitadosEndIndex, filteredInvitados.length)} de{" "}
-                {filteredInvitados.length} invitados
-              </CardDescription>
+          <Card className="border-uparsistem-100/50 dark:border-uparsistem-900/20 shadow-sm">
+            <CardHeader className="p-3 md:p-5 pb-2 md:pb-3">
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center gap-2 text-sm md:text-base">
+                  <UserPlus className="h-4 w-4 md:h-5 md:w-5 text-uparsistem-600" />
+                  Invitados Registrados
+                </CardTitle>
+                <span className="text-[10px] md:text-xs text-muted-foreground">
+                  {invitadosStartIndex + 1}-{Math.min(invitadosEndIndex, filteredInvitados.length)} de {filteredInvitados.length}
+                </span>
+              </div>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex flex-col md:flex-row gap-4">
-                <div className="relative flex-1">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Buscar por nombre, identificación o puesto..."
-                    value={invitadosSearchTerm}
-                    onChange={(e) => setInvitadosSearchTerm(e.target.value)}
-                    className="pl-10"
-                  />
+            <CardContent className="p-3 md:p-5 pt-0 md:pt-0 space-y-3 md:space-y-4">
+              <div className="flex flex-col md:flex-row gap-2 md:gap-3">
+                <div className="relative flex-1 min-w-0">
+                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 md:h-4 md:w-4 text-muted-foreground" />
+                  <Input placeholder="Buscar por nombre, ID o puesto..." value={invitadosSearchTerm} onChange={(e) => setInvitadosSearchTerm(e.target.value)} className="pl-8 md:pl-9 h-9 md:h-10 text-xs md:text-sm w-full" />
                 </div>
-
                 <Select value={String(itemsPerPage)} onValueChange={(v) => setItemsPerPage(Number(v))}>
-                  <SelectTrigger className="w-full md:w-[100px]">
-                    <SelectValue />
-                  </SelectTrigger>
+                    <SelectTrigger className="h-9 md:h-10 text-xs md:text-sm w-full md:w-[80px]">
+                      <SelectValue />
+                    </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="10">10</SelectItem>
                     <SelectItem value="25">25</SelectItem>
@@ -1060,87 +970,62 @@ export function DatabaseManagement() {
               </div>
 
               {/* Lista de invitados */}
-              <div className="space-y-3">
+              <div className="space-y-1.5 md:space-y-2">
                 {currentInvitados.length === 0 ? (
-                  <div className="text-center py-8 text-muted-foreground">
-                    <UserPlus className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                    <p>No hay invitados registrados</p>
-                    <p className="text-sm">Importa un archivo Excel con los campos: puesto, identificacion, nombre</p>
+                  <div className="text-center py-6 md:py-8 text-muted-foreground">
+                    <UserPlus className="h-8 w-8 md:h-12 md:w-12 mx-auto mb-2 md:mb-3 opacity-30" />
+                    <p className="text-xs md:text-sm font-medium">No hay invitados registrados</p>
+                    <p className="text-[10px] md:text-sm">Importa un archivo Excel con los campos: puesto, identificacion, nombre</p>
                   </div>
                 ) : (
                   currentInvitados.map((invitado) => (
-                    <Card key={invitado.id} className="p-4">
-                      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                        <div className="flex items-center gap-4">
-                          <div className="h-12 w-12 rounded-full bg-purple-100 flex items-center justify-center">
-                            <UserPlus className="h-6 w-6 text-purple-600" />
-                          </div>
-                          <div>
-                            <h3 className="font-semibold">{invitado.nombre}</h3>
-                            <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-                              <span className="flex items-center gap-1">
-                                <Briefcase className="h-3 w-3" />
-                                Puesto {invitado.puesto}
-                              </span>
-                              <span>•</span>
-                              <span>ID: {invitado.identificacion}</span>
+                    <div key={invitado.id} className="flex items-start gap-1.5 md:gap-3 p-1.5 md:p-3 rounded-lg border border-purple-100/50 dark:border-purple-900/20 bg-white dark:bg-gray-900">
+                      <div className="flex size-7 md:size-10 shrink-0 items-center justify-center rounded-full bg-purple-100 dark:bg-purple-900/30 mt-0.5">
+                        <UserPlus className="size-3.5 md:size-5 text-purple-600 dark:text-purple-400" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-start justify-between gap-1">
+                          <div className="min-w-0 flex-1">
+                            <p className="text-[10px] md:text-sm font-semibold truncate">{invitado.nombre}</p>
+                            <div className="flex items-center gap-1 text-[8px] md:text-xs text-muted-foreground mt-0.5 flex-wrap">
+                              <span className="font-mono font-bold text-foreground">{invitado.identificacion}</span>
+                              <span className="opacity-50">·</span>
+                              <span className="truncate max-w-[80px] md:max-w-none">{invitado.puesto}</span>
                             </div>
                           </div>
-                        </div>
-                        <div className="flex flex-wrap items-center gap-2">
-                          <Badge variant="outline" className="bg-purple-100 text-purple-800 border-purple-300">
-                            Invitado
-                          </Badge>
-                          <Badge variant="secondary">1 cupo único</Badge>
-                          {(invitado.cuposConsumidos || 0) > 0 && (
-                            <Badge variant="outline" className="bg-orange-100 text-orange-800 border-orange-300">
-                              {invitado.cuposConsumidos} consumido{(invitado.cuposConsumidos || 0) !== 1 ? "s" : ""}
-                            </Badge>
-                          )}
+                          <div className="flex items-center gap-0.5 shrink-0 mt-0.5">
+                            <span className="text-[8px] md:text-[10px] font-semibold text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-950/20 px-1.5 py-0.5 rounded-md whitespace-nowrap">Invitado</span>
+                            <span className="text-[8px] md:text-[10px] font-semibold text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded-md whitespace-nowrap">1 cupo</span>
+                            {(invitado.cuposConsumidos || 0) > 0 && (
+                              <span className="text-[8px] md:text-[10px] font-semibold text-orange-700 dark:text-orange-300 bg-orange-50 dark:bg-orange-950/20 px-1.5 py-0.5 rounded-md whitespace-nowrap">
+                                {invitado.cuposConsumidos} cons.
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </div>
-                    </Card>
+                    </div>
                   ))
                 )}
               </div>
 
               {/* Paginación de invitados */}
               {totalInvitadosPages > 1 && (
-                <div className="flex items-center justify-center gap-2">
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={() => setInvitadosCurrentPage(1)}
-                    disabled={invitadosCurrentPage === 1}
-                  >
-                    <ChevronsLeft className="h-4 w-4" />
+                <div className="flex items-center justify-center gap-1 pt-1 md:pt-2">
+                  <Button variant="ghost" size="icon" onClick={() => setInvitadosCurrentPage(1)} disabled={invitadosCurrentPage === 1} className="size-7 md:size-8">
+                    <ChevronsLeft className="size-3 md:size-3.5" />
                   </Button>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={() => setInvitadosCurrentPage((p) => Math.max(1, p - 1))}
-                    disabled={invitadosCurrentPage === 1}
-                  >
-                    <ChevronLeft className="h-4 w-4" />
+                  <Button variant="ghost" size="icon" onClick={() => setInvitadosCurrentPage((p) => Math.max(1, p - 1))} disabled={invitadosCurrentPage === 1} className="size-7 md:size-8">
+                    <ChevronLeft className="size-3 md:size-3.5" />
                   </Button>
-                  <span className="text-sm">
-                    Página {invitadosCurrentPage} de {totalInvitadosPages}
+                  <span className="text-[10px] md:text-xs text-muted-foreground px-2 min-w-[80px] text-center">
+                    {invitadosCurrentPage} / {totalInvitadosPages}
                   </span>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={() => setInvitadosCurrentPage((p) => Math.min(totalInvitadosPages, p + 1))}
-                    disabled={invitadosCurrentPage === totalInvitadosPages}
-                  >
-                    <ChevronRight className="h-4 w-4" />
+                  <Button variant="ghost" size="icon" onClick={() => setInvitadosCurrentPage((p) => Math.min(totalInvitadosPages, p + 1))} disabled={invitadosCurrentPage === totalInvitadosPages} className="size-7 md:size-8">
+                    <ChevronRight className="size-3 md:size-3.5" />
                   </Button>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={() => setInvitadosCurrentPage(totalInvitadosPages)}
-                    disabled={invitadosCurrentPage === totalInvitadosPages}
-                  >
-                    <ChevronsRight className="h-4 w-4" />
+                  <Button variant="ghost" size="icon" onClick={() => setInvitadosCurrentPage(totalInvitadosPages)} disabled={invitadosCurrentPage === totalInvitadosPages} className="size-7 md:size-8">
+                    <ChevronsRight className="size-3 md:size-3.5" />
                   </Button>
                 </div>
               )}
