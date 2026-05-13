@@ -60,6 +60,12 @@ export function UserManagement() {
     fullName: "",
     password: "",
   })
+  const [editRoles, setEditRoles] = useState({
+    administrador: false,
+    operativo: false,
+    bufete: false,
+  })
+  const [editMesaAsignada, setEditMesaAsignada] = useState(1)
 
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedRoleFilter, setSelectedRoleFilter] = useState<"todos" | "administrador" | "operativo" | "bufete">(
@@ -337,6 +343,12 @@ export function UserManagement() {
       fullName: user.fullName,
       password: "",
     })
+    setEditRoles({
+      administrador: user.roles.includes("administrador"),
+      operativo: user.roles.includes("operativo"),
+      bufete: user.roles.includes("bufete"),
+    })
+    setEditMesaAsignada(user.mesaAsignada || 1)
     setIsEditDialogOpen(true)
   }
 
@@ -349,9 +361,33 @@ export function UserManagement() {
     setSuccess("")
 
     try {
+      const selectedRoles: ("administrador" | "operativo" | "bufete")[] = []
+      if (editRoles.administrador) selectedRoles.push("administrador")
+      if (editRoles.operativo) selectedRoles.push("operativo")
+      if (editRoles.bufete) selectedRoles.push("bufete")
+
+      if (selectedRoles.length === 0) {
+        setError("El usuario debe tener al menos un rol")
+        setCreating(false)
+        return
+      }
+
+      if (editRoles.bufete && !mesasActivas.includes(editMesaAsignada) && editingUser.roles.includes("bufete")) {
+        setError(`La Mesa ${editMesaAsignada} está inactiva. Selecciona una mesa activa.`)
+        setCreating(false)
+        return
+      }
+
       const updateData: any = {
         idNumber: editForm.idNumber,
         fullName: editForm.fullName,
+        roles: selectedRoles,
+      }
+
+      if (editRoles.bufete) {
+        updateData.mesaAsignada = editMesaAsignada
+      } else {
+        updateData.mesaAsignada = null
       }
 
       if (editForm.password.trim()) {
@@ -428,14 +464,14 @@ export function UserManagement() {
         </div>
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
-            <Button size="sm" className="shrink-0">
+            <Button size="sm" className="shrink-0 bg-uparsistem-600 hover:bg-uparsistem-700 text-white">
               <Plus className="w-4 h-4 mr-2" />
               Nuevo
             </Button>
           </DialogTrigger>
-          <DialogContent className="w-[95vw] max-w-md mx-auto">
+          <DialogContent className="w-[95vw] max-w-md mx-auto border-t-4 border-t-uparsistem-600 rounded-lg">
             <DialogHeader>
-              <DialogTitle>Crear Nuevo Usuario</DialogTitle>
+              <DialogTitle className="text-uparsistem-700">Crear Nuevo Usuario</DialogTitle>
               <DialogDescription>Ingresa los datos del nuevo usuario del sistema</DialogDescription>
             </DialogHeader>
             <form onSubmit={handleCreateUser}>
@@ -450,7 +486,7 @@ export function UserManagement() {
                       placeholder="1234567890"
                       value={newUser.idNumber}
                       onChange={(e) => setNewUser({ ...newUser, idNumber: e.target.value })}
-                      className="pl-10"
+                      className="pl-10 border-uparsistem-200 focus-visible:ring-uparsistem-500"
                       required
                       disabled={creating}
                     />
@@ -467,7 +503,7 @@ export function UserManagement() {
                       placeholder="Juan Pérez"
                       value={newUser.fullName}
                       onChange={(e) => setNewUser({ ...newUser, fullName: e.target.value })}
-                      className="pl-10"
+                      className="pl-10 border-uparsistem-200 focus-visible:ring-uparsistem-500"
                       required
                       disabled={creating}
                     />
@@ -485,6 +521,7 @@ export function UserManagement() {
                     required
                     disabled={creating}
                     minLength={6}
+                    className="border-uparsistem-200 focus-visible:ring-uparsistem-500"
                   />
                 </div>
 
@@ -571,7 +608,7 @@ export function UserManagement() {
               </div>
 
               <DialogFooter>
-                <Button type="submit" disabled={creating} className="w-full">
+                <Button type="submit" disabled={creating} className="w-full bg-uparsistem-600 hover:bg-uparsistem-700 text-white">
                   {creating ? (
                     <>
                       <Loader2 className="w-4 h-4 mr-2 animate-spin" />
@@ -706,10 +743,10 @@ export function UserManagement() {
                         </div>
                       </div>
                       <div className="flex items-center gap-0.5 shrink-0 mt-0.5">
-                        <button className="size-6 md:size-7 flex items-center justify-center rounded-md hover:bg-uparsistem-50 text-muted-foreground hover:text-uparsistem-700 transition-colors" onClick={() => handleEditClick(user)}>
+                        <button className="size-6 md:size-7 flex items-center justify-center rounded-md hover:bg-uparsistem-50 text-muted-foreground hover:text-uparsistem-700 transition-colors" onClick={() => handleOpenEditDialog(user)}>
                           <Edit className="size-3 md:size-3.5" />
                         </button>
-                        <button className="size-6 md:size-7 flex items-center justify-center rounded-md hover:bg-red-50 text-muted-foreground hover:text-red-600 transition-colors" onClick={() => handleDeleteClick(user)}>
+                        <button className="size-6 md:size-7 flex items-center justify-center rounded-md hover:bg-red-50 text-muted-foreground hover:text-red-600 transition-colors" onClick={() => handleDeleteUser(user.id, user.fullName)}>
                           <Trash2 className="size-3 md:size-3.5" />
                         </button>
                       </div>
@@ -723,10 +760,10 @@ export function UserManagement() {
       </Tabs>
 
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <DialogContent className="w-[95vw] max-w-md mx-auto">
-          <DialogHeader>
-            <DialogTitle>Editar Usuario</DialogTitle>
-            <DialogDescription>Modifica los datos del usuario</DialogDescription>
+          <DialogContent className="w-[95vw] max-w-md mx-auto border-t-4 border-t-uparsistem-600 rounded-lg">
+            <DialogHeader>
+              <DialogTitle className="text-uparsistem-700">Editar Usuario</DialogTitle>
+              <DialogDescription>Modifica los datos del usuario</DialogDescription>
           </DialogHeader>
           <form onSubmit={handleEditUser}>
             <div className="space-y-4 py-4">
@@ -734,73 +771,155 @@ export function UserManagement() {
                 <Label htmlFor="edit-idNumber">Número de Identificación</Label>
                 <div className="relative">
                   <IdCard className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                  <Input
-                    id="edit-idNumber"
-                    type="text"
-                    placeholder="1234567890"
-                    value={editForm.idNumber}
-                    onChange={(e) => setEditForm({ ...editForm, idNumber: e.target.value })}
-                    className="pl-10"
-                    required
-                    disabled={creating}
-                  />
+                    <Input
+                      id="edit-idNumber"
+                      type="text"
+                      placeholder="1234567890"
+                      value={editForm.idNumber}
+                      onChange={(e) => setEditForm({ ...editForm, idNumber: e.target.value })}
+                      className="pl-10 border-uparsistem-200 focus-visible:ring-uparsistem-500"
+                      required
+                      disabled={creating}
+                    />
+                  </div>
                 </div>
-              </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="edit-fullName">Nombre Completo</Label>
-                <div className="relative">
-                  <User className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                  <Input
-                    id="edit-fullName"
-                    type="text"
-                    placeholder="Juan Pérez"
-                    value={editForm.fullName}
-                    onChange={(e) => setEditForm({ ...editForm, fullName: e.target.value })}
-                    className="pl-10"
-                    required
-                    disabled={creating}
-                  />
+                <div className="space-y-2">
+                  <Label htmlFor="edit-fullName">Nombre Completo</Label>
+                  <div className="relative">
+                    <User className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                    <Input
+                      id="edit-fullName"
+                      type="text"
+                      placeholder="Juan Pérez"
+                      value={editForm.fullName}
+                      onChange={(e) => setEditForm({ ...editForm, fullName: e.target.value })}
+                      className="pl-10 border-uparsistem-200 focus-visible:ring-uparsistem-500"
+                      required
+                      disabled={creating}
+                    />
+                  </div>
                 </div>
-              </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="edit-password">Nueva Contraseña (opcional)</Label>
-                <Input
-                  id="edit-password"
-                  type="password"
-                  placeholder="Dejar vacío para mantener la actual"
-                  value={editForm.password}
-                  onChange={(e) => setEditForm({ ...editForm, password: e.target.value })}
-                  disabled={creating}
-                  minLength={6}
-                />
+                <div className="space-y-2">
+                  <Label htmlFor="edit-password">Nueva Contraseña (opcional)</Label>
+                  <Input
+                    id="edit-password"
+                    type="password"
+                    placeholder="Dejar vacío para mantener la actual"
+                    value={editForm.password}
+                    onChange={(e) => setEditForm({ ...editForm, password: e.target.value })}
+                    disabled={creating}
+                    minLength={6}
+                    className="border-uparsistem-200 focus-visible:ring-uparsistem-500"
+                  />
                 <p className="text-xs text-muted-foreground">
                   Deja este campo vacío si no deseas cambiar la contraseña
                 </p>
               </div>
+
+              <div className="space-y-2">
+                <Label>Roles del Usuario</Label>
+                <div className="space-y-2 border rounded-lg p-3">
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="edit-role-operativo"
+                      checked={editRoles.operativo}
+                      onCheckedChange={(checked) =>
+                        setEditRoles({ ...editRoles, operativo: checked as boolean })
+                      }
+                      disabled={creating}
+                    />
+                    <label htmlFor="edit-role-operativo" className="flex items-center gap-2 text-sm cursor-pointer">
+                      <User className="w-4 h-4" />
+                      Operativo
+                    </label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="edit-role-administrador"
+                      checked={editRoles.administrador}
+                      onCheckedChange={(checked) =>
+                        setEditRoles({ ...editRoles, administrador: checked as boolean })
+                      }
+                      disabled={creating}
+                    />
+                    <label htmlFor="edit-role-administrador" className="flex items-center gap-2 text-sm cursor-pointer">
+                      <Shield className="w-4 h-4" />
+                      Administrador
+                    </label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="edit-role-bufete"
+                      checked={editRoles.bufete}
+                      onCheckedChange={(checked) =>
+                        setEditRoles({ ...editRoles, bufete: checked as boolean })
+                      }
+                      disabled={creating}
+                    />
+                    <label htmlFor="edit-role-bufete" className="flex items-center gap-2 text-sm cursor-pointer">
+                      <Scale className="w-4 h-4" />
+                      Bufete
+                    </label>
+                  </div>
+                </div>
+              </div>
+
+              {editRoles.bufete && (
+                <div className="space-y-2">
+                  <Label htmlFor="edit-mesa">Mesa Asignada</Label>
+                  <Select
+                    value={editMesaAsignada.toString()}
+                    onValueChange={(value) => setEditMesaAsignada(Number.parseInt(value))}
+                    disabled={creating}
+                  >
+                    <SelectTrigger className="border-uparsistem-200 focus-visible:ring-uparsistem-500">
+                      <SelectValue placeholder="Selecciona la mesa" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {mesasActivas.length > 0 ? (
+                        mesasActivas.map((mesa) => (
+                          <SelectItem key={mesa} value={mesa.toString()}>
+                            Mesa {mesa} (Activa)
+                          </SelectItem>
+                        ))
+                      ) : (
+                        <SelectItem value="0" disabled>
+                          No hay mesas activas disponibles
+                        </SelectItem>
+                      )}
+                    </SelectContent>
+                  </Select>
+                  {mesasActivas.length === 0 && (
+                    <p className="text-xs text-red-600">
+                      No hay mesas activas. Contacta al administrador para activar mesas.
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
 
             <DialogFooter>
-              <Button type="submit" disabled={creating} className="w-full">
-                {creating ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Guardando...
-                  </>
-                ) : (
-                  "Guardar Cambios"
-                )}
-              </Button>
+                <Button type="submit" disabled={creating} className="w-full bg-uparsistem-600 hover:bg-uparsistem-700 text-white">
+                  {creating ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Guardando...
+                    </>
+                  ) : (
+                    "Guardar Cambios"
+                  )}
+                </Button>
             </DialogFooter>
           </form>
         </DialogContent>
       </Dialog>
 
       <AlertDialog open={confirmDialog.open} onOpenChange={(open) => setConfirmDialog({ ...confirmDialog, open })}>
-        <AlertDialogContent>
+        <AlertDialogContent className="border-t-4 border-t-uparsistem-600 rounded-lg">
           <AlertDialogHeader>
-            <AlertDialogTitle>{confirmDialog.title}</AlertDialogTitle>
+            <AlertDialogTitle className="text-uparsistem-700">{confirmDialog.title}</AlertDialogTitle>
             <AlertDialogDescription>{confirmDialog.description}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
