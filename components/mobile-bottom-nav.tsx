@@ -13,17 +13,18 @@ interface NavTab {
   bufeteOnly?: boolean
   operativoOnly?: boolean
   adminOrOperativo?: boolean
+  iconColor?: string
 }
 
 const tabs: NavTab[] = [
-  { path: "/dashboard", icon: Home, label: "Inicio", adminOnly: true },
-  { path: "/dashboard/escanear", icon: Scan, label: "Escanear" },
-  { path: "/dashboard/inventario", icon: Package, label: "Inventario", adminOnly: true },
-  { path: "/dashboard/control-acceso", icon: DoorOpen, label: "Control", adminOrOperativo: true },
-  { path: "/dashboard/base-datos", icon: Database, label: "Datos", adminOnly: true },
-  { path: "/dashboard/usuarios", icon: Users, label: "Usuarios", adminOnly: true },
-  { path: "/dashboard/bufetes", icon: Utensils, label: "Bufetes", bufeteOnly: true },
-  { path: "/dashboard/control-bufetes", icon: Table, label: "Bufetes", adminOnly: true },
+  { path: "/dashboard", icon: Home, label: "Inicio", adminOnly: true, iconColor: "text-uparsistem-600" },
+  { path: "/dashboard/escanear", icon: Scan, label: "Escanear", iconColor: "text-blue-500" },
+  { path: "/dashboard/inventario", icon: Package, label: "Inventario", adminOnly: true, iconColor: "text-orange-500" },
+  { path: "/dashboard/control-acceso", icon: DoorOpen, label: "Control", adminOrOperativo: true, iconColor: "text-amber-500" },
+  { path: "/dashboard/base-datos", icon: Database, label: "Datos", adminOnly: true, iconColor: "text-indigo-500" },
+  { path: "/dashboard/usuarios", icon: Users, label: "Usuarios", adminOnly: true, iconColor: "text-pink-500" },
+  { path: "/dashboard/bufetes", icon: Utensils, label: "Bufetes", bufeteOnly: true, iconColor: "text-emerald-500" },
+  { path: "/dashboard/control-bufetes", icon: Table, label: "Bufetes", adminOnly: true, iconColor: "text-violet-500" },
 ]
 
 const roleIndicator: Record<string, string> = {
@@ -72,11 +73,11 @@ export function MobileBottomNav() {
 
       <nav className="fixed bottom-0 left-0 right-0 z-50 md:hidden">
         <div className={`
-          border-t border-gray-200 dark:border-gray-800
+          border-t border-uparsistem-200/50 dark:border-uparsistem-800/30
           transition-[border-radius,box-shadow,background-color] duration-300 ease-out will-change-[border-radius,box-shadow]
           ${expanded
-            ? "bg-white dark:bg-gray-950 shadow-[0_-8px_30px_rgba(0,0,0,0.2)] rounded-t-2xl"
-            : "bg-white/95 dark:bg-gray-950/95 backdrop-blur-xl shadow-[0_-4px_20px_rgba(0,0,0,0.08)]"
+            ? "bg-uparsistem-50 dark:bg-uparsistem-950 shadow-[0_-8px_30px_rgba(40,107,4,0.12)] rounded-t-2xl"
+            : "bg-uparsistem-50/90 dark:bg-uparsistem-950/90 backdrop-blur-xl shadow-[0_-4px_20px_rgba(40,107,4,0.06)]"
           }`}>
           {/* First row - primary tabs */}
           <div className="flex items-center justify-around px-2 py-1">
@@ -93,7 +94,7 @@ export function MobileBottomNav() {
                     <div className={`absolute -top-1 left-1/2 -translate-x-1/2 w-8 h-0.5 rounded-full ${roleIndicator[activeRole || ""] || "bg-primary"}`} />
                   )}
                   <div className={`flex items-center justify-center size-6 rounded-lg transition-colors duration-150 ${
-                    isActive ? "text-foreground" : "text-muted-foreground/60"
+                    isActive ? "text-foreground" : tab.iconColor || "text-muted-foreground/60"
                   }`}>
                     <Icon className="size-5" />
                   </div>
@@ -146,7 +147,7 @@ export function MobileBottomNav() {
                           <div className={`flex items-center justify-center size-7 rounded-xl transition-colors duration-150 ${
                             isActive
                               ? "text-foreground bg-primary/10"
-                              : "text-muted-foreground/70"
+                              : tab.iconColor || "text-muted-foreground/70"
                           }`}>
                             <Icon className="size-5" />
                           </div>

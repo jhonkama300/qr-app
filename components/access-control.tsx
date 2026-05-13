@@ -330,272 +330,257 @@ export function AccessControl() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex gap-2 border-b">
-        <Button
-          variant={activeSection === "estudiantes" ? "default" : "ghost"}
+    <div className="space-y-3 md:space-y-6 w-full min-w-0 overflow-hidden">
+      {/* Section Tabs (Estudiantes / Invitados) */}
+      <div className="flex gap-1 p-1 rounded-xl bg-uparsistem-50/50 dark:bg-uparsistem-950/10 border border-uparsistem-100 dark:border-uparsistem-900/20 w-fit">
+        <button
           onClick={() => setActiveSection("estudiantes")}
-          className="rounded-b-none"
+          className={`flex items-center gap-1.5 px-3 md:px-4 py-1.5 md:py-2 rounded-lg text-xs md:text-sm font-medium transition-all ${
+            activeSection === "estudiantes"
+              ? "bg-uparsistem-600 text-white shadow-sm"
+              : "text-uparsistem-700/70 dark:text-uparsistem-300/70 hover:text-uparsistem-700 dark:hover:text-uparsistem-300"
+          }`}
         >
-          <GraduationCap className="mr-2 h-4 w-4" />
-          Estudiantes ({allPersons.length})
-        </Button>
-        <Button
-          variant={activeSection === "invitados" ? "default" : "ghost"}
+          <GraduationCap className="size-3.5 md:size-4" />
+          <span>Estudiantes <span className="opacity-70">({allPersons.length})</span></span>
+        </button>
+        <button
           onClick={() => setActiveSection("invitados")}
-          className="rounded-b-none"
+          className={`flex items-center gap-1.5 px-3 md:px-4 py-1.5 md:py-2 rounded-lg text-xs md:text-sm font-medium transition-all ${
+            activeSection === "invitados"
+              ? "bg-uparsistem-600 text-white shadow-sm"
+              : "text-uparsistem-700/70 dark:text-uparsistem-300/70 hover:text-uparsistem-700 dark:hover:text-uparsistem-300"
+          }`}
         >
-          <UserPlus className="mr-2 h-4 w-4" />
-          Invitados ({allInvitados.length})
-        </Button>
+          <UserPlus className="size-3.5 md:size-4" />
+          <span>Invitados <span className="opacity-70">({allInvitados.length})</span></span>
+        </button>
       </div>
 
-      {/* Estadísticas */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card
-          className={`cursor-pointer transition-all ${activeTab === "granted" ? "ring-2 ring-green-500" : ""}`}
+      {/* Stat Cards - Compact */}
+      <div className="flex gap-1.5 md:gap-3 w-full">
+        <button
           onClick={() => setActiveTab("granted")}
+          className={`flex-1 flex items-center gap-2 md:gap-3 rounded-xl border transition-all px-3 md:px-4 py-2 md:py-3 ${
+            activeTab === "granted"
+              ? "border-green-300 ring-2 ring-green-200 dark:ring-green-800 bg-green-50 dark:bg-green-950/20"
+              : "border-green-200/50 hover:border-green-300 bg-white dark:bg-gray-900"
+          }`}
         >
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium flex items-center gap-2">
-              <CheckCircle className="h-4 w-4 text-green-500" />
-              Acceso Concedido
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-600">{grantedAccess.length}</div>
-          </CardContent>
-        </Card>
+          <CheckCircle className="size-4 md:size-5 text-green-500 shrink-0" />
+          <div className="flex-1 min-w-0 text-left">
+            <div className="text-sm md:text-lg font-bold text-green-800 dark:text-green-300">{grantedAccess.length}</div>
+            <p className="text-[8px] md:text-[10px] text-green-600/70 dark:text-green-400/70 font-medium uppercase tracking-wider leading-tight">Concedidos</p>
+          </div>
+        </button>
 
-        <Card
-          className={`cursor-pointer transition-all ${activeTab === "denied" ? "ring-2 ring-red-500" : ""}`}
+        <button
           onClick={() => setActiveTab("denied")}
+          className={`flex-1 flex items-center gap-2 md:gap-3 rounded-xl border transition-all px-3 md:px-4 py-2 md:py-3 ${
+            activeTab === "denied"
+              ? "border-red-300 ring-2 ring-red-200 dark:ring-red-800 bg-red-50 dark:bg-red-950/20"
+              : "border-red-200/50 hover:border-red-300 bg-white dark:bg-gray-900"
+          }`}
         >
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium flex items-center gap-2">
-              <XCircle className="h-4 w-4 text-red-500" />
-              Acceso Denegado
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-red-600">{deniedAccess.length}</div>
-          </CardContent>
-        </Card>
+          <XCircle className="size-4 md:size-5 text-red-500 shrink-0" />
+          <div className="flex-1 min-w-0 text-left">
+            <div className="text-sm md:text-lg font-bold text-red-800 dark:text-red-300">{deniedAccess.length}</div>
+            <p className="text-[8px] md:text-[10px] text-red-600/70 dark:text-red-400/70 font-medium uppercase tracking-wider leading-tight">Denegados</p>
+          </div>
+        </button>
 
-        <Card
-          className={`cursor-pointer transition-all ${activeTab === "waiting" ? "ring-2 ring-yellow-500" : ""}`}
+        <button
           onClick={() => setActiveTab("waiting")}
+          className={`flex-1 flex items-center gap-2 md:gap-3 rounded-xl border transition-all px-3 md:px-4 py-2 md:py-3 ${
+            activeTab === "waiting"
+              ? "border-amber-300 ring-2 ring-amber-200 dark:ring-amber-800 bg-amber-50 dark:bg-amber-950/20"
+              : "border-amber-200/50 hover:border-amber-300 bg-white dark:bg-gray-900"
+          }`}
         >
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium flex items-center gap-2">
-              <Clock className="h-4 w-4 text-yellow-500" />
-              En Espera
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-yellow-600">{waitingPersons.length}</div>
-          </CardContent>
-        </Card>
+          <Clock className="size-4 md:size-5 text-amber-500 shrink-0" />
+          <div className="flex-1 min-w-0 text-left">
+            <div className="text-sm md:text-lg font-bold text-amber-800 dark:text-amber-300">{waitingPersons.length}</div>
+            <p className="text-[8px] md:text-[10px] text-amber-600/70 dark:text-amber-400/70 font-medium uppercase tracking-wider leading-tight">Espera</p>
+          </div>
+        </button>
       </div>
 
-      {/* Lista de personas */}
-      <Card>
-        <CardHeader>
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <CardTitle className="flex items-center gap-2">
-              {activeTab === "granted" && <CheckCircle className="h-5 w-5 text-green-500" />}
-              {activeTab === "denied" && <XCircle className="h-5 w-5 text-red-500" />}
-              {activeTab === "waiting" && <Clock className="h-5 w-5 text-yellow-500" />}
-              {activeTab === "granted" && "Acceso Concedido"}
-              {activeTab === "denied" && "Acceso Denegado"}
-              {activeTab === "waiting" && "En Espera"}
-            </CardTitle>
-            {activeTab === "waiting" && selectedToAuthorize.size > 0 && (
-              <Button onClick={handleAuthorizeSelected} disabled={authorizing} size="sm">
-                {authorizing ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : (
-                  <UserCheck className="mr-2 h-4 w-4" />
-                )}
-                Autorizar ({selectedToAuthorize.size})
-              </Button>
+      {/* Search + Bulk Actions */}
+      <div className="flex flex-col md:flex-row gap-2 md:gap-3 w-full">
+        <div className="relative flex-1 min-w-0">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 md:size-4 text-muted-foreground" />
+          <Input
+            placeholder="Buscar por nombre, ID, puesto o programa..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-8 md:pl-9 h-9 md:h-10 text-xs md:text-sm w-full"
+          />
+        </div>
+        {activeTab === "waiting" && selectedToAuthorize.size > 0 && (
+          <Button
+            onClick={handleAuthorizeSelected}
+            disabled={authorizing}
+            size="sm"
+            className="h-9 md:h-10 text-xs md:text-sm shrink-0 bg-uparsistem-600 hover:bg-uparsistem-700 text-white"
+          >
+            {authorizing ? (
+              <Loader2 className="mr-1.5 size-3.5 animate-spin" />
+            ) : (
+              <UserCheck className="mr-1.5 size-3.5" />
+            )}
+            Autorizar ({selectedToAuthorize.size})
+          </Button>
+        )}
+      </div>
+
+      {/* List */}
+      <Card className="border-uparsistem-100 dark:border-uparsistem-900/20 shadow-sm">
+        <CardHeader className="p-3 md:p-5 pb-2 md:pb-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              {activeTab === "granted" && <CheckCircle className="size-4 md:size-5 text-uparsistem-600" />}
+              {activeTab === "denied" && <XCircle className="size-4 md:size-5 text-red-500" />}
+              {activeTab === "waiting" && <Clock className="size-4 md:size-5 text-amber-500" />}
+              <div>
+                <h3 className="text-xs md:text-base font-semibold">
+                  {activeTab === "granted" && "Acceso Concedido"}
+                  {activeTab === "denied" && "Acceso Denegado"}
+                  {activeTab === "waiting" && "En Espera"}
+                </h3>
+                <p className="text-[10px] md:text-xs text-muted-foreground">
+                  {filteredData.length} registro{filteredData.length !== 1 ? "s" : ""}
+                </p>
+              </div>
+            </div>
+            {activeTab === "waiting" && currentData.length > 0 && (
+              <label className="flex items-center gap-1.5 text-[10px] md:text-xs text-muted-foreground cursor-pointer select-none">
+                <Checkbox
+                  checked={selectedToAuthorize.size === currentData.length && currentData.length > 0}
+                  onCheckedChange={toggleSelectAll}
+                />
+                Seleccionar todos
+              </label>
             )}
           </div>
-          <CardDescription className="text-sm">
-            {activeTab === "granted" &&
-              `${activeSection === "estudiantes" ? "Estudiantes" : "Invitados"} que han obtenido acceso al sistema`}
-            {activeTab === "denied" &&
-              `${activeSection === "estudiantes" ? "Estudiantes" : "Invitados"} a los que se les ha denegado el acceso`}
-            {activeTab === "waiting" &&
-              `${activeSection === "estudiantes" ? "Estudiantes" : "Invitados"} registrados que aún no han sido escaneados`}
-          </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
-          {/* Búsqueda */}
-          <div className="flex flex-col md:flex-row gap-4">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Buscar por nombre, identificación, puesto..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
-              />
+        <CardContent className="p-3 md:p-5 pt-0 md:pt-0 space-y-1.5 md:space-y-2">
+          {currentData.length === 0 ? (
+            <div className="text-center py-8 md:py-12 text-muted-foreground">
+              <Users className="size-10 md:size-14 mx-auto mb-3 opacity-30" />
+              <p className="text-xs md:text-sm font-medium">
+                No hay {activeSection === "estudiantes" ? "estudiantes" : "invitados"} en esta categoría
+              </p>
+              <p className="text-[10px] md:text-xs text-muted-foreground/60 mt-1">
+                {activeTab === "waiting"
+                  ? "Todos han sido procesados"
+                  : "No se encontraron registros con los filtros actuales"}
+              </p>
             </div>
-            <Select value={String(itemsPerPage)} onValueChange={(v) => setItemsPerPage(Number(v))}>
-              <SelectTrigger className="w-full md:w-[100px]">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="10">10</SelectItem>
-                <SelectItem value="25">25</SelectItem>
-                <SelectItem value="50">50</SelectItem>
-                <SelectItem value="100">100</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+          ) : (
+            currentData.map((item: any) => {
+              const person = item.person || item
+              const isStudent = activeSection === "estudiantes"
+              const cupos =
+                isStudent && person.cuposExtras !== undefined ? calculateCuposDisplay(person as PersonData) : null
 
-          {/* Checkbox para seleccionar todos (solo en pestaña waiting) */}
-          {activeTab === "waiting" && currentData.length > 0 && (
-            <div className="flex items-center gap-2 p-2 bg-muted/50 rounded-md">
-              <Checkbox
-                checked={selectedToAuthorize.size === currentData.length && currentData.length > 0}
-                onCheckedChange={toggleSelectAll}
-              />
-              <span className="text-sm text-muted-foreground">
-                Seleccionar todos los visibles ({currentData.length})
-              </span>
-            </div>
+              return (
+                <div
+                  key={person.id || person.identificacion}
+                  className={`relative flex items-start gap-1.5 md:gap-3 p-2 md:p-3 rounded-lg border transition-all hover:shadow-sm ${
+                    activeTab === "waiting"
+                      ? "border-uparsistem-200/60 dark:border-uparsistem-800/30 hover:border-uparsistem-300 dark:hover:border-uparsistem-700 bg-white dark:bg-gray-900 hover:bg-uparsistem-50/50 dark:hover:bg-uparsistem-950/20"
+                      : activeTab === "granted"
+                        ? "border-green-200/60 dark:border-green-900/30 bg-white dark:bg-gray-900 hover:bg-green-50/50 dark:hover:bg-green-950/20 hover:border-green-300 dark:hover:border-green-700"
+                        : "border-red-200/60 dark:border-red-900/30 bg-white dark:bg-gray-900 hover:bg-red-50/50 dark:hover:bg-red-950/20 hover:border-red-300 dark:hover:border-red-700"
+                  }`}
+                >
+                  {/* Left accent bar */}
+                  <div className={`absolute left-0 top-2 bottom-2 w-0.5 rounded-full ${
+                    activeTab === "waiting" ? "bg-amber-400" : activeTab === "granted" ? "bg-green-400" : "bg-red-400"
+                  }`} />
+                  {activeTab === "waiting" && (
+                    <Checkbox
+                      checked={selectedToAuthorize.has(person.identificacion)}
+                      onCheckedChange={() => toggleSelectPerson(person.identificacion)}
+                      className="shrink-0 mt-1.5 md:mt-2"
+                    />
+                  )}
+                  <div className={`flex size-7 md:size-10 shrink-0 items-center justify-center rounded-full mt-0.5 ${
+                    isStudent ? "bg-uparsistem-100 dark:bg-uparsistem-900/30" : "bg-purple-100 dark:bg-purple-900/30"
+                  }`}>
+                    {isStudent ? (
+                      <GraduationCap className="size-3.5 md:size-5 text-uparsistem-600 dark:text-uparsistem-400" />
+                    ) : (
+                      <UserPlus className="size-3.5 md:size-5 text-purple-600 dark:text-purple-400" />
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs md:text-sm font-semibold">{person.nombre}</p>
+                    {isStudent && person.programa && (
+                      <span className="text-[9px] md:text-xs font-bold px-1.5 py-0.5 rounded-md bg-uparsistem-100/70 dark:bg-uparsistem-900/30 text-uparsistem-700 dark:text-uparsistem-300 border border-uparsistem-200/50 dark:border-uparsistem-800/30 inline-block mt-0.5">
+                        {person.programa}
+                      </span>
+                    )}
+                    <div className="flex items-center gap-1 text-[9px] md:text-xs text-muted-foreground mt-0.5 flex-wrap">
+                      <span className="text-xs md:text-sm font-bold text-foreground font-mono">{person.identificacion}</span>
+                      {item.timestamp && (
+                        <>
+                          <span className="opacity-50">·</span>
+                          <span className="truncate">{new Date(item.timestamp).toLocaleString()}</span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex flex-col items-end gap-0.5 shrink-0">
+                    <span className="text-[10px] md:text-xs font-bold text-uparsistem-700 dark:text-uparsistem-300 truncate max-w-[100px] md:max-w-[140px] text-right">
+                      <Briefcase className="size-2.5 md:size-3 inline mr-0.5 -mt-0.5" />
+                      {person.puesto}
+                    </span>
+                    <Badge
+                      variant="secondary"
+                      className={`text-[9px] md:text-xs px-1.5 py-0 md:py-0.5 ${
+                        isStudent
+                          ? "bg-uparsistem-100 text-uparsistem-700 dark:bg-uparsistem-900/30 dark:text-uparsistem-300"
+                          : "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300"
+                      }`}
+                    >
+                      {isStudent ? "Estudiante" : "Invitado"}
+                    </Badge>
+                    {activeTab !== "waiting" && (
+                      <Badge
+                        variant="secondary"
+                        className={`text-[9px] md:text-xs px-1.5 py-0 md:py-0.5 ${
+                          item.status === "granted" || item.status === "q10_success"
+                            ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300"
+                            : "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300"
+                        }`}
+                      >
+                        {item.status === "granted" || item.status === "q10_success" ? "Concedido" : "Denegado"}
+                      </Badge>
+                    )}
+                  </div>
+                </div>
+              )
+            })
           )}
 
-          {/* Lista */}
-          <div className="space-y-3">
-            {currentData.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                <Users className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                <p>No hay {activeSection === "estudiantes" ? "estudiantes" : "invitados"} en esta categoría</p>
-              </div>
-            ) : (
-              currentData.map((item: any) => {
-                const person = item.person || item
-                const isStudent = activeSection === "estudiantes"
-                const cupos =
-                  isStudent && person.cuposExtras !== undefined ? calculateCuposDisplay(person as PersonData) : null
-
-                return (
-                  <Card key={person.id || person.identificacion} className="p-4">
-                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                      <div className="flex items-center gap-4">
-                        {activeTab === "waiting" && (
-                          <Checkbox
-                            checked={selectedToAuthorize.has(person.identificacion)}
-                            onCheckedChange={() => toggleSelectPerson(person.identificacion)}
-                          />
-                        )}
-                        <div
-                          className={`h-12 w-12 rounded-full flex items-center justify-center ${
-                            isStudent ? "bg-primary/10" : "bg-purple-100"
-                          }`}
-                        >
-                          {isStudent ? (
-                            <GraduationCap className="h-6 w-6 text-primary" />
-                          ) : (
-                            <UserPlus className="h-6 w-6 text-purple-600" />
-                          )}
-                        </div>
-                        <div>
-                          <h3 className="font-semibold">{person.nombre}</h3>
-                          <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-                            <span className="flex items-center gap-1">
-                              <Briefcase className="h-3 w-3" />
-                              Puesto {person.puesto}
-                            </span>
-                            <span>•</span>
-                            <span>ID: {person.identificacion}</span>
-                            {item.timestamp && (
-                              <>
-                                <span>•</span>
-                                <span>{new Date(item.timestamp).toLocaleString()}</span>
-                              </>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                      <div className="flex flex-wrap items-center gap-2">
-                        {isStudent && person.programa && <Badge variant="outline">{person.programa}</Badge>}
-                        <Badge
-                          variant={isStudent ? "default" : "secondary"}
-                          className={isStudent ? "" : "bg-purple-100 text-purple-800 border-purple-300"}
-                        >
-                          {isStudent ? "Estudiante" : "Invitado"}
-                        </Badge>
-                        {isStudent && cupos && (
-                          <Badge variant="secondary" className="bg-blue-100 text-blue-800">
-                            Graduando + {cupos.acompanantes} acompañante{cupos.acompanantes !== 1 ? "s" : ""}
-                            {cupos.extras > 0 && (
-                              <span className="ml-1 text-xs opacity-75">
-                                (1 + {cupos.extras} extra{cupos.extras !== 1 ? "s" : ""})
-                              </span>
-                            )}
-                          </Badge>
-                        )}
-                        {/* Badge de cupo único para invitados */}
-                        {!isStudent && <Badge variant="secondary">1 cupo único</Badge>}
-                        {/* Badge de estado */}
-                        {activeTab !== "waiting" && (
-                          <Badge
-                            variant={
-                              item.status === "granted" || item.status === "q10_success" ? "default" : "destructive"
-                            }
-                            className={
-                              item.status === "granted" || item.status === "q10_success"
-                                ? "bg-green-100 text-green-800"
-                                : "bg-red-100 text-red-800"
-                            }
-                          >
-                            {item.status === "granted" || item.status === "q10_success" ? "Concedido" : "Denegado"}
-                          </Badge>
-                        )}
-                      </div>
-                    </div>
-                  </Card>
-                )
-              })
-            )}
-          </div>
-
-          {/* Paginación */}
+          {/* Pagination */}
           {totalPages > 1 && (
-            <div className="flex items-center justify-center gap-2">
-              <Button variant="outline" size="icon" onClick={() => setCurrentPage(1)} disabled={currentPage === 1}>
-                <ChevronsLeft className="h-4 w-4" />
+            <div className="flex items-center justify-center gap-1 pt-2 md:pt-3">
+              <Button variant="ghost" size="icon" onClick={() => setCurrentPage(1)} disabled={currentPage === 1} className="size-7 md:size-8">
+                <ChevronsLeft className="size-3 md:size-3.5" />
               </Button>
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                disabled={currentPage === 1}
-              >
-                <ChevronLeft className="h-4 w-4" />
+              <Button variant="ghost" size="icon" onClick={() => setCurrentPage((p) => Math.max(1, p - 1))} disabled={currentPage === 1} className="size-7 md:size-8">
+                <ChevronLeft className="size-3 md:size-3.5" />
               </Button>
-              <span className="text-sm">
-                Página {currentPage} de {totalPages}
+              <span className="text-[10px] md:text-xs text-muted-foreground px-2 min-w-[80px] text-center">
+                {currentPage} / {totalPages}
               </span>
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                disabled={currentPage === totalPages}
-              >
-                <ChevronRight className="h-4 w-4" />
+              <Button variant="ghost" size="icon" onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages} className="size-7 md:size-8">
+                <ChevronRight className="size-3 md:size-3.5" />
               </Button>
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={() => setCurrentPage(totalPages)}
-                disabled={currentPage === totalPages}
-              >
-                <ChevronsRight className="h-4 w-4" />
+              <Button variant="ghost" size="icon" onClick={() => setCurrentPage(totalPages)} disabled={currentPage === totalPages} className="size-7 md:size-8">
+                <ChevronsRight className="size-3 md:size-3.5" />
               </Button>
             </div>
           )}

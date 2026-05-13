@@ -64,7 +64,7 @@ export default function LoginForm() {
           <div className="flex justify-center mb-1 sm:mb-2">
             <div className="relative w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-gradient-to-br from-green-400 to-green-600 p-2 shadow-lg">
               <Image
-                src="/images/logoupar.png"
+                src="/images/logo.png"
                 alt="Logo Uparsistem"
                 width={56}
                 height={56}

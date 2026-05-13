@@ -394,7 +394,7 @@ export function UserManagement() {
 
   if (loading) {
     return (
-      <main className="flex flex-1 flex-col gap-4 p-4">
+    <main className="flex flex-1 flex-col gap-2 md:gap-4 p-2 md:p-4">
         <div className="flex items-center justify-center min-h-[400px]">
           <div className="text-center">
             <Loader2 className="h-8 w-8 animate-spin mx-auto mb-2" />
@@ -419,10 +419,10 @@ export function UserManagement() {
         </Alert>
       )}
 
-      <header className="flex items-center justify-between gap-4">
+      <header className="flex items-center justify-between gap-2 md:gap-4">
         <div className="min-w-0 flex-1">
-          <h1 className="text-xl font-bold">Gestión de Usuarios</h1>
-          <p className="text-sm text-muted-foreground">
+          <h1 className="text-base md:text-xl font-bold">Gestión de Usuarios</h1>
+          <p className="text-xs md:text-sm text-muted-foreground">
             {users.length} usuario{users.length !== 1 ? "s" : ""} registrado{users.length !== 1 ? "s" : ""}
           </p>
         </div>

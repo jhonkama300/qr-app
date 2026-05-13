@@ -695,7 +695,7 @@ export function DatabaseManagement() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-3 md:space-y-6">
       {error && (
         <Alert variant="destructive">
           <AlertDescription>{error}</AlertDescription>
@@ -707,22 +707,22 @@ export function DatabaseManagement() {
         </Alert>
       )}
 
-      <div className="flex gap-2 border-b">
+      <div className="flex gap-1 md:gap-2 border-b overflow-x-auto">
         <Button
           variant={activeSection === "estudiantes" ? "default" : "ghost"}
           onClick={() => setActiveSection("estudiantes")}
-          className="rounded-b-none"
+          className="rounded-b-none text-xs md:text-sm"
         >
-          <GraduationCap className="mr-2 h-4 w-4" />
-          Estudiantes ({persons.length})
+          <GraduationCap className="mr-1 md:mr-2 h-3 w-3 md:h-4 md:w-4" />
+          <span className="whitespace-nowrap">Estudiantes ({persons.length})</span>
         </Button>
         <Button
           variant={activeSection === "invitados" ? "default" : "ghost"}
           onClick={() => setActiveSection("invitados")}
-          className="rounded-b-none"
+          className="rounded-b-none text-xs md:text-sm"
         >
-          <UserPlus className="mr-2 h-4 w-4" />
-          Invitados ({invitados.length})
+          <UserPlus className="mr-1 md:mr-2 h-3 w-3 md:h-4 md:w-4" />
+          <span className="whitespace-nowrap">Invitados ({invitados.length})</span>
         </Button>
       </div>
 

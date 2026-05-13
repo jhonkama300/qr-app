@@ -38,6 +38,7 @@ interface NavItem {
   adminOrOperativo?: boolean
   getDescription?: (role: string) => string
   description?: string
+  iconColor?: string
 }
 
 const items: NavItem[] = [
@@ -48,6 +49,7 @@ const items: NavItem[] = [
     adminOnly: true,
     bufeteOnly: false,
     operativoOnly: false,
+    iconColor: "text-uparsistem-600",
   },
   {
     title: "Escanear",
@@ -56,6 +58,7 @@ const items: NavItem[] = [
     adminOnly: false,
     bufeteOnly: false,
     operativoOnly: false,
+    iconColor: "text-blue-500",
     getDescription: (userRole: string) => {
       if (userRole === "bufete") return "Entrega de Comida"
       if (userRole === "operativo") return "Control de Acceso"
@@ -70,6 +73,7 @@ const items: NavItem[] = [
     bufeteOnly: false,
     operativoOnly: false,
     adminOrOperativo: true,
+    iconColor: "text-amber-500",
   },
   {
     title: "Inventario de Platos",
@@ -78,6 +82,7 @@ const items: NavItem[] = [
     adminOnly: true,
     bufeteOnly: false,
     operativoOnly: false,
+    iconColor: "text-orange-500",
   },
   {
     title: "Gestión de Bufetes",
@@ -86,6 +91,7 @@ const items: NavItem[] = [
     adminOnly: false,
     bufeteOnly: true,
     operativoOnly: false,
+    iconColor: "text-emerald-500",
   },
   {
     title: "Estado de Mesas",
@@ -94,6 +100,7 @@ const items: NavItem[] = [
     adminOnly: false,
     bufeteOnly: false,
     operativoOnly: true,
+    iconColor: "text-cyan-500",
     description: "Vista de solo lectura",
   },
   {
@@ -103,6 +110,7 @@ const items: NavItem[] = [
     adminOnly: true,
     bufeteOnly: false,
     operativoOnly: false,
+    iconColor: "text-violet-500",
   },
   {
     title: "Usuarios",
@@ -111,6 +119,7 @@ const items: NavItem[] = [
     adminOnly: true,
     bufeteOnly: false,
     operativoOnly: false,
+    iconColor: "text-pink-500",
   },
   {
     title: "Base de Datos",
@@ -119,6 +128,7 @@ const items: NavItem[] = [
     adminOnly: true,
     bufeteOnly: false,
     operativoOnly: false,
+    iconColor: "text-indigo-500",
   },
 ]
 
@@ -231,7 +241,7 @@ export function AppSidebar() {
                         <div className={`flex items-center justify-center size-7 rounded-md shrink-0 ${
                           isActive ? "bg-sidebar-primary/15" : "bg-sidebar-primary/5"
                         }`}>
-                          <item.icon className={`size-4 ${isActive ? "text-sidebar-primary" : "text-sidebar-foreground/60"}`} />
+                          <item.icon className={`size-4 ${isActive ? "text-sidebar-primary" : item.iconColor || "text-sidebar-foreground/60"}`} />
                         </div>
                         <div className="flex flex-col flex-1 min-w-0 group-data-[collapsible=icon]:hidden">
                           <span className="text-sm leading-tight">{item.title}</span>

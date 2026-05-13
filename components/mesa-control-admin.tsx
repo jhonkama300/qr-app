@@ -155,8 +155,8 @@ export function MesaControlAdmin() {
     <div className="space-y-4 sm:space-y-6 p-3 sm:p-0">
       <header className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="space-y-1">
-          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Control de Mesas</h1>
-          <p className="text-sm sm:text-base text-muted-foreground">
+          <h1 className="text-lg sm:text-3xl font-bold tracking-tight">Control de Mesas</h1>
+          <p className="text-xs sm:text-base text-muted-foreground">
             Administra el estado de las mesas registradas en el inventario de comidas
           </p>
         </div>

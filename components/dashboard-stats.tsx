@@ -524,99 +524,63 @@ export function DashboardStats({ currentUserRole = "administrador", userName = "
       )}
 
       <div className="grid gap-1 md:gap-3 grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-        <Card className="p-1 md:p-2 shadow-sm md:shadow-sm border-blue-300/60 dark:border-blue-800/40 bg-blue-100/70 dark:bg-blue-950/20">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-0 p-1 md:p-2">
-            <CardTitle className="text-[8px] sm:text-[10px] md:text-xs font-medium text-blue-800 leading-tight">
-              Graduandos
-            </CardTitle>
-            <GraduationCap className="h-2.5 w-2.5 md:h-4 md:w-4 text-blue-700 flex-shrink-0" />
-          </CardHeader>
-          <CardContent className="p-1 md:p-2 pt-0">
-            <div className="text-[11px] sm:text-sm md:text-lg font-bold text-blue-900">{graduandosRegistrados}</div>
-            <p className="hidden md:block text-[8px] sm:text-[9px] md:text-xs text-muted-foreground leading-tight">
-              Total registrados
-            </p>
-          </CardContent>
-        </Card>
+        <div className="relative overflow-hidden rounded-xl bg-gradient-to-b from-blue-100 to-blue-200 dark:from-blue-950/30 dark:to-blue-900/20 border border-blue-200 dark:border-blue-800/30 p-2 md:p-4">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-[9px] md:text-xs font-semibold text-blue-700 dark:text-blue-300 uppercase tracking-wider">Graduandos</span>
+            <GraduationCap className="size-3 md:size-4 text-blue-500" />
+          </div>
+          <div className="text-base md:text-2xl font-bold text-blue-800 dark:text-blue-200">{graduandosRegistrados}</div>
+          <p className="text-[7px] md:text-[10px] text-blue-600/70 dark:text-blue-400/70 mt-0.5">Registrados</p>
+        </div>
 
-        <Card className="p-1 md:p-2 shadow-sm md:shadow-sm bg-uparsistem-100/70 dark:bg-uparsistem-950/20 border-uparsistem-300/60 dark:border-uparsistem-800/40">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-0 p-1 md:p-2">
-            <CardTitle className="text-[8px] sm:text-[10px] md:text-xs font-medium text-uparsistem-800 leading-tight">
-              Accesos
-            </CardTitle>
-            <CheckCircle className="h-2.5 w-2.5 md:h-4 md:w-4 text-uparsistem-700 flex-shrink-0" />
-          </CardHeader>
-          <CardContent className="p-1 md:p-2 pt-0">
-            <div className="text-[11px] sm:text-sm md:text-lg font-bold text-uparsistem-800">{grantedAccessCount}</div>
-            <p className="hidden md:block text-[8px] sm:text-[9px] md:text-xs text-muted-foreground leading-tight">
-              Con acceso permitido
-            </p>
-          </CardContent>
-        </Card>
+        <div className="relative overflow-hidden rounded-xl bg-gradient-to-b from-uparsistem-100 to-uparsistem-200 dark:from-uparsistem-950/30 dark:to-uparsistem-900/20 border border-uparsistem-200 dark:border-uparsistem-800/30 p-2 md:p-4">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-[9px] md:text-xs font-semibold text-uparsistem-700 dark:text-uparsistem-300 uppercase tracking-wider">Accesos</span>
+            <CheckCircle className="size-3 md:size-4 text-uparsistem-500" />
+          </div>
+          <div className="text-base md:text-2xl font-bold text-uparsistem-800 dark:text-uparsistem-200">{grantedAccessCount}</div>
+          <p className="text-[7px] md:text-[10px] text-uparsistem-600/70 dark:text-uparsistem-400/70 mt-0.5">Permitidos</p>
+        </div>
 
-        <Card className="p-1 md:p-2 shadow-sm md:shadow-sm bg-red-100/70 dark:bg-red-950/20 border-red-300/60 dark:border-red-800/40">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-0 p-1 md:p-2">
-            <CardTitle className="text-[8px] sm:text-[10px] md:text-xs font-medium text-red-800 leading-tight">
-              Denegados
-            </CardTitle>
-            <XCircle className="h-2.5 w-2.5 md:h-4 md:w-4 text-red-700 flex-shrink-0" />
-          </CardHeader>
-          <CardContent className="p-1 md:p-2 pt-0">
-            <div className="text-[11px] sm:text-sm md:text-lg font-bold text-red-900">{deniedAccessCount}</div>
-            <p className="hidden md:block text-[8px] sm:text-[9px] md:text-xs text-muted-foreground leading-tight">
-              Acceso denegado
-            </p>
-          </CardContent>
-        </Card>
+        <div className="relative overflow-hidden rounded-xl bg-gradient-to-b from-red-100 to-red-200 dark:from-red-950/30 dark:to-red-900/20 border border-red-200 dark:border-red-800/30 p-2 md:p-4">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-[9px] md:text-xs font-semibold text-red-700 dark:text-red-300 uppercase tracking-wider">Denegados</span>
+            <XCircle className="size-3 md:size-4 text-red-500" />
+          </div>
+          <div className="text-base md:text-2xl font-bold text-red-800 dark:text-red-200">{deniedAccessCount}</div>
+          <p className="text-[7px] md:text-[10px] text-red-600/70 dark:text-red-400/70 mt-0.5">Rechazados</p>
+        </div>
 
-        <Card className="p-1 md:p-2 shadow-sm md:shadow-sm bg-amber-100/70 dark:bg-amber-950/20 border-amber-300/60 dark:border-amber-800/40">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-0 p-1 md:p-2">
-            <CardTitle className="text-[8px] sm:text-[10px] md:text-xs font-medium text-amber-800 leading-tight">
-              Espera
-            </CardTitle>
-            <Clock className="h-2.5 w-2.5 md:h-4 md:w-4 text-amber-700 flex-shrink-0" />
-          </CardHeader>
-          <CardContent className="p-1 md:p-2 pt-0">
-            <div className="text-[11px] sm:text-sm md:text-lg font-bold text-amber-900">{waitingPersonsCount}</div>
-            <p className="hidden md:block text-[8px] sm:text-[9px] md:text-xs text-muted-foreground leading-tight">
-              Sin procesar
-            </p>
-          </CardContent>
-        </Card>
+        <div className="relative overflow-hidden rounded-xl bg-gradient-to-b from-amber-100 to-amber-200 dark:from-amber-950/30 dark:to-amber-900/20 border border-amber-200 dark:border-amber-800/30 p-2 md:p-4">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-[9px] md:text-xs font-semibold text-amber-700 dark:text-amber-300 uppercase tracking-wider">Espera</span>
+            <Clock className="size-3 md:size-4 text-amber-500" />
+          </div>
+          <div className="text-base md:text-2xl font-bold text-amber-800 dark:text-amber-200">{waitingPersonsCount}</div>
+          <p className="text-[7px] md:text-[10px] text-amber-600/70 dark:text-amber-400/70 mt-0.5">Sin procesar</p>
+        </div>
 
-        <Card className="p-1 md:p-2 shadow-sm md:shadow-sm bg-cyan-100/70 dark:bg-cyan-950/20 border-cyan-300/60 dark:border-cyan-800/40">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-0 p-1 md:p-2">
-            <CardTitle className="text-[8px] sm:text-[10px] md:text-xs font-medium text-cyan-800 leading-tight">
-              Mesas
-            </CardTitle>
-            <Utensils className="h-2.5 w-2.5 md:h-4 md:w-4 text-cyan-700 flex-shrink-0" />
-          </CardHeader>
-          <CardContent className="p-1 md:p-2 pt-0">
-            <div className="text-[11px] sm:text-sm md:text-lg font-bold text-cyan-900">
-              {buffetStats.mesasActivas}/{buffetStats.totalMesas}
-            </div>
-            <p className="hidden md:block text-[8px] sm:text-[9px] md:text-xs text-muted-foreground leading-tight">
-              Bufete operativas
-            </p>
-          </CardContent>
-        </Card>
+        <div className="relative overflow-hidden rounded-xl bg-gradient-to-b from-cyan-100 to-cyan-200 dark:from-cyan-950/30 dark:to-cyan-900/20 border border-cyan-200 dark:border-cyan-800/30 p-2 md:p-4">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-[9px] md:text-xs font-semibold text-cyan-700 dark:text-cyan-300 uppercase tracking-wider">Mesas</span>
+            <Utensils className="size-3 md:size-4 text-cyan-500" />
+          </div>
+          <div className="text-base md:text-2xl font-bold text-cyan-800 dark:text-cyan-200">
+            {buffetStats.mesasActivas}/{buffetStats.totalMesas}
+          </div>
+          <p className="text-[7px] md:text-[10px] text-cyan-600/70 dark:text-cyan-400/70 mt-0.5">Operativas</p>
+        </div>
 
-        <Card className="p-1 md:p-2 shadow-sm md:shadow-sm bg-violet-100/70 dark:bg-violet-950/20 border-violet-300/60 dark:border-violet-800/40">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-0 p-1 md:p-2">
-            <CardTitle className="text-[8px] sm:text-[10px] md:text-xs font-medium text-violet-800 leading-tight">
-              Comidas
-            </CardTitle>
-            <ChefHat className="h-2.5 w-2.5 md:h-4 md:w-4 text-violet-700 flex-shrink-0" />
-          </CardHeader>
-          <CardContent className="p-1 md:p-2 pt-0">
-            <div className="text-[11px] sm:text-sm md:text-lg font-bold text-violet-900">
-              {buffetStats.comidasEntregadas}
-            </div>
-            <p className="hidden md:block text-[8px] sm:text-[9px] md:text-xs text-muted-foreground leading-tight">
-              Entregas realizadas
-            </p>
-          </CardContent>
-        </Card>
+        <div className="relative overflow-hidden rounded-xl bg-gradient-to-b from-violet-100 to-violet-200 dark:from-violet-950/30 dark:to-violet-900/20 border border-violet-200 dark:border-violet-800/30 p-2 md:p-4">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-[9px] md:text-xs font-semibold text-violet-700 dark:text-violet-300 uppercase tracking-wider">Comidas</span>
+            <ChefHat className="size-3 md:size-4 text-violet-500" />
+          </div>
+          <div className="text-base md:text-2xl font-bold text-violet-800 dark:text-violet-200">
+            {buffetStats.comidasEntregadas}
+          </div>
+          <p className="text-[7px] md:text-[10px] text-violet-600/70 dark:text-violet-400/70 mt-0.5">Entregadas</p>
+        </div>
       </div>
 
       <div className="grid gap-1 md:gap-4 grid-cols-1 lg:grid-cols-2">
