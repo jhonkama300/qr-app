@@ -1,6 +1,6 @@
 "use client"
 
-import { Home, Scan, Shield, Database, Users, LogOut, User, ChevronUp, Settings, Utensils } from "lucide-react"
+import { Home, Scan, Shield, Database, Users, LogOut, User, Table, Utensils, ChevronLeft, DoorOpen } from "lucide-react"
 import { useState } from "react"
 import {
   Sidebar,
@@ -8,15 +8,22 @@ import {
   SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
-  SidebarGroupLabel,
   SidebarHeader,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-  SidebarRail,
   useSidebar,
 } from "@/components/ui/sidebar"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { useAuth } from "@/components/auth-provider"
 import { useRouter } from "next/navigation"
 import type { ViewType } from "@/components/spa-dashboard"
@@ -27,18 +34,29 @@ interface AppSidebarProps {
   onViewChange?: (view: ViewType) => void
 }
 
-const items = [
+interface NavItem {
+  title: string
+  view: ViewType
+  icon: React.ElementType
+  adminOnly: boolean
+  bufeteOnly: boolean
+  operativoOnly: boolean
+  adminOrOperativo?: boolean
+  getDescription?: (role: string) => string
+}
+
+const items: NavItem[] = [
   {
     title: "Inicio",
-    view: "inicio" as ViewType,
+    view: "inicio",
     icon: Home,
-    adminOnly: true, // Solo administradores pueden ver el dashboard de inicio
+    adminOnly: true,
     bufeteOnly: false,
     operativoOnly: false,
   },
   {
     title: "Escanear",
-    view: "escanear" as ViewType,
+    view: "escanear",
     icon: Scan,
     adminOnly: false,
     bufeteOnly: false,
@@ -51,32 +69,32 @@ const items = [
   },
   {
     title: "Control de Acceso",
-    view: "control-acceso" as ViewType, // Permitir acceso a administradores y operativos
-    icon: Shield,
+    view: "control-acceso",
+    icon: DoorOpen,
     adminOnly: false,
     bufeteOnly: false,
     operativoOnly: false,
-    adminOrOperativo: true, // Nueva propiedad para indicar que necesita ser admin o operativo
+    adminOrOperativo: true,
   },
   {
-    title: "Gestión de Bufetes", // Cambiar "Gestión de Mesas" por "Gestión de Bufetes"
-    view: "bufetes-gestion" as ViewType, // Cambiar view name
+    title: "Gestión de Bufetes",
+    view: "bufetes-gestion",
     icon: Utensils,
     adminOnly: false,
     bufeteOnly: true,
     operativoOnly: false,
   },
   {
-    title: "Control de Bufetes", // Cambiar "Control de Mesas" por "Control de Bufetes"
-    view: "control-bufetes" as ViewType, // Cambiar view name
-    icon: Settings,
+    title: "Control de Bufetes",
+    view: "control-bufetes",
+    icon: Table,
     adminOnly: true,
     bufeteOnly: false,
     operativoOnly: false,
   },
   {
     title: "Usuarios",
-    view: "usuarios" as ViewType,
+    view: "usuarios",
     icon: Users,
     adminOnly: true,
     bufeteOnly: false,
@@ -84,7 +102,7 @@ const items = [
   },
   {
     title: "Base de Datos",
-    view: "base-datos" as ViewType,
+    view: "base-datos",
     icon: Database,
     adminOnly: true,
     bufeteOnly: false,
@@ -92,47 +110,51 @@ const items = [
   },
 ]
 
+const roleStyles: Record<string, { label: string; gradient: string; badge: string }> = {
+  administrador: {
+    label: "Admin",
+    gradient: "from-rose-500 to-pink-600",
+    badge: "bg-rose-100 text-rose-700 border-rose-200",
+  },
+  operativo: {
+    label: "Operativo",
+    gradient: "from-blue-500 to-indigo-600",
+    badge: "bg-blue-100 text-blue-700 border-blue-200",
+  },
+  bufete: {
+    label: "Bufete",
+    gradient: "from-emerald-500 to-green-600",
+    badge: "bg-emerald-100 text-emerald-700 border-emerald-200",
+  },
+}
+
 export function AppSidebar({ currentView = "inicio", onViewChange }: AppSidebarProps) {
   const { user, activeRole, isAdmin, isBufete, logout, fullName } = useAuth()
   const router = useRouter()
-  const { setOpenMobile, isMobile } = useSidebar()
+  const { toggleSidebar, state, setOpenMobile, isMobile } = useSidebar()
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
 
-  const handleLogout = async () => {
-    console.log("[v0] handleLogout llamado")
-    if (isMobile) {
-      setOpenMobile(false)
-    }
-    // Esperar a que el sidebar se cierre antes de mostrar el modal
-    setTimeout(() => {
-      console.log("[v0] Mostrando modal de confirmación")
-      setShowLogoutConfirm(true)
-    }, 300) // Aumentado a 300ms para dar tiempo a la animación del sidebar
+  const isCollapsed = state === "collapsed"
+
+  const handleLogout = () => {
+    if (isMobile) setOpenMobile(false)
+    setTimeout(() => setShowLogoutConfirm(true), 300)
   }
 
   const confirmLogout = () => {
-    console.log("[v0] Logout confirmado")
     logout()
     router.push("/")
     setShowLogoutConfirm(false)
   }
 
-  const cancelLogout = () => {
-    console.log("[v0] Logout cancelado")
-    setShowLogoutConfirm(false)
-  }
-
   const handleViewChange = (view: ViewType) => {
-    if (onViewChange) {
-      onViewChange(view)
-    }
-    if (isMobile) {
-      setOpenMobile(false)
-    }
+    onViewChange?.(view)
+    if (isMobile) setOpenMobile(false)
   }
 
-  const userName = user?.email?.split("@")[0] || "Usuario"
   const isOperativo = activeRole === "operativo"
+  const roleInfo = roleStyles[activeRole || ""] || roleStyles.operativo
+  const tip = roleInfo.label.toLowerCase()
 
   const visibleItems = items.filter((item) => {
     if (item.adminOnly && !isAdmin) return false
@@ -144,192 +166,116 @@ export function AppSidebar({ currentView = "inicio", onViewChange }: AppSidebarP
 
   return (
     <>
-      <Sidebar variant="inset">
-        <SidebarHeader>
-          <SidebarMenu>
-            <SidebarMenuItem>
-              <SidebarMenuButton
-                size="lg"
-                className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
-              >
-                <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
-                  <User className="size-4" />
-                </div>
-                <div className="grid flex-1 text-left text-sm leading-tight">
-                  <span className="truncate font-semibold">Aplicativo Control de Acceso</span>
-                  <span className="truncate text-xs">
-                    Uparsistem -{" "}
-                    {isAdmin ? "Administrador" : isBufete ? "Bufete" : isOperativo ? "Operativo" : "Usuario"}
-                  </span>
-                </div>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-            <SidebarMenuItem className="mt-2">
-              <RoleSwitcher />
-            </SidebarMenuItem>
-          </SidebarMenu>
+      <Sidebar collapsible="icon" variant="inset">
+        <SidebarHeader className="relative p-3 group-data-[collapsible=icon]:p-2">
+          <div className="flex items-center gap-3 px-1 group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:justify-center">
+            <div className={`flex size-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br ${roleInfo.gradient} shadow-md`}>
+              <User className="size-4 text-white" />
+            </div>
+            <div className="flex-1 min-w-0 group-data-[collapsible=icon]:hidden">
+              <p className="text-sm font-semibold truncate text-sidebar-foreground">Uparsistem</p>
+              <p className="text-[11px] truncate text-sidebar-foreground/60">Control de Acceso</p>
+            </div>
+            <span className={`text-[10px] px-2 py-0.5 rounded-full border font-medium ${roleInfo.badge} shrink-0 group-data-[collapsible=icon]:hidden`}>
+              {roleInfo.label}
+            </span>
+          </div>
+          <div className="mt-2 px-1 group-data-[collapsible=icon]:hidden">
+            <RoleSwitcher />
+          </div>
+          {/* Toggle collapse button - top right edge */}
+          <button
+            onClick={toggleSidebar}
+            className="
+              absolute -right-3 top-5 z-20
+              flex size-6 items-center justify-center
+              rounded-full border border-sidebar-border bg-sidebar
+              text-sidebar-foreground/50 hover:text-sidebar-foreground hover:border-sidebar-foreground/30
+              shadow-sm hover:shadow-md
+              transition-all duration-200
+              group-data-[collapsible=icon]:rotate-180
+              group-data-[collapsible=icon]:-right-3 group-data-[collapsible=icon]:top-5
+            "
+            aria-label={isCollapsed ? "Expandir sidebar" : "Contraer sidebar"}
+          >
+            <ChevronLeft className="size-3.5 transition-transform duration-200" />
+          </button>
         </SidebarHeader>
+
         <SidebarContent>
           <SidebarGroup>
-            <SidebarGroupLabel>Navegación Principal</SidebarGroupLabel>
             <SidebarGroupContent>
-              <SidebarMenu className="space-y-2">
-                {visibleItems.map((item) => (
-                  <SidebarMenuItem key={item.title}>
-                    <SidebarMenuButton
-                      size="lg"
-                      className={`h-14 px-4 py-3 border border-sidebar-border rounded-lg transition-all duration-200 shadow-sm cursor-pointer ${
-                        currentView === item.view
-                          ? "bg-sidebar-accent border-sidebar-accent-foreground/20"
-                          : "bg-sidebar-accent/50 hover:bg-sidebar-accent hover:border-sidebar-accent-foreground/20"
-                      }`}
-                      onClick={() => handleViewChange(item.view)}
-                    >
-                      <div className="flex items-center gap-3 w-full">
-                        <div className="flex items-center justify-center w-8 h-8 rounded-md bg-sidebar-primary/10 relative">
-                          <item.icon className="w-5 h-5" />
-                          {item.adminOnly && isAdmin && (
-                            <div className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full"></div>
-                          )}
-                          {item.bufeteOnly && isBufete && (
-                            <div className="absolute -top-1 -right-1 w-2 h-2 bg-green-500 rounded-full"></div>
-                          )}
-                          {item.operativoOnly && isOperativo && (
-                            <div className="absolute -top-1 -right-1 w-2 h-2 bg-blue-500 rounded-full"></div>
-                          )}
-                          {item.adminOrOperativo && (isAdmin || isOperativo) && (
-                            <div className="absolute -top-1 -right-1 w-2 h-2 bg-purple-500 rounded-full"></div>
-                          )}
+              <SidebarMenu className="px-1.5 space-y-0.5 group-data-[collapsible=icon]:px-1">
+                {visibleItems.map((item) => {
+                  const isActive = currentView === item.view
+                  return (
+                    <SidebarMenuItem key={item.title}>
+                      <SidebarMenuButton
+                        size="lg"
+                        isActive={isActive}
+                        onClick={() => handleViewChange(item.view)}
+                        className="relative h-11 px-3 rounded-lg cursor-pointer group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:size-11"
+                      >
+                        {isActive && (
+                          <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 rounded-r-full bg-sidebar-primary group-data-[collapsible=icon]:hidden" />
+                        )}
+                        <div className={`flex items-center justify-center size-7 rounded-md shrink-0 ${
+                          isActive ? "bg-sidebar-primary/15" : "bg-sidebar-primary/5"
+                        }`}>
+                          <item.icon className={`size-4 ${isActive ? "text-sidebar-primary" : "text-sidebar-foreground/60"}`} />
                         </div>
-                        <div className="flex flex-col flex-1">
-                          <span className="font-medium text-base">{item.title}</span>
+                        <div className="flex flex-col flex-1 min-w-0 group-data-[collapsible=icon]:hidden">
+                          <span className="text-sm leading-tight">{item.title}</span>
                           {item.view === "escanear" && item.getDescription && (
-                            <span className="text-xs text-muted-foreground">
+                            <span className="text-[10px] text-sidebar-foreground/50 leading-tight mt-px">
                               {item.getDescription(activeRole || "")}
                             </span>
                           )}
                         </div>
-                        {item.adminOnly && isAdmin && (
-                          <span className="ml-auto text-xs bg-red-100 text-red-700 px-2 py-1 rounded-full">Admin</span>
-                        )}
-                        {item.bufeteOnly && isBufete && (
-                          <span className="ml-auto text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full">
-                            Bufete
-                          </span>
-                        )}
-                        {item.operativoOnly && isOperativo && (
-                          <span className="ml-auto text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full">
-                            Operativo
-                          </span>
-                        )}
-                        {item.adminOrOperativo && (isAdmin || isOperativo) && !item.adminOnly && (
-                          <span className="ml-auto text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded-full">
-                            {isAdmin ? "Admin" : "Operativo"}
-                          </span>
-                        )}
-                      </div>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                ))}
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  )
+                })}
               </SidebarMenu>
             </SidebarGroupContent>
           </SidebarGroup>
         </SidebarContent>
-        <SidebarFooter>
-          <SidebarMenu>
-            <SidebarMenuItem>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <SidebarMenuButton
-                    size="lg"
-                    className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
-                  >
-                    <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
-                      <User className="size-4" />
-                    </div>
-                    <div className="grid flex-1 text-left text-sm leading-tight">
-                      <span className="truncate font-semibold">
-                        {fullName || userName}
-                        {isAdmin && " (Admin)"}
-                        {isBufete && " (Bufete)"}
-                        {isOperativo && " (Operativo)"}
-                      </span>
-                      <span className="truncate text-xs">
-                        ID: {user?.idNumber} • {activeRole}
-                      </span>
-                    </div>
-                    <ChevronUp className="ml-auto size-4" />
-                  </SidebarMenuButton>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent
-                  className="w-[--radix-dropdown-menu-trigger-width] min-w-56 rounded-lg"
-                  side="bottom"
-                  align="end"
-                  sideOffset={4}
-                >
-                  <DropdownMenuItem className="gap-2 p-2">
-                    <div className="flex size-6 items-center justify-center rounded-sm bg-sidebar-primary text-sidebar-primary-foreground">
-                      <User className="size-4" />
-                    </div>
-                    <div className="grid flex-1 text-left text-sm leading-tight">
-                      <span className="truncate font-semibold">
-                        {fullName || userName}
-                        {isAdmin && " (Admin)"}
-                        {isBufete && " (Bufete)"}
-                        {isOperativo && " (Operativo)"}
-                      </span>
-                      <span className="truncate text-xs">
-                        ID: {user?.idNumber} • {activeRole}
-                      </span>
-                    </div>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={handleLogout} className="gap-2 p-2 text-red-600 focus:text-red-600">
-                    <LogOut className="size-4" />
-                    <span>Cerrar Sesión</span>
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </SidebarMenuItem>
-          </SidebarMenu>
+
+        <SidebarFooter className="p-3 border-t border-sidebar-border/50 group-data-[collapsible=icon]:p-2">
+          <button
+            onClick={handleLogout}
+            className="flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-sidebar-foreground/60 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 transition-all duration-150 group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:justify-center"
+          >
+            <div className="flex size-7 shrink-0 items-center justify-center rounded-md bg-sidebar-primary/5 group-hover:bg-red-100 dark:group-hover:bg-red-950/50 transition-colors">
+              <LogOut className="size-4" />
+            </div>
+            <div className="flex-1 text-left min-w-0 group-data-[collapsible=icon]:hidden">
+              <p className="text-sm font-medium truncate">{fullName || user?.idNumber || "Usuario"}</p>
+              <p className="text-[10px] truncate text-sidebar-foreground/40">
+                {user?.idNumber || ""} · {roleInfo.label}
+              </p>
+            </div>
+          </button>
         </SidebarFooter>
-        <SidebarRail />
+
       </Sidebar>
 
-      {showLogoutConfirm && (
-        <div
-          className="fixed inset-0 bg-black/50 flex items-center justify-center z-[100] p-4"
-          onClick={(e) => {
-            // Prevenir que clicks en el backdrop cierren el modal
-            if (e.target === e.currentTarget) {
-              e.stopPropagation()
-            }
-          }}
-        >
-          <div
-            className="bg-white rounded-lg shadow-xl max-w-md w-full p-6 space-y-4"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h2 className="text-xl font-semibold text-center">¿Cerrar sesión?</h2>
-            <p className="text-sm text-muted-foreground text-center">
+      <AlertDialog open={showLogoutConfirm} onOpenChange={setShowLogoutConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Cerrar sesión</AlertDialogTitle>
+            <AlertDialogDescription>
               ¿Estás seguro de que deseas cerrar sesión? Tendrás que volver a iniciar sesión para acceder al sistema.
-            </p>
-            <div className="space-y-2">
-              <button
-                onClick={confirmLogout}
-                className="w-full bg-black text-white py-3 rounded-lg font-medium hover:bg-black/90 transition-colors"
-              >
-                Confirmar
-              </button>
-              <button
-                onClick={cancelLogout}
-                className="w-full bg-white text-black py-3 rounded-lg font-medium border border-gray-300 hover:bg-gray-50 transition-colors"
-              >
-                Cancelar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmLogout} className="bg-red-600 hover:bg-red-700 text-white">
+              Cerrar sesión
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   )
 }

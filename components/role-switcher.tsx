@@ -1,77 +1,62 @@
 "use client"
 
 import { useAuth } from "@/components/auth-provider"
-import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Shield, Users, Scale, ChevronDown, Check } from "lucide-react"
 
+const roleConfig: Record<string, { icon: React.ElementType; label: string; gradient: string }> = {
+  administrador: { icon: Shield, label: "Administrador", gradient: "from-rose-500 to-pink-600" },
+  operativo: { icon: Users, label: "Operativo", gradient: "from-blue-500 to-indigo-600" },
+  bufete: { icon: Scale, label: "Bufete", gradient: "from-emerald-500 to-green-600" },
+}
+
 export function RoleSwitcher() {
   const { activeRole, availableRoles, switchRole } = useAuth()
 
-  // Don't show the switcher if user only has one role
-  if (availableRoles.length <= 1) {
-    return null
-  }
+  if (availableRoles.length <= 1) return null
 
-  const getRoleIcon = (role: string) => {
-    switch (role) {
-      case "administrador":
-        return <Shield className="h-4 w-4" />
-      case "operativo":
-        return <Users className="h-4 w-4" />
-      case "bufete":
-        return <Scale className="h-4 w-4" />
-      default:
-        return null
-    }
-  }
-
-  const getRoleLabel = (role: string) => {
-    switch (role) {
-      case "administrador":
-        return "Administrador"
-      case "operativo":
-        return "Operativo"
-      case "bufete":
-        return "Bufete"
-      default:
-        return role
-    }
-  }
+  const current = roleConfig[activeRole || ""]
+  const Icon = current?.icon || Users
 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="outline" className="gap-2 bg-transparent">
-          {getRoleIcon(activeRole || "")}
-          <span>{getRoleLabel(activeRole || "")}</span>
-          <ChevronDown className="h-4 w-4 opacity-50" />
-        </Button>
+        <button className="flex items-center gap-2 w-full px-2.5 py-2 rounded-lg text-sm text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent/60 transition-all duration-150 group">
+          <div className={`flex size-6 items-center justify-center rounded-md bg-gradient-to-br ${current?.gradient || "from-gray-500 to-gray-600"} text-white`}>
+            <Icon className="size-3" />
+          </div>
+          <span className="flex-1 text-left text-xs font-medium">{current?.label || activeRole}</span>
+          <ChevronDown className="size-3 opacity-40 group-hover:opacity-70 transition-opacity" />
+        </button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-56">
-        <DropdownMenuLabel>Cambiar Rol</DropdownMenuLabel>
+      <DropdownMenuContent align="start" className="w-48">
+        <div className="px-2 py-1.5 text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Cambiar Rol</div>
         <DropdownMenuSeparator />
-        {availableRoles.map((role) => (
-          <DropdownMenuItem
-            key={role}
-            onClick={() => switchRole(role)}
-            className="gap-2 cursor-pointer"
-            disabled={role === activeRole}
-          >
-            <div className="flex items-center gap-2 flex-1">
-              {getRoleIcon(role)}
-              <span>{getRoleLabel(role)}</span>
-            </div>
-            {role === activeRole && <Check className="h-4 w-4" />}
-          </DropdownMenuItem>
-        ))}
+        {availableRoles.map((role) => {
+          const cfg = roleConfig[role]
+          const RoleIcon = cfg?.icon || Users
+          const isActive = role === activeRole
+          return (
+            <DropdownMenuItem
+              key={role}
+              onClick={() => switchRole(role)}
+              disabled={isActive}
+              className="gap-2.5 py-2 cursor-pointer"
+            >
+              <div className={`flex size-6 items-center justify-center rounded-md bg-gradient-to-br ${cfg?.gradient || "from-gray-500 to-gray-600"} text-white shrink-0`}>
+                <RoleIcon className="size-3" />
+              </div>
+              <span className="flex-1 text-sm">{cfg?.label || role}</span>
+              {isActive && <Check className="size-3.5 text-primary" />}
+            </DropdownMenuItem>
+          )
+        })}
       </DropdownMenuContent>
     </DropdownMenu>
   )

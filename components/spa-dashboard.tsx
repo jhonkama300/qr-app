@@ -3,18 +3,28 @@
 import { useState } from "react"
 import { useAuth } from "@/components/auth-provider"
 import { AppSidebar } from "@/components/app-sidebar"
-import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar"
-import { Separator } from "@/components/ui/separator"
-import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbList,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
-} from "@/components/ui/breadcrumb"
+import { MobileBottomNav } from "@/components/mobile-bottom-nav"
+import { LogOut, Home, Scan, DoorOpen, Table, Utensils, Users, Database } from "lucide-react"
+import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
 import { useRouter } from "next/navigation"
 import { useEffect } from "react"
+import { useIsMobile } from "@/hooks/use-mobile"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { collection, query, where, onSnapshot } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -45,10 +55,12 @@ interface SPADashboardProps {
 }
 
 export function SPADashboard({ initialView = "inicio" }: SPADashboardProps) {
-  const { user, loading, userRole, isAdmin, isBufete, mesaAsignada } = useAuth()
+  const { user, loading, userRole, isAdmin, isBufete, mesaAsignada, fullName, logout } = useAuth()
   const router = useRouter()
+  const isMobile = useIsMobile()
   const [currentView, setCurrentView] = useState<ViewType>(initialView)
   const [scannerKey, setScannerKey] = useState(0)
+  const [showLogoutModal, setShowLogoutModal] = useState(false)
 
   const [estudiantesAtendidos, setEstudiantesAtendidos] = useState(0)
   const [mesaActiva, setMesaActiva] = useState(true)
@@ -221,6 +233,27 @@ export function SPADashboard({ initialView = "inicio" }: SPADashboardProps) {
     return null
   }
 
+  const roleStyles: Record<string, string> = {
+    administrador: "from-rose-500 to-pink-600",
+    operativo: "from-blue-500 to-indigo-600",
+    bufete: "from-emerald-500 to-green-600",
+  }
+  const roleInfo = { gradient: roleStyles[userRole || ""] || "from-gray-500 to-gray-600" }
+
+  const getViewIcon = () => {
+    const className = "size-4 text-white"
+    switch (currentView) {
+      case "inicio": return <Home className={className} />
+      case "escanear": return <Scan className={className} />
+      case "control-acceso": return <DoorOpen className={className} />
+      case "bufetes-gestion": return <Utensils className={className} />
+      case "control-bufetes": return <Table className={className} />
+      case "usuarios": return <Users className={className} />
+      case "base-datos": return <Database className={className} />
+      default: return <Home className={className} />
+    }
+  }
+
   const getBreadcrumbTitle = () => {
     switch (currentView) {
       case "inicio":
@@ -238,7 +271,7 @@ export function SPADashboard({ initialView = "inicio" }: SPADashboardProps) {
       case "bufetes-gestion":
         return `Gestión de Bufetes${mesaAsignada ? ` - Bufete ${mesaAsignada}` : ""}`
       case "control-bufetes":
-        return "Control de Bufetes (Admin)"
+        return "Control de Bufetes"
       case "usuarios":
         return "Usuarios"
       case "base-datos":
@@ -251,13 +284,22 @@ export function SPADashboard({ initialView = "inicio" }: SPADashboardProps) {
   const handleViewChange = (newView: ViewType) => {
     console.log("[v0] Changing view from", currentView, "to", newView)
 
-    // Si estamos saliendo de una vista con escáner, incrementar la key
     if (currentView === "escanear" && newView !== "escanear") {
       console.log("[v0] Leaving scanner view, forcing unmount")
       setScannerKey((prev) => prev + 1)
     }
 
     setCurrentView(newView)
+  }
+
+  const handleLogout = () => {
+    setShowLogoutModal(true)
+  }
+
+  const confirmLogout = () => {
+    logout()
+    router.push("/")
+    setShowLogoutModal(false)
   }
 
   const renderCurrentView = () => {
@@ -426,31 +468,70 @@ export function SPADashboard({ initialView = "inicio" }: SPADashboardProps) {
     <SidebarProvider>
       <AppSidebar currentView={currentView} onViewChange={handleViewChange} />
       <SidebarInset>
-        <header className="flex h-14 md:h-16 shrink-0 items-center gap-2 border-b px-2 md:px-4">
-          <SidebarTrigger className="-ml-1" />
-          <Separator orientation="vertical" className="mr-2 h-4" />
-          <Breadcrumb>
-            <BreadcrumbList>
-              <BreadcrumbItem className="hidden sm:block">
-                <BreadcrumbLink
-                  href="#"
-                  onClick={(e) => {
-                    e.preventDefault()
-                    handleViewChange("inicio")
-                  }}
-                >
-                  Dashboard
-                </BreadcrumbLink>
-              </BreadcrumbItem>
-              <BreadcrumbSeparator className="hidden sm:block" />
-              <BreadcrumbItem>
-                <BreadcrumbPage className="text-sm md:text-base">{getBreadcrumbTitle()}</BreadcrumbPage>
-              </BreadcrumbItem>
-            </BreadcrumbList>
-          </Breadcrumb>
+        <header className="flex h-14 md:h-16 shrink-0 items-center border-b px-4 md:px-6">
+          {/* Mobile: icon + view name + avatar */}
+          {isMobile ? (
+            <>
+              <div className="flex items-center gap-3 flex-1 min-w-0">
+                <div className={`flex size-8 items-center justify-center rounded-lg bg-gradient-to-br ${roleInfo.gradient} shadow-sm shrink-0`}>
+                  {getViewIcon()}
+                </div>
+                <div className="min-w-0">
+                  <h1 className="text-sm font-bold text-foreground truncate">{getBreadcrumbTitle()}</h1>
+                  <p className="text-[10px] text-muted-foreground/60">Uparsistem · Control de Acceso</p>
+                </div>
+              </div>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button className="flex items-center justify-center size-8 rounded-full bg-gradient-to-br from-lime-500 to-green-600 text-white text-xs font-bold shadow-sm shrink-0">
+                    {(fullName || user?.idNumber || "U")[0].toUpperCase()}
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56">
+                  <div className="px-2 py-2 border-b">
+                    <p className="text-sm font-semibold truncate">{fullName || "Usuario"}</p>
+                    <p className="text-xs text-muted-foreground">ID: {user?.idNumber || ""}</p>
+                  </div>
+                  <DropdownMenuItem onClick={handleLogout} className="gap-2 text-red-600 focus:text-red-600 mt-1">
+                    <LogOut className="size-4" />
+                    <span>Cerrar sesión</span>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </>
+          ) : (
+            /* PC: just the view title, clean */
+            <div className="flex items-center gap-3 w-full">
+              <div className={`flex size-8 items-center justify-center rounded-lg bg-gradient-to-br ${roleInfo.gradient} shadow-sm shrink-0`}>
+                {getViewIcon()}
+              </div>
+              <h1 className="text-base font-semibold text-foreground">{getBreadcrumbTitle()}</h1>
+            </div>
+          )}
         </header>
-        {renderCurrentView()}
+        <div className={isMobile ? "pb-16" : ""}>
+          {renderCurrentView()}
+        </div>
       </SidebarInset>
+      {isMobile && (
+        <MobileBottomNav currentView={currentView} onViewChange={handleViewChange} />
+      )}
+      <AlertDialog open={showLogoutModal} onOpenChange={setShowLogoutModal}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Cerrar sesión</AlertDialogTitle>
+            <AlertDialogDescription>
+              ¿Estás seguro de que deseas cerrar sesión? Tendrás que volver a iniciar sesión para acceder al sistema.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmLogout} className="bg-red-600 hover:bg-red-700 text-white">
+              Cerrar sesión
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </SidebarProvider>
   )
 }
