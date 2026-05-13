@@ -16,7 +16,11 @@ import {
   Activity,
   ChefHat,
   GraduationCap,
+  Package,
+  AlertTriangle,
 } from "lucide-react"
+import { Progress } from "@/components/ui/progress"
+import type { MealInventory } from "@/lib/firestore-service"
 
 interface PersonData {
   id: string
@@ -95,6 +99,7 @@ export function DashboardStats({ currentUserRole = "administrador" }: DashboardS
   const [usersCache, setUsersCache] = useState<Map<string, UserData>>(new Map())
   const [adminOperativoStats, setAdminOperativoStats] = useState<UserStats[]>([])
   const [bufeteStats, setBuffeteStats] = useState<UserStats[]>([])
+  const [mealInventory, setMealInventory] = useState<MealInventory | null>(null)
 
   useEffect(() => {
     loadInitialData()
@@ -160,9 +165,18 @@ export function DashboardStats({ currentUserRole = "administrador" }: DashboardS
       console.log("[v0] Configuración de mesas actualizada:", mesasData.length)
     })
 
+    const inventoryRef = doc(db, "config", "meal_inventory")
+    const unsubscribeInventory = onSnapshot(inventoryRef, (docSnapshot) => {
+      if (docSnapshot.exists()) {
+        setMealInventory(docSnapshot.data() as MealInventory)
+        console.log("[v0] Inventario de comidas actualizado:", docSnapshot.data())
+      }
+    })
+
     return () => {
       unsubscribeLogs()
       unsubscribeMesas()
+      unsubscribeInventory()
     }
   }
 
@@ -374,8 +388,6 @@ export function DashboardStats({ currentUserRole = "administrador" }: DashboardS
 
   const uniqueAccessLogs = getUniqueAccessLogs()
   const allUserStatsMap = new Map<string, UserStats>()
-
-  // Combinar estadísticas de admin/operativo y bufete para el mismo usuario
   ;[...adminOperativoStats, ...bufeteStats].forEach((stat) => {
     const existing = allUserStatsMap.get(stat.userId)
     if (existing) {
@@ -401,6 +413,11 @@ export function DashboardStats({ currentUserRole = "administrador" }: DashboardS
   const totalPersonsCount = allPersons.length
   const graduandosRegistrados = totalPersonsCount
   const entregasPorMesa = getEntregasPorMesa()
+
+  const inventoryPercentage = mealInventory
+    ? (mealInventory.comidasDisponibles / mealInventory.totalComidas) * 100
+    : 100
+  const isLowInventory = inventoryPercentage < 20
 
   if (loading) {
     return (
@@ -434,6 +451,56 @@ export function DashboardStats({ currentUserRole = "administrador" }: DashboardS
         <Alert variant="destructive">
           <AlertDescription>{error}</AlertDescription>
         </Alert>
+      )}
+
+      {isLowInventory && mealInventory && (
+        <Alert variant="destructive">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertDescription>
+            ¡Advertencia! El inventario de comidas está bajo ({inventoryPercentage.toFixed(1)}% disponible). Solo quedan{" "}
+            {mealInventory.comidasDisponibles} de {mealInventory.totalComidas} comidas.
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {mealInventory && (
+        <Card className="bg-gradient-to-br from-orange-50 to-orange-100 border-orange-200">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm md:text-base flex items-center gap-2 text-orange-800">
+              <Package className="h-4 w-4 md:h-5 md:w-5" />
+              Inventario Global de Comidas
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="grid grid-cols-3 gap-2 md:gap-4">
+              <div className="text-center">
+                <div className="text-lg md:text-2xl font-bold text-orange-900">{mealInventory.totalComidas}</div>
+                <p className="text-[9px] md:text-xs text-orange-700">Total</p>
+              </div>
+              <div className="text-center">
+                <div className="text-lg md:text-2xl font-bold text-red-700">{mealInventory.comidasConsumidas}</div>
+                <p className="text-[9px] md:text-xs text-red-600">Entregadas</p>
+              </div>
+              <div className="text-center">
+                <div className={`text-lg md:text-2xl font-bold ${isLowInventory ? "text-red-700" : "text-green-700"}`}>
+                  {mealInventory.comidasDisponibles}
+                </div>
+                <p className={`text-[9px] md:text-xs ${isLowInventory ? "text-red-600" : "text-green-600"}`}>
+                  Disponibles
+                </p>
+              </div>
+            </div>
+            <div className="space-y-1">
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-orange-800">Progreso</span>
+                <span className="font-medium text-orange-900">
+                  {((mealInventory.comidasConsumidas / mealInventory.totalComidas) * 100).toFixed(1)}%
+                </span>
+              </div>
+              <Progress value={(mealInventory.comidasConsumidas / mealInventory.totalComidas) * 100} className="h-2" />
+            </div>
+          </CardContent>
+        </Card>
       )}
 
       <div className="grid gap-2 md:gap-3 grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
@@ -540,7 +607,7 @@ export function DashboardStats({ currentUserRole = "administrador" }: DashboardS
               Usuario Más Activo
             </CardTitle>
           </CardHeader>
-          <CardContent className="p-3 md:p-6 pt-0">
+          <CardContent className="space-y-2 md:space-y-3">
             {topUser ? (
               <div className="space-y-2 md:space-y-3">
                 <div className="flex items-center gap-2">
@@ -578,7 +645,6 @@ export function DashboardStats({ currentUserRole = "administrador" }: DashboardS
           </CardHeader>
           <CardContent className="p-3 md:p-6 pt-0">
             <div className="space-y-3 md:space-y-4">
-              {/* Sección Administrador/Operativo */}
               {adminOperativoStats.length > 0 && (
                 <div>
                   <div className="flex items-center gap-2 mb-2 md:mb-3">
@@ -624,7 +690,6 @@ export function DashboardStats({ currentUserRole = "administrador" }: DashboardS
                 </div>
               )}
 
-              {/* Sección Bufete */}
               {bufeteStats.length > 0 && (
                 <div>
                   <div className="flex items-center gap-2 mb-2 md:mb-3">

@@ -20,7 +20,6 @@ import {
   AlertTriangle,
   Keyboard,
   Search,
-  AlertCircle,
   RefreshCw,
 } from "lucide-react"
 import { useStudentStoreContext } from "@/components/providers/student-store-provider"
@@ -28,7 +27,7 @@ import { useQ10Validation } from "@/hooks/use-q10-validation"
 import { useAuth } from "@/components/auth-provider"
 
 interface ScanResultDisplay {
-  type: "success" | "denied" | "error" | "info"
+  type: "success" | "denied" | "error" | "info" | "already_scanned"
   identificacion: string
   person?: any
   message: string
@@ -204,9 +203,10 @@ export function BarcodeScanner() {
 
           if (alreadyScanned) {
             currentScanResult = {
-              type: "error",
+              type: "already_scanned",
               identificacion: q10Result.identificacion!,
-              message: `❌ Este código ya fue escaneado anteriormente. No se permite el ingreso duplicado.`,
+              person: q10Result.student,
+              message: `Este código ya fue escaneado anteriormente. Mostrando información del estudiante.`,
               source: "q10",
               timestamp: new Date().toISOString(),
             }
@@ -215,7 +215,6 @@ export function BarcodeScanner() {
             setIsScanning(false)
             return
           }
-          // Fin de la validación de escaneo duplicado para links Q10
 
           await markStudentAccess(q10Result.identificacion!, true, "Acceso concedido al evento", "q10", userInfo)
           currentScanResult = {
@@ -244,10 +243,14 @@ export function BarcodeScanner() {
         const alreadyScanned = await checkIfAlreadyScanned(scannedContent)
 
         if (alreadyScanned) {
+          const student = await getStudentById(scannedContent)
           currentScanResult = {
-            type: "error",
+            type: "already_scanned",
             identificacion: scannedContent,
-            message: `❌ Este código ya fue escaneado anteriormente. No se permite el ingreso duplicado.`,
+            person: student,
+            message: student
+              ? `Este código ya fue escaneado anteriormente. Mostrando información del estudiante.`
+              : `Este código ya fue escaneado anteriormente. No se encontró información adicional.`,
             source: source,
             timestamp: new Date().toISOString(),
           }
@@ -517,7 +520,7 @@ export function BarcodeScanner() {
         <CardContent className="space-y-4">
           {manualInputError && (
             <Alert variant="destructive">
-              <AlertCircle className="h-4 w-4" />
+              <AlertTriangle className="h-4 w-4" />
               <AlertDescription>{manualInputError}</AlertDescription>
             </Alert>
           )}
@@ -558,8 +561,9 @@ export function BarcodeScanner() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               {scanResultDisplay?.type === "success" && <CheckCircle className="w-5 h-5 text-green-600" />}
+              {scanResultDisplay?.type === "already_scanned" && <AlertTriangle className="w-5 h-5 text-yellow-600" />}
               {scanResultDisplay?.type === "denied" && <XCircle className="w-5 h-5 text-red-600" />}
-              {scanResultDisplay?.type === "error" && <AlertTriangle className="w-5 h-5 text-red-600" />}
+              {scanResultDisplay?.type === "error" && <AlertTriangle className="h-4 w-4 text-red-600" />}
               {scanResultDisplay?.type === "info" && <Loader2Icon className="w-5 h-5 animate-spin text-blue-600" />}
               Resultado del Control de Acceso
             </DialogTitle>
@@ -603,6 +607,42 @@ export function BarcodeScanner() {
                       <div className="text-xs text-green-700 bg-green-100 p-2 rounded">Bienvenido al evento</div>
                     </CardContent>
                   </Card>
+                )}
+
+                {scanResultDisplay.type === "already_scanned" && scanResultDisplay.person && (
+                  <Card className="border-yellow-300 bg-yellow-50">
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm text-yellow-800">⚠️ Ya Registrado Anteriormente</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-2">
+                      <div>
+                        <span className="font-medium text-sm text-yellow-900">Nombre:</span>
+                        <p className="text-sm text-yellow-800">{scanResultDisplay.person.nombre}</p>
+                      </div>
+                      <div>
+                        <span className="font-medium text-sm text-yellow-900">Programa:</span>
+                        <p className="text-sm text-yellow-800">{scanResultDisplay.person.programa}</p>
+                      </div>
+                      <div>
+                        <span className="font-medium text-sm text-yellow-900">Puesto:</span>
+                        <p className="text-sm text-yellow-800">{scanResultDisplay.person.puesto}</p>
+                      </div>
+                      <div>
+                        <span className="font-medium text-sm text-yellow-900">Cupos Extras:</span>
+                        <p className="text-sm text-yellow-800">{scanResultDisplay.person.cuposExtras || 0}</p>
+                      </div>
+                      <div className="text-xs text-yellow-800 bg-yellow-100 p-2 rounded border border-yellow-300">
+                        Este estudiante ya ingresó al evento previamente
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+
+                {scanResultDisplay.type === "already_scanned" && !scanResultDisplay.person && (
+                  <Alert className="border-yellow-300 bg-yellow-50">
+                    <AlertTriangle className="h-4 w-4 text-yellow-600" />
+                    <AlertDescription className="text-yellow-800">{scanResultDisplay.message}</AlertDescription>
+                  </Alert>
                 )}
 
                 {scanResultDisplay.type === "error" && (

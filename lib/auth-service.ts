@@ -145,7 +145,7 @@ export const checkUserExists = async (idNumber: string): Promise<boolean> => {
 
 export const checkIdType = async (
   idNumber: string,
-): Promise<{ type: "admin" | "student" | "none"; userData?: any }> => {
+): Promise<{ type: "admin" | "student" | "invitado" | "none"; userData?: any }> => {
   try {
     console.log("[v0] Verificando tipo de ID:", idNumber)
 
@@ -197,6 +197,28 @@ export const checkIdType = async (
           puesto: studentData.puesto,
           cuposExtras: studentData.cuposExtras || 0,
           cuposConsumidos: studentData.cuposConsumidos || 0,
+        },
+      }
+    }
+
+    const invitadosQuery = query(collection(db, "invitados"), where("identificacion", "==", idNumber))
+    const invitadosSnapshot = await getDocs(invitadosQuery)
+
+    console.log("[v0] Invitados encontrados:", invitadosSnapshot.size)
+
+    if (!invitadosSnapshot.empty) {
+      const invitadoData = invitadosSnapshot.docs[0].data()
+      console.log("[v0] Invitado encontrado:", invitadoData)
+      return {
+        type: "invitado",
+        userData: {
+          id: invitadosSnapshot.docs[0].id,
+          identificacion: invitadoData.identificacion,
+          nombre: invitadoData.nombre,
+          puesto: invitadoData.puesto,
+          cuposExtras: 0, // Invitados no tienen cupos extras
+          cuposConsumidos: invitadoData.cuposConsumidos || 0,
+          esInvitado: true,
         },
       }
     }

@@ -2,39 +2,40 @@
 
 import type React from "react"
 import { createContext, useContext, useCallback } from "react"
-import { collection, query, where, getDocs, addDoc, updateDoc, doc } from "firebase/firestore"
+import { collection, query, where, getDocs, addDoc, updateDoc, doc, getDoc, setDoc } from "firebase/firestore"
 import { db } from "@/lib/firebase"
+import type { MealInventory } from "@/lib/firestore-service"
+import { consumeTableMeal } from "@/lib/firestore-service"
 
 interface Student {
-  id: string // Corresponde a la identificación en Firestore
+  id: string
   puesto: string
   identificacion: string
   nombre: string
   programa: string
   cuposExtras: number
-  cuposConsumidos?: number // Agregado campo para cupos consumidos
+  cuposConsumidos?: number
 }
 
 export interface AccessLog {
-  // Exportar la interfaz
   identificacion: string
   timestamp: string
   status: "granted" | "denied" | "q10_success" | "q10_failed"
   details?: string
-  source?: "direct" | "q10" | "manual" // Nuevo campo para el origen del escaneo/entrada
-  grantedByUserId?: string // ID del usuario que otorgó el acceso
-  grantedByUserName?: string // Nombre del usuario que otorgó el acceso
-  grantedByUserEmail?: string // Email del usuario que otorgó el acceso
-  grantedByUserRole?: string // Agregado campo de rol del usuario que otorga el acceso
-  mesaUsada?: number // Agregado campo para la mesa donde se escaneó
+  source?: "direct" | "q10" | "manual"
+  grantedByUserId?: string
+  grantedByUserName?: string
+  grantedByUserEmail?: string
+  grantedByUserRole?: string
+  mesaUsada?: number
 }
 
 interface UserInfo {
   userId?: string
   userName?: string
   userEmail?: string
-  userRole?: string // Agregado campo de rol
-  mesaAsignada?: number // Agregado campo para mesa del usuario
+  userRole?: string
+  mesaAsignada?: number
 }
 
 interface StudentStoreContextType {
@@ -54,9 +55,15 @@ interface StudentStoreContextType {
     userInfo?: UserInfo,
   ) => Promise<void>
   checkIfAlreadyScanned: (identificacion: string) => Promise<boolean>
-  validateMesaAccess: (identificacion: string, mesaRequerida: number) => Promise<{ valid: boolean; message: string }> // Nueva función para validar mesa
-  checkMesaStatus: (mesaNumero: number) => Promise<boolean> // Nueva función para verificar si una mesa está activa
+  validateMesaAccess: (
+    identificacion: string,
+    mesaRequerida: number,
+  ) => Promise<{ valid: boolean; message: string; noAccessLog?: boolean }>
+  checkMesaStatus: (mesaNumero: number) => Promise<boolean>
   checkAccessGranted: (identificacion: string) => Promise<boolean>
+  getMealInventory: () => Promise<MealInventory>
+  decrementMealInventory: () => Promise<boolean>
+  isSystemUser: (identificacion: string) => Promise<boolean>
 }
 
 const StudentStoreContext = createContext<StudentStoreContextType | undefined>(undefined)
@@ -70,6 +77,55 @@ export const useStudentStoreContext = () => {
 }
 
 export function StudentStoreProvider({ children }: { children: React.ReactNode }) {
+  const getMealInventory = useCallback(async (): Promise<MealInventory> => {
+    try {
+      const inventoryRef = doc(db, "config", "meal_inventory")
+      const inventorySnap = await getDoc(inventoryRef)
+
+      if (inventorySnap.exists()) {
+        return inventorySnap.data() as MealInventory
+      } else {
+        const defaultInventory: MealInventory = {
+          totalComidas: 2400,
+          comidasConsumidas: 0,
+          comidasDisponibles: 2400,
+          fechaActualizacion: new Date().toISOString(),
+        }
+        await setDoc(inventoryRef, defaultInventory)
+        return defaultInventory
+      }
+    } catch (error) {
+      console.error("Error al obtener inventario:", error)
+      throw error
+    }
+  }, [])
+
+  const decrementMealInventory = useCallback(async (): Promise<boolean> => {
+    try {
+      const inventoryRef = doc(db, "config", "meal_inventory")
+      const currentInventory = await getMealInventory()
+
+      if (currentInventory.comidasDisponibles <= 0) {
+        console.error("[v0] No hay comidas disponibles en el inventario")
+        return false
+      }
+
+      const updatedInventory: MealInventory = {
+        totalComidas: currentInventory.totalComidas,
+        comidasConsumidas: currentInventory.comidasConsumidas + 1,
+        comidasDisponibles: currentInventory.comidasDisponibles - 1,
+        fechaActualizacion: new Date().toISOString(),
+      }
+
+      await setDoc(inventoryRef, updatedInventory)
+      console.log("[v0] Inventario actualizado:", updatedInventory)
+      return true
+    } catch (error) {
+      console.error("Error al decrementar inventario:", error)
+      return false
+    }
+  }, [getMealInventory])
+
   const checkMesaStatus = useCallback(async (mesaNumero: number): Promise<boolean> => {
     try {
       const mesasQuery = query(collection(db, "mesas_config"), where("numero", "==", mesaNumero))
@@ -155,22 +211,47 @@ export function StudentStoreProvider({ children }: { children: React.ReactNode }
   }, [])
 
   const validateMesaAccess = useCallback(
-    async (identificacion: string, mesaRequerida: number): Promise<{ valid: boolean; message: string }> => {
+    async (
+      identificacion: string,
+      mesaRequerida: number,
+    ): Promise<{ valid: boolean; message: string; noAccessLog?: boolean }> => {
       try {
-        // Los bufetes deben poder procesar estudiantes que ya pasaron por control de acceso
-        // pero aún tienen cupos disponibles
+        const hasEventAccess = await checkAccessGranted(identificacion)
+        if (!hasEventAccess) {
+          return {
+            valid: false,
+            message: `❌ Estudiante sin acceso al evento. Debe registrarse primero con el rol Operativo.`,
+            noAccessLog: true, // Indica que no debe registrar log, queda en espera
+          }
+        }
+
+        const tableMealSuccess = await consumeTableMeal(mesaRequerida)
+        if (!tableMealSuccess) {
+          return {
+            valid: false,
+            message: `⚠️ La Mesa ${mesaRequerida} no tiene comidas disponibles o está inactiva`,
+          }
+        }
+
+        const inventory = await getMealInventory()
+        if (inventory.comidasDisponibles <= 0) {
+          return {
+            valid: false,
+            message: `⚠️ No hay comidas disponibles en el inventario global`,
+          }
+        }
 
         const mesaActiva = await checkMesaStatus(mesaRequerida)
         if (!mesaActiva) {
           return {
             valid: false,
-            message: `La Mesa ${mesaRequerida} está inactiva. No se puede procesar la entrega.`,
+            message: `La Mesa ${mesaRequerida} está inactiva`,
           }
         }
 
         const student = await getStudentById(identificacion)
         if (!student) {
-          return { valid: false, message: "Estudiante no encontrado en la base de datos" }
+          return { valid: false, message: "Estudiante no encontrado" }
         }
 
         const cuposTotales = 2 + student.cuposExtras
@@ -180,20 +261,20 @@ export function StudentStoreProvider({ children }: { children: React.ReactNode }
         if (cuposDisponibles <= 0) {
           return {
             valid: false,
-            message: `❌ Se acabaron los cupos de comida. Ya consumió todas sus ${cuposTotales} comidas disponibles.`,
+            message: `❌ Se acabaron los cupos. Ya consumió todas sus ${cuposTotales} comidas`,
           }
         }
 
         return {
           valid: true,
-          message: `Comida entregada exitosamente. Cupos restantes: ${cuposDisponibles - 1}/${cuposTotales}`,
+          message: `Comida entregada exitosamente en Mesa ${mesaRequerida}. Cupos: ${cuposDisponibles - 1}/${cuposTotales}`,
         }
       } catch (error) {
-        console.error("Error al validar acceso por mesa:", error)
+        console.error("Error al validar acceso:", error)
         return { valid: false, message: "Error al validar el acceso" }
       }
     },
-    [getStudentById, checkMesaStatus],
+    [getStudentById, checkMesaStatus, getMealInventory, checkAccessGranted],
   )
 
   const markStudentAccess = useCallback(
@@ -207,9 +288,15 @@ export function StudentStoreProvider({ children }: { children: React.ReactNode }
       try {
         console.log("[v0] UserInfo recibido en markStudentAccess:", userInfo)
 
-        const shouldConsumeCupo = userInfo?.mesaAsignada !== undefined && userInfo?.mesaAsignada !== null
+        const shouldConsumeCupo =
+          userInfo?.userRole === "bufete" && userInfo?.mesaAsignada !== undefined && userInfo?.mesaAsignada !== null
 
         if (granted && shouldConsumeCupo) {
+          const inventorySuccess = await decrementMealInventory()
+          if (!inventorySuccess) {
+            throw new Error("No se pudo actualizar el inventario de comidas")
+          }
+
           const student = await getStudentById(identificacion)
           if (student) {
             const cuposConsumidos = (student.cuposConsumidos || 0) + 1
@@ -219,7 +306,9 @@ export function StudentStoreProvider({ children }: { children: React.ReactNode }
             console.log(`[v0] 1 comida consumida para ${identificacion}. Total acumulado: ${cuposConsumidos}`)
           }
         } else if (granted && !shouldConsumeCupo) {
-          console.log(`[v0] Acceso registrado para ${identificacion} sin consumir cupo (rol admin/operativo)`)
+          console.log(
+            `[v0] Acceso registrado para ${identificacion} sin consumir cupo (rol: ${userInfo?.userRole || "desconocido"})`,
+          )
         }
 
         if (granted) {
@@ -245,7 +334,6 @@ export function StudentStoreProvider({ children }: { children: React.ReactNode }
         } else {
           const hasAccessGranted = await checkAccessGranted(identificacion)
           if (!hasAccessGranted) {
-            // Solo registrar el denegado si no hay un acceso concedido previo
             const log: AccessLog = {
               identificacion,
               timestamp: new Date().toISOString(),
@@ -273,7 +361,7 @@ export function StudentStoreProvider({ children }: { children: React.ReactNode }
         throw error
       }
     },
-    [getStudentById, checkAccessGranted],
+    [getStudentById, checkAccessGranted, decrementMealInventory],
   )
 
   const markQ10Access = useCallback(
@@ -312,6 +400,21 @@ export function StudentStoreProvider({ children }: { children: React.ReactNode }
     [],
   )
 
+  const isSystemUser = useCallback(async (identificacion: string): Promise<boolean> => {
+    try {
+      console.log("[v0] Verificando si la identificación es de un usuario del sistema:", identificacion)
+      const q = query(collection(db, "users"), where("idNumber", "==", identificacion))
+      const querySnapshot = await getDocs(q)
+
+      const isUser = !querySnapshot.empty
+      console.log("[v0] Es usuario del sistema:", isUser)
+      return isUser
+    } catch (error) {
+      console.error("Error al verificar si es usuario del sistema:", error)
+      return false
+    }
+  }, [])
+
   return (
     <StudentStoreContext.Provider
       value={{
@@ -322,6 +425,9 @@ export function StudentStoreProvider({ children }: { children: React.ReactNode }
         validateMesaAccess,
         checkMesaStatus,
         checkAccessGranted,
+        getMealInventory,
+        decrementMealInventory,
+        isSystemUser,
       }}
     >
       {children}

@@ -1,6 +1,6 @@
 "use client"
 
-import { Home, Scan, Shield, Database, Users, LogOut, User, Table, Utensils, ChevronLeft, DoorOpen } from "lucide-react"
+import { Home, Scan, Shield, Database, Users, LogOut, User, Table, Utensils, ChevronLeft, DoorOpen, Package, Eye } from "lucide-react"
 import { useState } from "react"
 import {
   Sidebar,
@@ -43,6 +43,7 @@ interface NavItem {
   operativoOnly: boolean
   adminOrOperativo?: boolean
   getDescription?: (role: string) => string
+  description?: string
 }
 
 const items: NavItem[] = [
@@ -68,13 +69,21 @@ const items: NavItem[] = [
     },
   },
   {
-    title: "Control de Acceso",
+    title: "Control Acceso",
     view: "control-acceso",
     icon: DoorOpen,
     adminOnly: false,
     bufeteOnly: false,
     operativoOnly: false,
     adminOrOperativo: true,
+  },
+  {
+    title: "Inventario de Platos",
+    view: "inventario",
+    icon: Package,
+    adminOnly: true,
+    bufeteOnly: false,
+    operativoOnly: false,
   },
   {
     title: "Gestión de Bufetes",
@@ -85,7 +94,16 @@ const items: NavItem[] = [
     operativoOnly: false,
   },
   {
-    title: "Control de Bufetes",
+    title: "Estado de Mesas",
+    view: "estado-mesas",
+    icon: Eye,
+    adminOnly: false,
+    bufeteOnly: false,
+    operativoOnly: true,
+    description: "Vista de solo lectura",
+  },
+  {
+    title: "Control platos",
     view: "control-bufetes",
     icon: Table,
     adminOnly: true,
@@ -154,7 +172,6 @@ export function AppSidebar({ currentView = "inicio", onViewChange }: AppSidebarP
 
   const isOperativo = activeRole === "operativo"
   const roleInfo = roleStyles[activeRole || ""] || roleStyles.operativo
-  const tip = roleInfo.label.toLowerCase()
 
   const visibleItems = items.filter((item) => {
     if (item.adminOnly && !isAdmin) return false
@@ -183,7 +200,6 @@ export function AppSidebar({ currentView = "inicio", onViewChange }: AppSidebarP
           <div className="mt-2 px-1 group-data-[collapsible=icon]:hidden">
             <RoleSwitcher />
           </div>
-          {/* Toggle collapse button - top right edge */}
           <button
             onClick={toggleSidebar}
             className="
@@ -229,6 +245,11 @@ export function AppSidebar({ currentView = "inicio", onViewChange }: AppSidebarP
                           {item.view === "escanear" && item.getDescription && (
                             <span className="text-[10px] text-sidebar-foreground/50 leading-tight mt-px">
                               {item.getDescription(activeRole || "")}
+                            </span>
+                          )}
+                          {item.description && (
+                            <span className="text-[10px] text-sidebar-foreground/50 leading-tight mt-px">
+                              {item.description}
                             </span>
                           )}
                         </div>

@@ -224,21 +224,23 @@ export function BuffeteScanner() {
               const validation = await studentStore.validateMesaAccess(q10Result.identificacion!, user.mesaAsignada)
 
               if (!validation.valid) {
-                const userInfo = {
-                  userId: user.id,
-                  userName: fullName || user.fullName || "Usuario Bufete",
-                  userEmail: user.idNumber + "@sistema.com",
-                  userRole: activeRole || "bufete",
-                  mesaAsignada: user.mesaAsignada,
-                }
+                if (!validation.noAccessLog) {
+                  const userInfo = {
+                    userId: user.id,
+                    userName: fullName || user.fullName || "Usuario Bufete",
+                    userEmail: user.idNumber + "@sistema.com",
+                    userRole: activeRole || "bufete",
+                    mesaAsignada: user.mesaAsignada,
+                  }
 
-                await studentStore.markStudentAccess(
-                  q10Result.identificacion!,
-                  false,
-                  validation.message,
-                  "q10",
-                  userInfo,
-                )
+                  await studentStore.markStudentAccess(
+                    q10Result.identificacion!,
+                    false,
+                    validation.message,
+                    "q10",
+                    userInfo,
+                  )
+                }
 
                 setScanResult({
                   identificacion: q10Result.identificacion!,
@@ -314,15 +316,17 @@ export function BuffeteScanner() {
         const validation = await studentStore.validateMesaAccess(identificacion, user.mesaAsignada)
 
         if (!validation.valid) {
-          const userInfo = {
-            userId: user.id,
-            userName: fullName || user.fullName || "Usuario Bufete",
-            userEmail: user.idNumber + "@sistema.com",
-            userRole: activeRole || "bufete",
-            mesaAsignada: user.mesaAsignada,
-          }
+          if (!validation.noAccessLog) {
+            const userInfo = {
+              userId: user.id,
+              userName: fullName || user.fullName || "Usuario Bufete",
+              userEmail: user.idNumber + "@sistema.com",
+              userRole: activeRole || "bufete",
+              mesaAsignada: user.mesaAsignada,
+            }
 
-          await studentStore.markStudentAccess(identificacion, false, validation.message, source, userInfo)
+            await studentStore.markStudentAccess(identificacion, false, validation.message, source, userInfo)
+          }
 
           setScanResult({
             identificacion,
@@ -619,7 +623,7 @@ export function BuffeteScanner() {
         <CameraOff className="text-destructive mb-6 size-20" />
         <h3 className="text-2xl md:text-2xl font-bold text-green-900">Entrega de Comida</h3>
         <p className="text-sm md:text-base text-green-700">
-          Bufete {user?.mesaAsignada || "N/A"} - Escanea QR o ingresa ID
+          Mesa {user?.mesaAsignada || "N/A"} - Escanea QR o ingresa ID
         </p>
       </div>
     )
@@ -636,13 +640,13 @@ export function BuffeteScanner() {
         <div className="text-center">
           <h1 className="text-xl md:text-2xl font-bold text-green-900">Entrega de Comida</h1>
           <p className="text-sm md:text-base text-green-700">
-            Bufete {user?.mesaAsignada || "N/A"} - Escanea QR o ingresa ID
+            Mesa {user?.mesaAsignada || "N/A"} - Escanea QR o ingresa ID
           </p>
         </div>
 
         <Badge variant="outline" className="bg-green-100 text-green-800 border-green-300">
           <Utensils className="w-3 h-3 md:w-4 md:h-4 mr-1" />
-          Bufete {user?.mesaAsignada || "N/A"}
+          Mesa {user?.mesaAsignada || "N/A"}
         </Badge>
 
         <Card className="w-full max-w-2xl bg-white shadow-lg border-green-200">
@@ -838,9 +842,9 @@ export function BuffeteScanner() {
                         <div className="flex items-start gap-2">
                           <Utensils className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
                           <div className="flex-1 min-w-0">
-                            <p className="text-[10px] text-gray-600 font-medium">Bufete de Entrega</p>
+                            <p className="text-[10px] text-gray-600 font-medium">Mesa de Entrega</p>
                             <Badge className="bg-green-600 hover:bg-green-700 text-white font-bold text-xs">
-                              Bufete {user.mesaAsignada}
+                              Mesa {user.mesaAsignada}
                             </Badge>
                           </div>
                         </div>
@@ -850,7 +854,7 @@ export function BuffeteScanner() {
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-1.5">
                             <Ticket className="w-3.5 h-3.5 text-green-600" />
-                            <span className="text-xs md:text-sm font-semibold text-gray-700">Bufetes Disponibles</span>
+                            <span className="text-xs md:text-sm font-semibold text-gray-700">Cupos Disponibles</span>
                           </div>
                           <span className="text-xl md:text-2xl font-bold text-green-600">{cuposDisponibles}</span>
                         </div>

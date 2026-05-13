@@ -1,6 +1,6 @@
 "use client"
 
-import { Home, Scan, DoorOpen, Database, Users, Table, Utensils } from "lucide-react"
+import { Home, Scan, DoorOpen, Database, Users, Table, Utensils, Package, Eye } from "lucide-react"
 import { useAuth } from "@/components/auth-provider"
 import type { ViewType } from "@/components/spa-dashboard"
 
@@ -22,9 +22,11 @@ interface NavTab {
 const tabs: NavTab[] = [
   { view: "inicio", icon: Home, label: "Inicio", adminOnly: true },
   { view: "escanear", icon: Scan, label: "Escanear" },
+  { view: "inventario", icon: Package, label: "Inventario", adminOnly: true },
   { view: "control-acceso", icon: DoorOpen, label: "Control", adminOrOperativo: true },
   { view: "bufetes-gestion", icon: Utensils, label: "Bufetes", bufeteOnly: true },
   { view: "control-bufetes", icon: Table, label: "Mesas", adminOnly: true },
+  { view: "estado-mesas", icon: Eye, label: "Estado", operativoOnly: true },
   { view: "usuarios", icon: Users, label: "Usuarios", adminOnly: true },
   { view: "base-datos", icon: Database, label: "Datos", adminOnly: true },
 ]
