@@ -179,6 +179,19 @@ export function BuffeteScanner() {
       setProcessing(true)
       setError("")
 
+      if (
+        source !== "q10" &&
+        !scannedContent.startsWith("https://site2.q10.com/CertificadosAcademicos/") &&
+        !scannedContent.startsWith("https://uparsistemvalledupar.q10.com/CertificadosAcademicos/")
+      ) {
+        const len = scannedContent.trim().length
+        if (len < 3 || len > 10) {
+          setError(`La identificación debe tener entre 3 y 10 caracteres. (Ingresaste ${len})`)
+          setProcessing(false)
+          return
+        }
+      }
+
       try {
         if (!user) {
           throw new Error("Usuario no autenticado")
@@ -725,10 +738,14 @@ export function BuffeteScanner() {
                       value={manualId}
                       onChange={(e) => setManualId(e.target.value)}
                       onKeyPress={(e) => {
-                        if (e.key === "Enter" && manualId.trim() && !processing && !isProcessingQ10) {
-                          processScanResult(manualId.trim(), "manual")
-                          setManualId("")
+                        if (e.key !== "Enter" || !manualId.trim() || processing || isProcessingQ10) return
+                        const id = manualId.trim()
+                        if (id.length < 3 || id.length > 10) {
+                          setError(`La identificación debe tener entre 3 y 10 caracteres. (Ingresaste ${id.length})`)
+                          return
                         }
+                        processScanResult(id, "manual")
+                        setManualId("")
                       }}
                       disabled={processing || isProcessingQ10}
                       className="text-lg h-12 border-green-300 focus:border-green-500"
@@ -738,10 +755,14 @@ export function BuffeteScanner() {
 
                   <Button
                     onClick={() => {
-                      if (manualId.trim()) {
-                        processScanResult(manualId.trim(), "manual")
-                        setManualId("")
+                      const id = manualId.trim()
+                      if (!id) return
+                      if (id.length < 3 || id.length > 10) {
+                        setError(`La identificación debe tener entre 3 y 10 caracteres. (Ingresaste ${id.length})`)
+                        return
                       }
+                      processScanResult(id, "manual")
+                      setManualId("")
                     }}
                     disabled={processing || isProcessingQ10 || !manualId.trim()}
                     className="w-full h-12 text-base bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white"

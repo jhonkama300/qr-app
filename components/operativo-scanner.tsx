@@ -267,6 +267,20 @@ export function OperativoScanner() {
       }
 
       setProcessing(true)
+
+      if (
+        source !== "q10" &&
+        !scannedContent.startsWith("https://site2.q10.com/CertificadosAcademicos/") &&
+        !scannedContent.startsWith("https://uparsistemvalledupar.q10.com/CertificadosAcademicos/")
+      ) {
+        const len = scannedContent.trim().length
+        if (len < 3 || len > 10) {
+          setError(`La identificación debe tener entre 3 y 10 caracteres. (Ingresaste ${len})`)
+          setProcessing(false)
+          return
+        }
+      }
+
       let currentScanResult: ScanResultDisplay
 
       const userInfo = user
@@ -576,10 +590,14 @@ export function OperativoScanner() {
                       value={manualId}
                       onChange={(e) => setManualId(e.target.value)}
                       onKeyPress={(e) => {
-                        if (e.key === "Enter" && manualId.trim() && !processing) {
-                          processStudentAccess(manualId.trim())
-                          setManualId("")
+                        if (e.key !== "Enter" || !manualId.trim() || processing) return
+                        const id = manualId.trim()
+                        if (id.length < 3 || id.length > 10) {
+                          setError(`La identificación debe tener entre 3 y 10 caracteres. (Ingresaste ${id.length})`)
+                          return
                         }
+                        processStudentAccess(id)
+                        setManualId("")
                       }}
                       disabled={processing}
                       className="text-lg h-12 border-purple-300 focus:border-purple-500"
@@ -589,10 +607,14 @@ export function OperativoScanner() {
 
                   <Button
                     onClick={() => {
-                      if (manualId.trim()) {
-                        processStudentAccess(manualId.trim())
-                        setManualId("")
+                      const id = manualId.trim()
+                      if (!id) return
+                      if (id.length < 3 || id.length > 10) {
+                        setError(`La identificación debe tener entre 3 y 10 caracteres. (Ingresaste ${id.length})`)
+                        return
                       }
+                      processStudentAccess(id)
+                      setManualId("")
                     }}
                     disabled={processing || !manualId.trim()}
                     className="w-full h-12 text-base bg-gradient-to-r from-purple-500 to-violet-500 hover:from-purple-600 hover:to-violet-600 text-white"

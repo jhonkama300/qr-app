@@ -1,7 +1,7 @@
 "use client"
 
 import { Home, Scan, Shield, Database, Users, LogOut, User, Table, Utensils, ChevronLeft, DoorOpen, Package, Eye } from "lucide-react"
-import { useState } from "react"
+import { useState, useCallback } from "react"
 import {
   Sidebar,
   SidebarContent,
@@ -25,18 +25,12 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { useAuth } from "@/components/auth-provider"
-import { useRouter } from "next/navigation"
-import type { ViewType } from "@/components/spa-dashboard"
+import { useRouter, useSearchParams, usePathname } from "next/navigation"
 import { RoleSwitcher } from "@/components/role-switcher"
-
-interface AppSidebarProps {
-  currentView?: ViewType
-  onViewChange?: (view: ViewType) => void
-}
 
 interface NavItem {
   title: string
-  view: ViewType
+  path: string
   icon: React.ElementType
   adminOnly: boolean
   bufeteOnly: boolean
@@ -49,7 +43,7 @@ interface NavItem {
 const items: NavItem[] = [
   {
     title: "Inicio",
-    view: "inicio",
+    path: "/dashboard",
     icon: Home,
     adminOnly: true,
     bufeteOnly: false,
@@ -57,7 +51,7 @@ const items: NavItem[] = [
   },
   {
     title: "Escanear",
-    view: "escanear",
+    path: "/dashboard/escanear",
     icon: Scan,
     adminOnly: false,
     bufeteOnly: false,
@@ -70,7 +64,7 @@ const items: NavItem[] = [
   },
   {
     title: "Control Acceso",
-    view: "control-acceso",
+    path: "/dashboard/control-acceso",
     icon: DoorOpen,
     adminOnly: false,
     bufeteOnly: false,
@@ -79,7 +73,7 @@ const items: NavItem[] = [
   },
   {
     title: "Inventario de Platos",
-    view: "inventario",
+    path: "/dashboard/inventario",
     icon: Package,
     adminOnly: true,
     bufeteOnly: false,
@@ -87,7 +81,7 @@ const items: NavItem[] = [
   },
   {
     title: "Gestión de Bufetes",
-    view: "bufetes-gestion",
+    path: "/dashboard/bufetes",
     icon: Utensils,
     adminOnly: false,
     bufeteOnly: true,
@@ -95,7 +89,7 @@ const items: NavItem[] = [
   },
   {
     title: "Estado de Mesas",
-    view: "estado-mesas",
+    path: "/dashboard/bufetes",
     icon: Eye,
     adminOnly: false,
     bufeteOnly: false,
@@ -104,7 +98,7 @@ const items: NavItem[] = [
   },
   {
     title: "Control platos",
-    view: "control-bufetes",
+    path: "/dashboard/control-bufetes",
     icon: Table,
     adminOnly: true,
     bufeteOnly: false,
@@ -112,7 +106,7 @@ const items: NavItem[] = [
   },
   {
     title: "Usuarios",
-    view: "usuarios",
+    path: "/dashboard/usuarios",
     icon: Users,
     adminOnly: true,
     bufeteOnly: false,
@@ -120,7 +114,7 @@ const items: NavItem[] = [
   },
   {
     title: "Base de Datos",
-    view: "base-datos",
+    path: "/dashboard/base-datos",
     icon: Database,
     adminOnly: true,
     bufeteOnly: false,
@@ -146,9 +140,10 @@ const roleStyles: Record<string, { label: string; gradient: string; badge: strin
   },
 }
 
-export function AppSidebar({ currentView = "inicio", onViewChange }: AppSidebarProps) {
+export function AppSidebar() {
   const { user, activeRole, isAdmin, isBufete, logout, fullName } = useAuth()
   const router = useRouter()
+  const pathname = usePathname()
   const { toggleSidebar, state, setOpenMobile, isMobile } = useSidebar()
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
 
@@ -165,10 +160,10 @@ export function AppSidebar({ currentView = "inicio", onViewChange }: AppSidebarP
     setShowLogoutConfirm(false)
   }
 
-  const handleViewChange = (view: ViewType) => {
-    onViewChange?.(view)
+  const navigate = useCallback((path: string) => {
+    router.push(path)
     if (isMobile) setOpenMobile(false)
-  }
+  }, [router, isMobile, setOpenMobile])
 
   const isOperativo = activeRole === "operativo"
   const roleInfo = roleStyles[activeRole || ""] || roleStyles.operativo
@@ -223,13 +218,13 @@ export function AppSidebar({ currentView = "inicio", onViewChange }: AppSidebarP
             <SidebarGroupContent>
               <SidebarMenu className="px-1.5 space-y-0.5 group-data-[collapsible=icon]:px-1">
                 {visibleItems.map((item) => {
-                  const isActive = currentView === item.view
+                  const isActive = pathname === item.path
                   return (
                     <SidebarMenuItem key={item.title}>
                       <SidebarMenuButton
                         size="lg"
                         isActive={isActive}
-                        onClick={() => handleViewChange(item.view)}
+                        onClick={() => navigate(item.path)}
                         className="relative h-11 px-3 rounded-lg cursor-pointer group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:size-11"
                       >
                         {isActive && (
@@ -242,7 +237,7 @@ export function AppSidebar({ currentView = "inicio", onViewChange }: AppSidebarP
                         </div>
                         <div className="flex flex-col flex-1 min-w-0 group-data-[collapsible=icon]:hidden">
                           <span className="text-sm leading-tight">{item.title}</span>
-                          {item.view === "escanear" && item.getDescription && (
+                          {item.path === "/dashboard/escanear" && item.getDescription && (
                             <span className="text-[10px] text-sidebar-foreground/50 leading-tight mt-px">
                               {item.getDescription(activeRole || "")}
                             </span>

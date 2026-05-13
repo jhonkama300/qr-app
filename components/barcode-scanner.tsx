@@ -169,6 +169,27 @@ export function BarcodeScanner() {
 
       lastScanTime.current = now
       setIsScanning(true)
+
+      if (
+        source !== "q10" &&
+        !scannedContent.startsWith("https://site2.q10.com/CertificadosAcademicos/") &&
+        !scannedContent.startsWith("https://uparsistemvalledupar.q10.com/CertificadosAcademicos/")
+      ) {
+        const len = scannedContent.trim().length
+        if (len < 3 || len > 10) {
+          setScanResultDisplay({
+            type: "error",
+            identificacion: scannedContent,
+            message: `La identificación debe tener entre 3 y 10 caracteres. (Ingresaste ${len})`,
+            source: source,
+            timestamp: new Date().toISOString(),
+          })
+          setShowResult(true)
+          setIsScanning(false)
+          return
+        }
+      }
+
       let currentScanResult: ScanResultDisplay
 
       const userInfo = user
@@ -404,8 +425,14 @@ export function BarcodeScanner() {
   }
 
   const handleManualSubmit = async () => {
-    if (!manualIdInput.trim()) {
+    const id = manualIdInput.trim()
+    if (!id) {
       setManualInputError("Por favor, ingresa una identificación.")
+      return
+    }
+
+    if (id.length < 3 || id.length > 10) {
+      setManualInputError(`La identificación debe tener entre 3 y 10 caracteres. (Ingresaste ${id.length})`)
       return
     }
 

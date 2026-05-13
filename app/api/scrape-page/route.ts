@@ -39,17 +39,11 @@ export async function GET(request: NextRequest) {
 }
 
 function extractIdentificationFromHTML(html: string, $: cheerio.CheerioAPI): string | null {
-  // Patrones para buscar números de identificación
   const patterns = [
-    // Números de 8-11 dígitos (cédulas colombianas típicas)
-    /\b\d{8,11}\b/g,
-    // Números con puntos o comas como separadores
+    /\b\d{3,11}\b/g,
     /\b\d{1,3}[.,]?\d{3}[.,]?\d{3,4}\b/g,
   ]
 
-  // 1. Buscar en elementos HTML específicos que puedan contener la identificación
-  // Ejemplo: <span id="identificacion">123456789</span>
-  // O: <p class="cedula">123456789</p>
   const potentialElements = $(
     '[id*="identificacion"], [class*="identificacion"], [id*="cedula"], [class*="cedula"], [id*="documento"], [class*="documento"], b, strong, span, p, div',
   )
@@ -60,7 +54,7 @@ function extractIdentificationFromHTML(html: string, $: cheerio.CheerioAPI): str
       const matches = text.match(pattern)
       if (matches && matches.length > 0) {
         const cleanNumber = matches[0].replace(/[^\d]/g, "")
-        if (cleanNumber.length >= 8 && cleanNumber.length <= 11) {
+        if (cleanNumber.length >= 3 && cleanNumber.length <= 11) {
           console.log(`Identificación encontrada en elemento: ${cleanNumber}`)
           return cleanNumber
         }
@@ -68,13 +62,12 @@ function extractIdentificationFromHTML(html: string, $: cheerio.CheerioAPI): str
     }
   }
 
-  // 2. Si no se encuentra en elementos específicos, buscar en todo el texto plano
-  const textContent = $.text() // Obtiene todo el texto de la página
+  const textContent = $.text()
   for (const pattern of patterns) {
     const matches = textContent.match(pattern)
     if (matches && matches.length > 0) {
       const cleanNumber = matches[0].replace(/[^\d]/g, "")
-      if (cleanNumber.length >= 8 && cleanNumber.length <= 11) {
+      if (cleanNumber.length >= 3 && cleanNumber.length <= 11) {
         console.log(`Identificación encontrada en texto plano: ${cleanNumber}`)
         return cleanNumber
       }

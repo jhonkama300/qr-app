@@ -23,20 +23,28 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { LogOut } from "lucide-react"
+import { LogOut, Home, Scan, DoorOpen, Table, Utensils, Users, Database, Eye, Package } from "lucide-react"
+import { usePathname } from "next/navigation"
 import { useRouter } from "next/navigation"
 import { useEffect } from "react"
 import { useIsMobile } from "@/hooks/use-mobile"
-import type { ViewType } from "@/components/spa-dashboard"
 
-const viewToRoute: Record<string, string> = {
-  inicio: "/dashboard",
-  escanear: "/dashboard/escanear",
-  "control-acceso": "/dashboard/control-acceso",
-  "bufetes-gestion": "/dashboard/bufetes",
-  "control-bufetes": "/dashboard/bufetes",
-  usuarios: "/dashboard/usuarios",
-  "base-datos": "/dashboard/base-datos",
+const viewConfig: Record<string, { icon: React.ElementType; title: string }> = {
+  "/dashboard": { icon: Home, title: "Inicio" },
+  "/dashboard/escanear": { icon: Scan, title: "Escanear" },
+  "/dashboard/control-acceso": { icon: DoorOpen, title: "Control de Acceso" },
+  "/dashboard/inventario": { icon: Package, title: "Inventario de Comidas" },
+  "/dashboard/bufetes": { icon: Utensils, title: "Gestión de Bufetes" },
+  "/dashboard/control-bufetes": { icon: Table, title: "Control de Mesas" },
+  "/dashboard/usuarios": { icon: Users, title: "Usuarios" },
+  "/dashboard/base-datos": { icon: Database, title: "Base de Datos" },
+  "/dashboard/mesas-bufete": { icon: Utensils, title: "Mesas Bufete" },
+}
+
+const roleGradients: Record<string, string> = {
+  administrador: "from-rose-500 to-pink-600",
+  operativo: "from-blue-500 to-indigo-600",
+  bufete: "from-emerald-500 to-green-600",
 }
 
 interface DashboardLayoutProps {
@@ -44,29 +52,19 @@ interface DashboardLayoutProps {
 }
 
 export function DashboardLayout({ children }: DashboardLayoutProps) {
-  const { user, loading, logout } = useAuth()
+  const { user, loading, userRole, fullName, logout } = useAuth()
   const router = useRouter()
+  const pathname = usePathname()
   const isMobile = useIsMobile()
   const [showLogoutModal, setShowLogoutModal] = useState(false)
 
   useEffect(() => {
-    if (!loading && !user) {
-      router.push("/")
-    }
+    if (!loading && !user) router.push("/")
   }, [user, loading, router])
 
-  const handleViewChange = (view: ViewType) => {
-    const route = viewToRoute[view]
-    if (route) {
-      router.push(route)
-    }
-  }
-
-  const confirmLogout = () => {
-    logout()
-    router.push("/")
-    setShowLogoutModal(false)
-  }
+  const currentView = viewConfig[pathname] || viewConfig["/dashboard"]
+  const gradient = roleGradients[userRole || ""] || "from-gray-500 to-gray-600"
+  const Icon = currentView.icon
 
   if (loading) {
     return (
@@ -79,9 +77,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
     )
   }
 
-  if (!user) {
-    return null
-  }
+  if (!user) return null
 
   return (
     <SidebarProvider>
@@ -91,23 +87,23 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
           {isMobile ? (
             <>
               <div className="flex items-center gap-3 flex-1 min-w-0">
-                <div className="flex size-8 items-center justify-center rounded-lg bg-gradient-to-br from-lime-500 to-green-600 shadow-sm shrink-0">
-                  <span className="text-white text-xs font-bold">U</span>
+                <div className={`flex size-8 items-center justify-center rounded-lg bg-gradient-to-br ${gradient} shadow-sm shrink-0`}>
+                  <Icon className="size-4 text-white" />
                 </div>
                 <div className="min-w-0">
-                  <h1 className="text-sm font-bold text-foreground truncate">Dashboard</h1>
+                  <h1 className="text-sm font-bold text-foreground truncate">{currentView.title}</h1>
                   <p className="text-[10px] text-muted-foreground/60">Uparsistem · Control de Acceso</p>
                 </div>
               </div>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <button className="flex items-center justify-center size-8 rounded-full bg-gradient-to-br from-lime-500 to-green-600 text-white text-xs font-bold shadow-sm shrink-0">
-                    {(user?.fullName || user?.idNumber || "U")[0].toUpperCase()}
+                    {(fullName || user?.idNumber || "U")[0].toUpperCase()}
                   </button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-56">
                   <div className="px-2 py-2 border-b">
-                    <p className="text-sm font-semibold truncate">{user?.fullName || "Usuario"}</p>
+                    <p className="text-sm font-semibold truncate">{fullName || "Usuario"}</p>
                     <p className="text-xs text-muted-foreground">ID: {user?.idNumber || ""}</p>
                   </div>
                   <DropdownMenuItem onClick={() => setShowLogoutModal(true)} className="gap-2 text-red-600 focus:text-red-600 mt-1">
@@ -119,10 +115,10 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
             </>
           ) : (
             <div className="flex items-center gap-3 w-full">
-              <div className="flex size-8 items-center justify-center rounded-lg bg-gradient-to-br from-lime-500 to-green-600 shadow-sm shrink-0">
-                <span className="text-white text-xs font-bold">U</span>
+              <div className={`flex size-8 items-center justify-center rounded-lg bg-gradient-to-br ${gradient} shadow-sm shrink-0`}>
+                <Icon className="size-4 text-white" />
               </div>
-              <h1 className="text-base font-semibold text-foreground">Dashboard</h1>
+              <h1 className="text-base font-semibold text-foreground">{currentView.title}</h1>
             </div>
           )}
         </header>
@@ -130,9 +126,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
           {children}
         </div>
       </SidebarInset>
-      {isMobile && (
-        <MobileBottomNav currentView="inicio" onViewChange={handleViewChange} />
-      )}
+      {isMobile && <MobileBottomNav />}
       <AlertDialog open={showLogoutModal} onOpenChange={setShowLogoutModal}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -143,7 +137,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmLogout} className="bg-red-600 hover:bg-red-700 text-white">
+            <AlertDialogAction onClick={() => { logout(); router.push("/"); setShowLogoutModal(false) }} className="bg-red-600 hover:bg-red-700 text-white">
               Cerrar sesión
             </AlertDialogAction>
           </AlertDialogFooter>
