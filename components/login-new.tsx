@@ -47,6 +47,7 @@ export function LoginNew() {
   const [qrCodeUrl, setQrCodeUrl] = useState("")
   const [successMessage, setSuccessMessage] = useState("")
   const [showChangePasswordModal, setShowChangePasswordModal] = useState(false)
+  const [showQrPreview, setShowQrPreview] = useState(false)
   const [newPassword, setNewPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
   const [showNewPassword, setShowNewPassword] = useState(false)
@@ -344,19 +345,19 @@ export function LoginNew() {
 
       {/* ====== Student/Invitado Modal ====== */}
       <Dialog open={showStudentModal} onOpenChange={setShowStudentModal}>
-        <DialogContent className="w-[92vw] sm:w-auto sm:max-w-[400px] p-0 bg-white rounded-2xl shadow-xl border-slate-100">
-          <DialogHeader className={`px-5 py-4 rounded-t-2xl border-b ${
+        <DialogContent className="w-[94vw] max-w-[400px] p-0 bg-white rounded-2xl shadow-xl border-slate-100 overflow-y-auto max-h-[90vh]">
+          <DialogHeader className={`px-4 py-3 rounded-t-2xl border-b ${
             studentData?.esInvitado ? "bg-violet-600 border-violet-700" : "bg-uparsistem-600 border-uparsistem-700"
           } text-white`}>
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-xl bg-white/10 border border-white/20">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="p-2 rounded-xl bg-white/10 border border-white/20 shrink-0">
                 {studentData?.esInvitado ? <UserPlus className="w-5 h-5" /> : <GraduationCap className="w-5 h-5" />}
               </div>
-              <div>
-                <DialogTitle className="text-lg font-bold tracking-tight">
+              <div className="min-w-0">
+                <DialogTitle className="text-base sm:text-lg font-bold tracking-tight truncate">
                   {studentData?.esInvitado ? "Invitado Verificado" : "Graduando Verificado"}
                 </DialogTitle>
-                <DialogDescription className="text-white/70 text-xs mt-0.5">
+                <DialogDescription className="text-white/70 text-xs mt-0.5 truncate">
                   {studentData?.esInvitado ? "Información del invitado al evento" : "Información y estado de cupos"}
                 </DialogDescription>
               </div>
@@ -364,37 +365,32 @@ export function LoginNew() {
           </DialogHeader>
 
           {studentData && (
-            <div className="px-5 py-4 space-y-4">
-              {/* Profile */}
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center shrink-0">
-                  <User className="w-6 h-6 text-slate-400" />
-                </div>
-                <div className="min-w-0 flex-1">
+            <div className="px-4 py-3 space-y-3">
+              <div className="flex flex-col items-center min-w-0">
+                <div className="min-w-0 w-full text-center">
                   <p className="text-lg font-bold text-slate-900 truncate">{studentData.nombre}</p>
-                  <div className="flex items-center gap-1 text-xs text-slate-500 font-mono">
-                    <CreditCard className="w-3 h-3" />
-                    {studentData.identificacion}
+                  <div className="flex items-center justify-center gap-1.5 text-base text-slate-500 font-mono">
+                    <CreditCard className="w-3 h-3 shrink-0" />
+                    <span>{studentData.identificacion}</span>
                   </div>
                 </div>
                 {studentData.esInvitado && (
-                  <Badge variant="outline" className="shrink-0 border-violet-200 bg-violet-50 text-violet-700">Invitado</Badge>
+                  <Badge variant="outline" className="shrink-0 border-violet-200 bg-violet-50 text-violet-700 text-xs mt-1">Invitado</Badge>
                 )}
               </div>
 
-              {/* Details */}
               <div className="space-y-2">
                 {studentData.esInvitado ? (
-                  <div className="flex items-center gap-3 bg-slate-50 p-3 rounded-xl border border-slate-100">
-                    <div className="bg-violet-100 rounded-lg p-2"><Briefcase className="w-4 h-4 text-violet-600" /></div>
+                  <div className="flex items-center gap-2 bg-slate-50 p-2.5 rounded-lg border border-slate-100 min-w-0">
+                    <div className="bg-violet-100 rounded-md p-1.5 shrink-0"><Briefcase className="w-4 h-4 text-violet-600" /></div>
                     <div className="min-w-0">
                       <p className="text-xs text-slate-500 font-medium">Puesto</p>
                       <p className="text-sm font-semibold text-slate-900 truncate">{studentData.puesto || "No especificado"}</p>
                     </div>
                   </div>
                 ) : (
-                  <div className="flex items-center gap-3 bg-slate-50 p-3 rounded-xl border border-slate-100">
-                    <div className="bg-uparsistem-100 rounded-lg p-2"><BookOpen className="w-4 h-4 text-uparsistem-600" /></div>
+                  <div className="flex items-center gap-2 bg-slate-50 p-2.5 rounded-lg border border-slate-100 min-w-0">
+                    <div className="bg-uparsistem-100 rounded-md p-1.5 shrink-0"><BookOpen className="w-4 h-4 text-uparsistem-600" /></div>
                     <div className="min-w-0">
                       <p className="text-xs text-slate-500 font-medium">Programa Académico</p>
                       <p className="text-sm font-semibold text-slate-900 truncate">{studentData.programa}</p>
@@ -402,8 +398,8 @@ export function LoginNew() {
                   </div>
                 )}
                 {!studentData.esInvitado && studentData.puesto && (
-                  <div className="flex items-center gap-3 bg-slate-50 p-3 rounded-xl border border-slate-100">
-                    <div className="bg-blue-100 rounded-lg p-2"><MapPin className="w-4 h-4 text-blue-600" /></div>
+                  <div className="flex items-center gap-2 bg-slate-50 p-2.5 rounded-lg border border-slate-100 min-w-0">
+                    <div className="bg-blue-100 rounded-md p-1.5 shrink-0"><MapPin className="w-4 h-4 text-blue-600" /></div>
                     <div className="min-w-0">
                       <p className="text-xs text-slate-500 font-medium">Puesto Asignado</p>
                       <p className="text-sm font-bold text-slate-900 truncate">{studentData.puesto}</p>
@@ -412,45 +408,47 @@ export function LoginNew() {
                 )}
               </div>
 
-              {/* QR Code - centered */}
               {qrCodeUrl && (
                 <div className="flex flex-col items-center">
-                  <div className="p-2 bg-white rounded-xl border-2 border-dashed border-slate-200 shadow-sm">
-                    <img src={qrCodeUrl} alt="QR Code" className="w-28 h-28" />
-                  </div>
-                  <p className="mt-1.5 text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Presenta este QR en el bufete</p>
+                  <button
+                    type="button"
+                    onClick={() => setShowQrPreview(true)}
+                    className="p-1.5 bg-white rounded-xl border-2 border-dashed border-slate-200 shadow-sm hover:border-uparsistem-400 hover:shadow-md transition-all cursor-pointer active:scale-95"
+                  >
+                    <img src={qrCodeUrl} alt="QR Code" className="w-24 h-24 sm:w-28 sm:h-28" />
+                  </button>
+                  <p className="mt-1 text-[10px] sm:text-[11px] font-semibold text-slate-400 uppercase tracking-wider text-center">Toca para ampliar</p>
                 </div>
               )}
 
-              {/* Cupos / Slots Status */}
-              <div className="bg-slate-50 border border-slate-100 rounded-xl p-3">
-                <div className="flex items-center gap-2 mb-2.5">
-                  <Briefcase className="w-4 h-4 text-slate-500" />
-                  <h4 className="text-sm font-bold text-slate-900">Estado de Bufete</h4>
+              <div className="bg-slate-50 border border-slate-100 rounded-lg p-3">
+                <div className="flex items-center gap-2 mb-2">
+                  <Briefcase className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                  <h4 className="text-xs font-bold text-slate-900">Estado de Bufete</h4>
                 </div>
 
-                <div className="grid grid-cols-3 gap-2 text-center mb-2.5">
-                  <div className="bg-white rounded-lg p-2 border border-slate-100">
-                    <p className="text-[11px] text-slate-500">{studentData.esInvitado ? "Cupo Único" : "Grad. + Acomp."}</p>
-                    <p className="text-lg font-extrabold text-slate-900 mt-0.5">{studentData.esInvitado ? "1" : `1 + ${calculateAcompanantes()}`}</p>
+                <div className="grid grid-cols-3 gap-1.5 sm:gap-2 text-center mb-2">
+                  <div className="bg-white rounded-md p-1.5 sm:p-2 border border-slate-100">
+                    <p className="text-[10px] sm:text-[11px] text-slate-500 leading-tight">{studentData.esInvitado ? "Cupo Único" : "Grad. + Acomp."}</p>
+                    <p className="text-base sm:text-lg font-extrabold text-slate-900 mt-0.5">{studentData.esInvitado ? "1" : `1+${calculateAcompanantes()}`}</p>
                   </div>
-                  <div className="bg-white rounded-lg p-2 border border-slate-100">
-                    <p className="text-[11px] text-slate-500">Consumidos</p>
-                    <p className="text-lg font-extrabold text-red-500 mt-0.5">{studentData.cuposConsumidos || 0}</p>
+                  <div className="bg-white rounded-md p-1.5 sm:p-2 border border-slate-100">
+                    <p className="text-[10px] sm:text-[11px] text-slate-500 leading-tight">Consumidos</p>
+                    <p className="text-base sm:text-lg font-extrabold text-red-500 mt-0.5">{studentData.cuposConsumidos || 0}</p>
                   </div>
-                  <div className="bg-white rounded-lg p-2 border border-slate-100">
-                    <p className="text-[11px] text-slate-500">Disponibles</p>
-                    <p className="text-lg font-extrabold text-uparsistem-600 mt-0.5">{calculateCuposDisponibles()}</p>
+                  <div className="bg-white rounded-md p-1.5 sm:p-2 border border-slate-100">
+                    <p className="text-[10px] sm:text-[11px] text-slate-500 leading-tight">Disponibles</p>
+                    <p className="text-base sm:text-lg font-extrabold text-uparsistem-600 mt-0.5">{calculateCuposDisponibles()}</p>
                   </div>
                 </div>
 
-                <div className="w-full bg-slate-200 rounded-full h-2 overflow-hidden">
+                <div className="w-full bg-slate-200 rounded-full h-1.5 overflow-hidden">
                   <div
                     className="bg-uparsistem-500 h-full rounded-full transition-all duration-500"
                     style={{ width: `${Math.min(100, ((studentData.cuposConsumidos || 0) / calculateTotalCupos()) * 100)}%` }}
                   />
                 </div>
-                <div className="flex justify-between text-[11px] text-slate-400 mt-1 font-medium">
+                <div className="flex justify-between text-[10px] sm:text-[11px] text-slate-400 mt-1 font-medium">
                   <span>Uso de cupos</span>
                   <span>{studentData.cuposConsumidos || 0} / {calculateTotalCupos()}</span>
                 </div>
@@ -458,7 +456,7 @@ export function LoginNew() {
 
               <Button
                 onClick={() => { setShowStudentModal(false); setStudentData(null); setIdNumber(""); setQrCodeUrl("") }}
-                className={`w-full h-11 font-semibold rounded-xl transition-all duration-200 active:scale-[0.98] shadow-md ${
+                className={`w-full h-10 sm:h-11 text-sm font-semibold rounded-xl transition-all duration-200 active:scale-[0.98] shadow-md ${
                   studentData.esInvitado
                     ? "bg-violet-600 hover:bg-violet-700 text-white shadow-violet-200"
                     : "bg-uparsistem-600 hover:bg-uparsistem-700 text-white shadow-uparsistem-200"
@@ -543,6 +541,26 @@ export function LoginNew() {
               )}
             </Button>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* ====== QR Preview ====== */}
+      <Dialog open={showQrPreview} onOpenChange={setShowQrPreview}>
+        <DialogContent className="max-w-[90vw] sm:max-w-[360px] bg-white rounded-2xl shadow-xl border-slate-100 p-6">
+          <DialogHeader>
+            <DialogTitle className="text-center text-lg font-bold text-slate-900">Código QR</DialogTitle>
+            <DialogDescription className="text-center text-sm text-slate-500">
+              {studentData?.nombre} — {studentData?.identificacion}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col items-center py-2">
+            {qrCodeUrl && (
+              <div className="p-3 bg-white rounded-2xl border-2 border-slate-200 shadow-sm">
+                <img src={qrCodeUrl} alt="QR Code" className="w-56 h-56 sm:w-64 sm:h-64" />
+              </div>
+            )}
+            <p className="mt-3 text-xs font-semibold text-slate-400 uppercase tracking-wider text-center">Presenta este QR en el bufete</p>
+          </div>
         </DialogContent>
       </Dialog>
     </>
