@@ -4,17 +4,18 @@ import { useState, useRef, useEffect, useCallback } from "react"
 import Webcam from "react-webcam"
 import { BrowserMultiFormatReader, BarcodeFormat, DecodeHintType } from "@zxing/library"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+
 import { useAuth } from "@/components/auth-provider"
 import { useStudentStoreContext } from "@/components/providers/student-store-provider"
 import { useQ10Validation } from "@/hooks/use-q10-validation"
 import {
+  CameraIcon,
   Loader2,
   CameraOff,
   CheckCircle,
@@ -26,8 +27,6 @@ import {
   Utensils,
   Hash,
   QrCode,
-  GraduationCap,
-  MapPin,
   Ticket,
   Clock,
 } from "lucide-react"
@@ -63,17 +62,15 @@ export function BuffeteScanner() {
 
   const webcamRef = useRef<Webcam>(null)
   const codeReader = useRef<BrowserMultiFormatReader | null>(null)
-  const scannerActive = useRef(false)
   const manualInputRef = useRef<HTMLInputElement>(null)
   const activeStreamRef = useRef<MediaStream | null>(null)
 
   const stopCamera = useCallback(() => {
     console.log("[v0] Stopping camera completely...")
 
-    if (codeReader.current && scannerActive.current) {
+    if (codeReader.current) {
       try {
         codeReader.current.reset()
-        scannerActive.current = false
       } catch (e) {
         console.error("[v0] Error resetting code reader:", e)
       }
@@ -430,10 +427,6 @@ export function BuffeteScanner() {
       !codeReader.current ||
       activeTab !== "qr"
     ) {
-      if (codeReader.current && scannerActive.current) {
-        console.log("[v0] Stopping scanner (conditions not met)")
-        stopCamera()
-      }
       return
     }
 
@@ -443,61 +436,52 @@ export function BuffeteScanner() {
       return
     }
 
-    if (scannerActive.current) {
-      console.log("[v0] Scanner already active")
-      return
-    }
-
     console.log("[v0] Starting continuous scan with device:", selectedDeviceId)
-    scannerActive.current = true
     setError("")
 
-    const startScanning = async () => {
-      try {
-        const initTimeout = setTimeout(() => {
-          console.error("[v0] Scanner initialization timeout")
-          setError("Tiempo de espera agotado. Intenta recargar la página.")
-          stopCamera()
-        }, 10000)
+    const initTimeout = setTimeout(() => {
+      console.error("[v0] Scanner initialization timeout")
+      setError("Tiempo de espera agotado al iniciar la cámara. Intenta recargar la página.")
+    }, 15000)
 
-        await codeReader.current!.decodeFromVideoDevice(selectedDeviceId, video, (result, err) => {
-          clearTimeout(initTimeout)
+    codeReader.current!
+      .decodeFromVideoDevice(selectedDeviceId, video, (result, err) => {
+        clearTimeout(initTimeout)
 
-          if (result && !processing && !isProcessingQ10) {
-            const scannedText = result.getText()
-            console.log("[v0] QR scanned:", scannedText)
-            processScanResult(scannedText, "direct")
+        if (result && !processing && !isProcessingQ10) {
+          const scannedText = result.getText()
+          console.log("[v0] QR scanned:", scannedText)
+          processScanResult(scannedText, "direct")
+        }
+        if (err && err.name !== "NotFoundException" && err.name !== "AbortError" && !err.message?.includes("No MultiFormat Readers")) {
+          console.error("[v0] Scanner error:", err)
+          if (err.name === "NotReadableError") {
+            setError("La cámara está siendo usada por otra aplicación. Cierra otras apps y recarga la página.")
           }
-          if (err && err.name !== "NotFoundException") {
-            if (err.name === "NotReadableError") {
-              console.error("[v0] Camera in use by another app")
-              setError("La cámara está en uso. Cierra otras aplicaciones e intenta de nuevo.")
-              stopCamera()
-            }
-          }
-        })
-
+        }
+      })
+      .then((controls) => {
         if (video.srcObject) {
           activeStreamRef.current = video.srcObject as MediaStream
         }
-      } catch (err: any) {
-        console.error("[v0] Error starting scanner:", err)
+      })
+      .catch((err: any) => {
+        clearTimeout(initTimeout)
+        console.error("[v0] Error starting continuous scan:", err)
         if (err.name === "NotAllowedError") {
-          setError("Permiso de cámara denegado")
+          setError("Permiso de cámara denegado.")
         } else if (err.name === "NotFoundError") {
-          setError("No se encontró la cámara")
+          setError("No se encontró la cámara.")
         } else if (err.name === "NotReadableError") {
           setError("La cámara está en uso. Cierra otras aplicaciones e intenta de nuevo.")
-        } else {
-          setError("Error al iniciar el escáner")
+        } else if (!err.message?.includes("No MultiFormat Readers")) {
+          setError("Error al iniciar el escáner. Intenta recargar la página.")
         }
         stopCamera()
-      }
-    }
-
-    startScanning()
+      })
 
     return () => {
+      clearTimeout(initTimeout)
       console.log("[v0] Cleaning up scanner...")
       stopCamera()
     }
@@ -592,9 +576,9 @@ export function BuffeteScanner() {
 
   if (authLoading) {
     return (
-      <div className="flex flex-col items-center justify-center p-8 text-center bg-card rounded-lg border shadow-sm">
-        <Loader2 className="text-primary mb-4 size-16 animate-spin" />
-        <p className="text-muted-foreground text-lg">Cargando autenticación...</p>
+      <div className="flex flex-col items-center justify-center p-8 text-center">
+        <Loader2 className="text-amber-600 mb-4 size-12 animate-spin" />
+        <p className="text-muted-foreground">Cargando autenticación...</p>
       </div>
     )
   }
@@ -623,21 +607,24 @@ export function BuffeteScanner() {
 
   if (!isClient) {
     return (
-      <div className="flex flex-col items-center justify-center p-8 text-center bg-card rounded-lg border shadow-sm">
-        <Loader2 className="text-primary mb-4 size-16 animate-spin" />
-        <p className="text-muted-foreground text-lg">Cargando escáner...</p>
+      <div className="flex flex-col items-center justify-center p-8 text-center">
+        <Loader2 className="text-amber-600 mb-4 size-12 animate-spin" />
+        <p className="text-muted-foreground">Cargando escáner...</p>
       </div>
     )
   }
 
   if (hasPermission === false && activeTab === "qr") {
     return (
-      <div className="flex flex-col items-center justify-center p-8 text-center bg-card rounded-lg border shadow-sm">
-        <CameraOff className="text-destructive mb-6 size-20" />
-        <h3 className="text-2xl md:text-2xl font-bold text-green-900">Entrega de Comida</h3>
-        <p className="text-sm md:text-base text-green-700">
-          Mesa {user?.mesaAsignada || "N/A"} - Escanea QR o ingresa ID
-        </p>
+      <div className="flex flex-col items-center justify-center p-8 text-center">
+        <CameraOff className="text-amber-600 mb-6 size-16" />
+        <h3 className="text-xl font-bold text-amber-900">Entrega de Comida</h3>
+        <p className="text-sm text-amber-700 mt-1">Mesa {user?.mesaAsignada || "N/A"}</p>
+        <p className="text-sm text-muted-foreground mt-3">Se necesita acceso a la cámara para escanear códigos QR</p>
+        <Button onClick={requestCamera} className="mt-4 bg-amber-600 hover:bg-amber-700 text-white">
+          <CameraIcon className="w-4 h-4 mr-2" />
+          Permitir cámara
+        </Button>
       </div>
     )
   }
@@ -648,164 +635,301 @@ export function BuffeteScanner() {
     : 0
 
   return (
-    <div className="flex flex-1 flex-col gap-4 p-3 md:p-4 bg-gradient-to-br from-green-50 to-emerald-50 min-h-screen">
-      <div className="flex flex-col items-center gap-3">
-        <div className="text-center">
-          <h1 className="text-xl md:text-2xl font-bold text-green-900">Entrega de Comida</h1>
-          <p className="text-sm md:text-base text-green-700">
-            Mesa {user?.mesaAsignada || "N/A"} - Escanea QR o ingresa ID
-          </p>
+    <div className="flex flex-1 flex-col gap-2 md:gap-4 p-2 md:p-4 bg-gradient-to-br from-amber-50/50 via-white to-orange-50/30">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2 md:gap-3">
+          <div className="flex size-8 md:size-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-amber-600 to-orange-500 shadow-md shadow-amber-600/20">
+            <Utensils className="size-4 md:size-5 text-white" />
+          </div>
+          <div>
+            <h1 className="text-sm md:text-lg font-bold leading-tight text-amber-900">Entrega de Comida</h1>
+            <p className="text-[10px] md:text-xs text-amber-600/70 leading-tight">
+              Mesa {user?.mesaAsignada || "N/A"} · Escanea QR o ingresa ID
+            </p>
+          </div>
         </div>
-
-        <Badge variant="outline" className="bg-green-100 text-green-800 border-green-300">
-          <Utensils className="w-3 h-3 md:w-4 md:h-4 mr-1" />
-          Mesa {user?.mesaAsignada || "N/A"}
-        </Badge>
-
-        <Card className="w-full max-w-2xl bg-white shadow-lg border-green-200">
-          <CardContent className="p-4 md:p-6">
-            <h2 className="text-lg md:text-xl font-semibold text-center mb-4 text-green-900">
-              Escanea QR o ingresa identificación
-            </h2>
-            <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "qr" | "manual")} className="w-full">
-              <TabsList className="grid w-full grid-cols-2 mb-4 bg-green-100">
-                <TabsTrigger
-                  value="qr"
-                  className="text-sm md:text-base data-[state=active]:bg-green-600 data-[state=active]:text-white"
-                >
-                  <QrCode className="w-4 h-4 mr-2" />
-                  Escanear QR
-                </TabsTrigger>
-                <TabsTrigger
-                  value="manual"
-                  className="text-sm md:text-base data-[state=active]:bg-green-600 data-[state=active]:text-white"
-                >
-                  <Hash className="w-4 h-4 mr-2" />
-                  Ingreso Manual
-                </TabsTrigger>
-              </TabsList>
-
-              <TabsContent value="qr" className="space-y-4 mt-0">
-                {error && activeTab === "qr" && (
-                  <Alert variant="destructive">
-                    <AlertTriangle className="h-4 w-4" />
-                    <AlertDescription>{error}</AlertDescription>
-                  </Alert>
-                )}
-
-                <div className="relative w-full pt-[100%] overflow-hidden rounded-lg bg-card shadow-lg border border-green-200">
-                  {selectedDeviceId && (
-                    <Webcam
-                      ref={webcamRef}
-                      audio={false}
-                      videoConstraints={{
-                        deviceId: selectedDeviceId,
-                        facingMode: "environment",
-                      }}
-                      className="absolute inset-0 w-full h-full object-cover"
-                    />
-                  )}
-                  <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[90%] h-[50%] border-4 border-green-500 rounded-lg shadow-[0_0_0_9999px_rgba(0,0,0,0.5)]">
-                    <div className="absolute top-1/2 left-[5%] right-[5%] h-[2px] bg-green-500 animate-scan"></div>
-                  </div>
-                </div>
-
-                <div className="text-center p-3 bg-green-50 rounded-lg border border-green-200">
-                  <p className="text-sm text-green-700">
-                    {processing || isProcessingQ10 ? (
-                      <span className="flex items-center justify-center gap-2">
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                        {isProcessingQ10 ? "Procesando certificado Q10..." : "Procesando..."}
-                      </span>
-                    ) : (
-                      "Apunta la cámara al código QR del estudiante"
-                    )}
-                  </p>
-                </div>
-              </TabsContent>
-
-              <TabsContent value="manual" className="space-y-4 mt-0">
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="manual-id" className="text-base text-green-900">
-                      Número de Identificación
-                    </Label>
-                    <Input
-                      ref={manualInputRef}
-                      id="manual-id"
-                      type="text"
-                      placeholder="Ej: 1065123456"
-                      value={manualId}
-                      onChange={(e) => setManualId(e.target.value)}
-                      onKeyPress={(e) => {
-                        if (e.key !== "Enter" || !manualId.trim() || processing || isProcessingQ10) return
-                        const id = manualId.trim()
-                        if (id.length < 3 || id.length > 10) {
-                          setError(`La identificación debe tener entre 3 y 10 caracteres. (Ingresaste ${id.length})`)
-                          return
-                        }
-                        processScanResult(id, "manual")
-                        setManualId("")
-                      }}
-                      disabled={processing || isProcessingQ10}
-                      className="text-lg h-12 border-green-300 focus:border-green-500"
-                    />
-                    <p className="text-xs text-green-600">Ingresa el número de cédula del estudiante</p>
-                  </div>
-
-                  <Button
-                    onClick={() => {
-                      const id = manualId.trim()
-                      if (!id) return
-                      if (id.length < 3 || id.length > 10) {
-                        setError(`La identificación debe tener entre 3 y 10 caracteres. (Ingresaste ${id.length})`)
-                        return
-                      }
-                      processScanResult(id, "manual")
-                      setManualId("")
-                    }}
-                    disabled={processing || isProcessingQ10 || !manualId.trim()}
-                    className="w-full h-12 text-base bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white"
-                    size="lg"
-                  >
-                    {processing || isProcessingQ10 ? (
-                      <>
-                        <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                        {isProcessingQ10 ? "Procesando Q10..." : "Procesando..."}
-                      </>
-                    ) : (
-                      <>
-                        <Search className="w-5 h-5 mr-2" />
-                        Continuar
-                      </>
-                    )}
-                  </Button>
-                </div>
-
-                <div className="bg-green-50 border border-green-200 rounded-lg p-3">
-                  <p className="text-xs text-green-900">
-                    <strong>Tip:</strong> El estudiante debe mostrar su documento de identidad para verificar el número.
-                  </p>
-                </div>
-              </TabsContent>
-            </Tabs>
-          </CardContent>
-        </Card>
+        <div className="flex items-center gap-1 md:gap-2">
+          <Badge variant="outline" className="bg-amber-100 text-amber-800 border-amber-300 text-[10px] md:text-xs">
+            <Utensils className="w-3 h-3 mr-1" />
+            Mesa {user?.mesaAsignada || "N/A"}
+          </Badge>
+        </div>
       </div>
 
+      {error && activeTab === "qr" && (
+        <div className="flex items-center gap-2 p-2 md:p-3 rounded-lg bg-red-50 border border-red-200">
+          <AlertTriangle className="size-3 md:size-4 text-red-600 shrink-0" />
+          <p className="text-[11px] md:text-sm text-red-700">{error}</p>
+        </div>
+      )}
+
+      {/* Mobile Mode Tabs */}
+      <div className="flex lg:hidden rounded-xl overflow-hidden border border-amber-200 bg-white/50 p-0.5">
+        <button
+          onClick={() => setActiveTab("qr")}
+          className={`flex-1 py-2 md:py-2.5 text-[10px] md:text-xs font-medium rounded-lg transition-all ${
+            activeTab === "qr"
+              ? "bg-amber-600 text-white shadow-sm shadow-amber-600/30"
+              : "text-amber-600/70 hover:text-amber-700"
+          }`}
+        >
+          <CameraIcon className="size-3 md:size-3.5 inline mr-1 -mt-0.5" />
+          Escanear QR
+        </button>
+        <button
+          onClick={() => setActiveTab("manual")}
+          className={`flex-1 py-2 md:py-2.5 text-[10px] md:text-xs font-medium rounded-lg transition-all ${
+            activeTab === "manual"
+              ? "bg-amber-600 text-white shadow-sm shadow-amber-600/30"
+              : "text-amber-600/70 hover:text-amber-700"
+          }`}
+        >
+          <Hash className="size-3 md:size-3.5 inline mr-1 -mt-0.5" />
+          Ingreso Manual
+        </button>
+      </div>
+
+      {/* Main Content */}
+      <div className="flex-1 min-h-0">
+        {/* Desktop: two columns */}
+        <div className="hidden lg:grid lg:grid-cols-3 lg:gap-4 h-full">
+          {/* Scanner */}
+          <div className="lg:col-span-2 relative rounded-xl overflow-hidden bg-black shadow-lg border border-white/10">
+            {selectedDeviceId && (
+              <Webcam
+                ref={webcamRef}
+                audio={false}
+                videoConstraints={{
+                  deviceId: selectedDeviceId,
+                  facingMode: "environment",
+                }}
+                className="absolute inset-0 w-full h-full object-cover"
+              />
+            )}
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="relative w-[85%] max-w-[320px] aspect-[4/3]">
+                <div className="absolute inset-0 rounded-xl border-2 border-amber-400/80 shadow-[0_0_0_9999px_rgba(0,0,0,0.55)]" />
+                <div className="absolute top-0 left-0 w-4 h-4 border-t-2 border-l-2 border-amber-300 rounded-tl" />
+                <div className="absolute top-0 right-0 w-4 h-4 border-t-2 border-r-2 border-amber-300 rounded-tr" />
+                <div className="absolute bottom-0 left-0 w-4 h-4 border-b-2 border-l-2 border-amber-300 rounded-bl" />
+                <div className="absolute bottom-0 right-0 w-4 h-4 border-b-2 border-r-2 border-amber-300 rounded-br" />
+                <div className="absolute top-1/2 left-[8%] right-[8%] h-[1.5px] bg-amber-300/80 animate-scan shadow-[0_0_8px_rgba(251,191,36,0.5)]" />
+              </div>
+            </div>
+            <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className={`size-2 rounded-full ${processing || isProcessingQ10 ? "bg-yellow-400 animate-pulse" : "bg-amber-400 animate-pulse"}`} />
+                  <span className="text-sm text-white/90">
+                    {processing ? "Procesando..." : isProcessingQ10 ? "Procesando Q10..." : "Escaneando..."}
+                  </span>
+                </div>
+                <span className="text-xs text-white/50">Apunta al código QR</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Manual */}
+          <div className="rounded-xl border border-amber-200 bg-white/80 backdrop-blur-xl shadow-sm p-5">
+            <div className="flex items-center gap-2 mb-4">
+              <div className="flex size-8 items-center justify-center rounded-lg bg-amber-100 text-amber-700">
+                <Search className="size-4" />
+              </div>
+              <div>
+                <h3 className="text-sm font-semibold leading-tight">Ingreso Manual</h3>
+                <p className="text-xs text-muted-foreground leading-tight">Escribe la identificación</p>
+              </div>
+            </div>
+
+            {error && activeTab === "manual" && (
+              <div className="flex items-center gap-1.5 p-2 mb-3 rounded-lg bg-red-50 border border-red-200">
+                <AlertTriangle className="size-3.5 text-red-600 shrink-0" />
+                <p className="text-xs text-red-700">{error}</p>
+              </div>
+            )}
+
+            <div className="space-y-3">
+              <Input
+                id="manual-id"
+                type="text"
+                placeholder="Número de identificación"
+                value={manualId}
+                onChange={(e) => setManualId(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && manualId.trim() && !processing && !isProcessingQ10) {
+                    const id = manualId.trim()
+                    if (id.length >= 3 && id.length <= 10) {
+                      processScanResult(id, "manual")
+                      setManualId("")
+                    }
+                  }
+                }}
+                disabled={processing || isProcessingQ10}
+                className="h-11 text-base border-amber-200 focus-visible:ring-amber-500"
+              />
+              <Button
+                onClick={() => {
+                  const id = manualId.trim()
+                  if (!id) return
+                  if (id.length < 3 || id.length > 10) {
+                    setError(`La identificación debe tener entre 3 y 10 caracteres. (Ingresaste ${id.length})`)
+                    return
+                  }
+                  processScanResult(id, "manual")
+                  setManualId("")
+                }}
+                disabled={processing || isProcessingQ10 || !manualId.trim()}
+                className="w-full h-11 text-sm bg-amber-600 hover:bg-amber-700 text-white"
+              >
+                {processing || isProcessingQ10 ? (
+                  <><Loader2 className="mr-2 size-4 animate-spin" /> Procesando...</>
+                ) : (
+                  <><Search className="mr-2 size-4" /> Validar</>
+                )}
+              </Button>
+            </div>
+
+            <div className="mt-4 p-3 rounded-lg bg-amber-50/50 border border-amber-100">
+              <p className="text-xs text-amber-700 leading-tight">
+                <span className="font-semibold">Tip:</span> Verifica el documento de identidad del estudiante antes de ingresar el número.
+              </p>
+            </div>
+
+            {hasPermission === false && (
+              <Button onClick={requestCamera} variant="outline" className="w-full mt-3 h-11 text-sm border-amber-300 text-amber-700 hover:bg-amber-50">
+                <CameraIcon className="mr-2 size-4" />
+                Reintentar cámara
+              </Button>
+            )}
+          </div>
+        </div>
+
+        {/* Mobile: show active tab */}
+        {activeTab === "qr" && (
+          <div className="lg:hidden relative rounded-xl overflow-hidden bg-black shadow-lg border border-white/10" style={{ height: "calc(100vh - 220px)" }}>
+            {selectedDeviceId && (
+              <Webcam
+                ref={webcamRef}
+                audio={false}
+                videoConstraints={{
+                  deviceId: selectedDeviceId,
+                  facingMode: "environment",
+                }}
+                className="absolute inset-0 w-full h-full object-cover"
+              />
+            )}
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="relative w-[85%] max-w-[320px] aspect-[4/3]">
+                <div className="absolute inset-0 rounded-xl border-2 border-amber-400/80 shadow-[0_0_0_9999px_rgba(0,0,0,0.55)]" />
+                <div className="absolute top-0 left-0 w-4 h-4 border-t-2 border-l-2 border-amber-300 rounded-tl" />
+                <div className="absolute top-0 right-0 w-4 h-4 border-t-2 border-r-2 border-amber-300 rounded-tr" />
+                <div className="absolute bottom-0 left-0 w-4 h-4 border-b-2 border-l-2 border-amber-300 rounded-bl" />
+                <div className="absolute bottom-0 right-0 w-4 h-4 border-b-2 border-r-2 border-amber-300 rounded-br" />
+                <div className="absolute top-1/2 left-[8%] right-[8%] h-[1.5px] bg-amber-300/80 animate-scan shadow-[0_0_8px_rgba(251,191,36,0.5)]" />
+              </div>
+            </div>
+            <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className={`size-2 rounded-full ${processing || isProcessingQ10 ? "bg-yellow-400 animate-pulse" : "bg-amber-400 animate-pulse"}`} />
+                  <span className="text-[11px] text-white/90">
+                    {processing ? "Procesando..." : isProcessingQ10 ? "Procesando Q10..." : "Escaneando..."}
+                  </span>
+                </div>
+                <span className="text-[10px] text-white/50">Apunta al código QR</span>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {activeTab === "manual" && (
+          <div className="lg:hidden rounded-xl border border-amber-200 bg-white/80 backdrop-blur-xl shadow-sm p-3">
+            <div className="flex items-center gap-2 mb-3">
+              <div className="flex size-7 items-center justify-center rounded-lg bg-amber-100 text-amber-700">
+                <Search className="size-3.5" />
+              </div>
+              <div>
+                <h3 className="text-[11px] font-semibold leading-tight">Ingreso Manual</h3>
+                <p className="text-[9px] text-muted-foreground leading-tight">Escribe la identificación</p>
+              </div>
+            </div>
+
+            {error && activeTab === "manual" && (
+              <div className="flex items-center gap-1.5 p-1.5 mb-2 rounded-lg bg-red-50 border border-red-200">
+                <AlertTriangle className="size-3 text-red-600 shrink-0" />
+                <p className="text-[10px] text-red-700">{error}</p>
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <Input
+                id="manual-id-mobile"
+                type="text"
+                placeholder="Número de identificación"
+                value={manualId}
+                onChange={(e) => setManualId(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && manualId.trim() && !processing && !isProcessingQ10) {
+                    const id = manualId.trim()
+                    if (id.length >= 3 && id.length <= 10) {
+                      processScanResult(id, "manual")
+                      setManualId("")
+                    }
+                  }
+                }}
+                disabled={processing || isProcessingQ10}
+                className="h-10 text-sm border-amber-200 focus-visible:ring-amber-500"
+              />
+              <Button
+                onClick={() => {
+                  const id = manualId.trim()
+                  if (!id) return
+                  if (id.length < 3 || id.length > 10) {
+                    setError(`La identificación debe tener entre 3 y 10 caracteres. (Ingresaste ${id.length})`)
+                    return
+                  }
+                  processScanResult(id, "manual")
+                  setManualId("")
+                }}
+                disabled={processing || isProcessingQ10 || !manualId.trim()}
+                className="w-full h-10 text-xs bg-amber-600 hover:bg-amber-700 text-white"
+              >
+                {processing || isProcessingQ10 ? (
+                  <><Loader2 className="mr-1.5 size-3.5 animate-spin" /> Procesando...</>
+                ) : (
+                  <><Search className="mr-1.5 size-3.5" /> Validar</>
+                )}
+              </Button>
+            </div>
+
+            <div className="mt-3 p-2 rounded-lg bg-amber-50/50 border border-amber-100">
+              <p className="text-[9px] text-amber-700 leading-tight">
+                <span className="font-semibold">Tip:</span> Verifica el documento de identidad del estudiante.
+              </p>
+            </div>
+
+            {hasPermission === false && (
+              <Button onClick={requestCamera} variant="outline" className="w-full mt-2 h-10 text-xs border-amber-300 text-amber-700 hover:bg-amber-50">
+                <CameraIcon className="mr-1.5 size-3.5" />
+                Reintentar cámara
+              </Button>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Result Dialog */}
       <Dialog open={showResult} onOpenChange={handleModalClose}>
-        <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogContent className="sm:max-w-md !rounded-2xl">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-base md:text-lg">
-              {scanResult?.status === "success" && <CheckCircle className="w-5 h-5 md:w-6 md:h-6 text-green-600" />}
-              {scanResult?.status === "no_cupos" && <XCircle className="w-5 h-5 md:w-6 md:h-6 text-red-600" />}
-              {scanResult?.status === "error" && <AlertTriangle className="w-5 h-5 md:w-6 md:h-6 text-orange-600" />}
-              Resultado del Proceso
+            <DialogTitle className="flex items-center gap-2 text-sm md:text-base">
+              {scanResult?.status === "success" && <CheckCircle className="size-5 text-amber-600" />}
+              {scanResult?.status === "no_cupos" && <XCircle className="size-5 text-red-600" />}
+              {scanResult?.status === "error" && <AlertTriangle className="size-5 text-orange-600" />}
+              Resultado
               {realtimeStudentData && (
-                <Badge
-                  variant="outline"
-                  className="ml-auto bg-green-50 text-green-700 border-green-200 animate-pulse text-xs"
-                >
+                <Badge variant="outline" className="ml-auto bg-amber-50 text-amber-700 border-amber-200 animate-pulse text-xs">
                   <Clock className="w-3 h-3 mr-1" />
                   En vivo
                 </Badge>
@@ -816,70 +940,52 @@ export function BuffeteScanner() {
           <div className="space-y-3">
             {scanResult && (
               <>
-                <div className="bg-gradient-to-r from-lime-50 to-green-50 rounded-lg p-3 border border-lime-200">
-                  <div className="flex items-center gap-2">
-                    <div className="bg-white rounded-full p-1.5 shadow-sm">
-                      <User className="w-4 h-4 text-lime-600" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-[10px] text-gray-600 font-medium">Identificación</p>
-                      <p className="text-base md:text-lg font-bold text-gray-900 truncate">
-                        {scanResult.identificacion}
-                      </p>
-                    </div>
-                  </div>
+                <div className="flex items-center gap-2 p-2 rounded-lg bg-gray-50">
+                  <User className="size-3.5 md:size-4 text-muted-foreground shrink-0" />
+                  <span className="text-[11px] md:text-sm font-medium">ID:</span>
+                  <Badge variant="secondary" className="text-[10px] md:text-xs font-mono">
+                    {scanResult.identificacion}
+                  </Badge>
                 </div>
 
                 {scanResult.status === "success" && displayStudent && (
-                  <Card className="border-green-200 bg-gradient-to-br from-green-50 to-emerald-50 shadow-lg">
-                    <CardHeader className="pb-2 pt-3 px-3 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-t-lg">
-                      <CardTitle className="text-sm md:text-base flex items-center gap-2">
-                        <CheckCircle className="w-4 h-4 md:w-5 md:h-5" />
-                        Comida Entregada Exitosamente
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-3 pt-3 px-3 pb-3">
-                      <div className="space-y-2">
-                        <div className="flex items-start gap-2">
-                          <GraduationCap className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
-                          <div className="flex-1 min-w-0">
-                            <p className="text-[10px] text-gray-600 font-medium">Nombre Completo</p>
-                            <p className="text-xs md:text-sm font-bold text-gray-900 break-words">
-                              {displayStudent.nombre}
-                            </p>
-                          </div>
+                  <div className="rounded-xl border border-amber-200 bg-amber-50/80 overflow-hidden">
+                    <div className="bg-amber-600 p-2.5 md:p-3">
+                      <div className="flex items-center gap-2">
+                        <CheckCircle className="size-4 md:size-5 text-white" />
+                        <p className="text-[11px] md:text-sm font-semibold text-white">Comida Entregada Exitosamente</p>
+                      </div>
+                    </div>
+                    <div className="p-3 md:p-4 space-y-2">
+                      <div className="grid grid-cols-2 gap-2 md:gap-3">
+                        <div>
+                          <p className="text-[9px] md:text-xs text-muted-foreground">Nombre</p>
+                          <p className="text-[11px] md:text-sm font-medium truncate">{displayStudent.nombre}</p>
                         </div>
-
-                        <div className="flex items-start gap-2">
-                          <MapPin className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
-                          <div className="flex-1 min-w-0">
-                            <p className="text-[10px] text-gray-600 font-medium">Programa Académico</p>
-                            <p className="text-xs md:text-sm font-semibold text-gray-800 break-words">
-                              {displayStudent.programa}
-                            </p>
-                          </div>
+                        <div>
+                          <p className="text-[9px] md:text-xs text-muted-foreground">Programa</p>
+                          <p className="text-[11px] md:text-sm font-medium truncate">{displayStudent.programa}</p>
                         </div>
-
-                        <div className="flex items-start gap-2">
-                          <Utensils className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
-                          <div className="flex-1 min-w-0">
-                            <p className="text-[10px] text-gray-600 font-medium">Mesa de Entrega</p>
-                            <Badge className="bg-green-600 hover:bg-green-700 text-white font-bold text-xs">
-                              Mesa {user.mesaAsignada}
-                            </Badge>
+                        {displayStudent.puesto && (
+                          <div>
+                            <p className="text-[9px] md:text-xs text-muted-foreground">Puesto</p>
+                            <p className="text-[11px] md:text-sm font-medium">{displayStudent.puesto}</p>
                           </div>
+                        )}
+                        <div>
+                          <p className="text-[9px] md:text-xs text-muted-foreground">Mesa</p>
+                          <Badge className="bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs">Mesa {user.mesaAsignada}</Badge>
                         </div>
                       </div>
 
-                      <div className="bg-white rounded-lg p-3 border-2 border-green-200 space-y-2">
+                      <div className="bg-white rounded-lg p-3 border border-amber-200 space-y-2">
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-1.5">
-                            <Ticket className="w-3.5 h-3.5 text-green-600" />
+                            <Ticket className="w-3.5 h-3.5 text-amber-600" />
                             <span className="text-xs md:text-sm font-semibold text-gray-700">Cupos Disponibles</span>
                           </div>
-                          <span className="text-xl md:text-2xl font-bold text-green-600">{cuposDisponibles}</span>
+                          <span className="text-xl md:text-2xl font-bold text-amber-600">{cuposDisponibles}</span>
                         </div>
-
                         <div className="grid grid-cols-2 gap-1.5 text-[10px] md:text-xs">
                           <div className="bg-gray-50 rounded p-1.5">
                             <p className="text-gray-600">Total</p>
@@ -890,10 +996,9 @@ export function BuffeteScanner() {
                             <p className="font-bold text-orange-700 text-sm">{displayStudent.cuposConsumidos || 0}</p>
                           </div>
                         </div>
-
                         <div className="w-full bg-gray-200 rounded-full h-1.5 mt-1">
                           <div
-                            className="bg-gradient-to-r from-green-500 to-emerald-500 h-1.5 rounded-full transition-all duration-500"
+                            className="bg-gradient-to-r from-amber-500 to-orange-500 h-1.5 rounded-full transition-all duration-500"
                             style={{
                               width: `${(cuposDisponibles / (2 + (displayStudent.cuposExtras || 0))) * 100}%`,
                             }}
@@ -901,58 +1006,46 @@ export function BuffeteScanner() {
                         </div>
                       </div>
 
-                      <div className="text-[10px] md:text-xs text-green-700 bg-green-100 p-2 rounded-lg font-medium text-center">
+                      <div className="text-[10px] md:text-xs text-amber-700 bg-amber-100 p-2 rounded-lg font-medium text-center">
                         {scanResult.message}
                         {scanResult.source === "q10" && (
-                          <Badge
-                            variant="outline"
-                            className="ml-2 bg-blue-50 text-blue-700 border-blue-200 text-[10px]"
-                          >
+                          <Badge variant="outline" className="ml-2 bg-blue-50 text-blue-700 border-blue-200 text-[10px]">
                             Q10
                           </Badge>
                         )}
                       </div>
-                    </CardContent>
-                  </Card>
+                    </div>
+                  </div>
                 )}
 
                 {scanResult.status === "no_cupos" && (
-                  <Alert variant="destructive" className="border-red-300 bg-red-50">
-                    <XCircle className="h-4 w-4 md:h-5 md:w-5" />
-                    <AlertDescription className="text-xs md:text-sm font-medium">{scanResult.message}</AlertDescription>
-                  </Alert>
+                  <div className="flex items-center gap-2 p-2 md:p-3 rounded-lg bg-red-50 border border-red-200">
+                    <XCircle className="size-3.5 md:size-4 text-red-600 shrink-0" />
+                    <p className="text-[11px] md:text-sm text-red-800">{scanResult.message}</p>
+                  </div>
                 )}
 
                 {scanResult.status === "error" && (
-                  <Alert variant="destructive" className="border-orange-300 bg-orange-50">
-                    <AlertTriangle className="h-4 w-4 md:h-5 md:w-5 text-orange-600" />
-                    <AlertDescription className="text-xs md:text-sm font-medium text-orange-800">
-                      {scanResult.message}
-                    </AlertDescription>
-                  </Alert>
+                  <div className="flex items-center gap-2 p-2 md:p-3 rounded-lg bg-orange-50 border border-orange-200">
+                    <AlertTriangle className="size-3.5 md:size-4 text-orange-600 shrink-0" />
+                    <p className="text-[11px] md:text-sm text-orange-800">{scanResult.message}</p>
+                  </div>
                 )}
 
-                <div className="text-[10px] md:text-xs text-gray-500 text-center flex items-center justify-center gap-1">
+                <p className="text-[9px] md:text-xs text-muted-foreground text-center flex items-center justify-center gap-1">
                   <Clock className="w-3 h-3" />
                   Procesado el {new Date(scanResult.timestamp).toLocaleString()}
-                </div>
+                </p>
               </>
             )}
           </div>
 
-          <div className="flex gap-2 pt-2">
-            <Button
-              onClick={resetScanner}
-              className="flex-1 bg-gradient-to-r from-lime-500 to-green-500 hover:from-lime-600 hover:to-green-600 h-10 text-xs md:text-sm"
-            >
-              <RefreshCw className="w-3.5 h-3.5 md:w-4 md:h-4 mr-1.5" />
+          <div className="flex gap-2 mt-1">
+            <Button onClick={resetScanner} className="flex-1 h-9 md:h-10 text-xs md:text-sm bg-amber-600 hover:bg-amber-700 text-white">
+              <RefreshCw className="size-3.5 md:size-4 mr-1.5" />
               Procesar Otro
             </Button>
-            <Button
-              variant="outline"
-              onClick={() => handleModalClose(false)}
-              className="border-gray-300 h-10 text-xs md:text-sm px-4"
-            >
+            <Button variant="outline" onClick={() => handleModalClose(false)} className="h-9 md:h-10 text-xs md:text-sm">
               Cerrar
             </Button>
           </div>
