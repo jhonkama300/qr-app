@@ -1,6 +1,6 @@
 "use client"
 
-import { Home, Scan, DoorOpen, Database, Users, Table, Utensils, Package, Eye, ChevronDown } from "lucide-react"
+import { Home, Scan, DoorOpen, Database, Users, Table, Utensils, Package, Eye, ChevronDown, LayoutDashboard } from "lucide-react"
 import { useAuth } from "@/components/auth-provider"
 import { useRouter, usePathname } from "next/navigation"
 import { useCallback, useState } from "react"
@@ -17,7 +17,7 @@ interface NavTab {
 }
 
 const tabs: NavTab[] = [
-  { path: "/dashboard", icon: Home, label: "Inicio", adminOnly: true, iconColor: "text-uparsistem-600" },
+  { path: "/dashboard", icon: LayoutDashboard, label: "Inicio", adminOnly: true, iconColor: "text-uparsistem-600" },
   { path: "/dashboard/escanear", icon: Scan, label: "Escanear", iconColor: "text-blue-500" },
   { path: "/dashboard/inventario", icon: Package, label: "Inventario", adminOnly: true, iconColor: "text-orange-500" },
   { path: "/dashboard/control-acceso", icon: DoorOpen, label: "Control", adminOrOperativo: true, iconColor: "text-amber-500" },
@@ -25,13 +25,8 @@ const tabs: NavTab[] = [
   { path: "/dashboard/usuarios", icon: Users, label: "Usuarios", adminOnly: true, iconColor: "text-pink-500" },
   { path: "/dashboard/bufetes", icon: Utensils, label: "Bufetes", bufeteOnly: true, iconColor: "text-emerald-500" },
   { path: "/dashboard/control-bufetes", icon: Table, label: "Bufetes", adminOnly: true, iconColor: "text-violet-500" },
+  { path: "/dashboard/bufetes", icon: Eye, label: "Mesas", operativoOnly: true, iconColor: "text-cyan-500" },
 ]
-
-const roleIndicator: Record<string, string> = {
-  administrador: "bg-green-600",
-  operativo: "bg-blue-500",
-  bufete: "bg-emerald-500",
-}
 
 const PRIMARY_COUNT = 4
 
@@ -63,24 +58,23 @@ export function MobileBottomNav() {
     <>
       {/* Dark overlay */}
       <div
-        className={`fixed inset-0 z-40 md:hidden transition-opacity duration-300 ease-out will-change-opacity ${
+        className={`fixed inset-0 z-40 md:hidden transition-opacity duration-300 ease-out ${
           expanded
-            ? "bg-black/60 backdrop-blur-sm opacity-100"
-            : "bg-black/60 backdrop-blur-sm opacity-0 pointer-events-none"
+            ? "bg-black/40 backdrop-blur-sm opacity-100"
+            : "bg-black/40 backdrop-blur-sm opacity-0 pointer-events-none"
         }`}
         onClick={() => setExpanded(false)}
       />
 
       <nav className="fixed bottom-0 left-0 right-0 z-50 md:hidden">
         <div className={`
-          border-t border-uparsistem-200/50 dark:border-uparsistem-800/30
-          transition-[border-radius,box-shadow,background-color] duration-300 ease-out will-change-[border-radius,box-shadow]
+          transition-[border-radius,box-shadow,background-color] duration-300 ease-out
           ${expanded
-            ? "bg-uparsistem-50 dark:bg-uparsistem-950 shadow-[0_-8px_30px_rgba(40,107,4,0.12)] rounded-t-2xl"
-            : "bg-uparsistem-50/90 dark:bg-uparsistem-950/90 backdrop-blur-xl shadow-[0_-4px_20px_rgba(40,107,4,0.06)]"
+            ? "bg-white shadow-[0_-8px_30px_rgba(0,0,0,0.1)] rounded-t-2xl"
+            : "bg-white/95 backdrop-blur-xl shadow-[0_-4px_20px_rgba(0,0,0,0.06)] border-t border-gray-100"
           }`}>
-          {/* First row - primary tabs */}
-          <div className="flex items-center justify-around px-2 py-1">
+          {/* Primary tabs */}
+          <div className="flex items-center justify-around px-2 py-1.5">
             {primaryTabs.map((tab) => {
               const isActive = pathname === tab.path
               const Icon = tab.icon
@@ -88,18 +82,24 @@ export function MobileBottomNav() {
                 <button
                   key={tab.path}
                   onClick={() => navigate(tab.path)}
-                  className="relative flex flex-col items-center gap-0.5 py-1.5 px-3 min-w-0 flex-1"
+                  className={`relative flex flex-col items-center gap-0.5 py-1.5 px-2 min-w-0 flex-1 rounded-xl transition-all duration-200 ${
+                    isActive ? "bg-uparsistem-50" : ""
+                  }`}
                 >
                   {isActive && (
-                    <div className={`absolute -top-1 left-1/2 -translate-x-1/2 w-8 h-0.5 rounded-full ${roleIndicator[activeRole || ""] || "bg-primary"}`} />
+                    <div className="absolute -top-0.5 left-1/2 -translate-x-1/2 w-6 h-1 rounded-full bg-uparsistem-500" />
                   )}
-                  <div className={`flex items-center justify-center size-6 rounded-lg transition-colors duration-150 ${
-                    isActive ? "text-foreground" : tab.iconColor || "text-muted-foreground/60"
+                  <div className={`flex items-center justify-center size-7 rounded-lg transition-all duration-200 ${
+                    isActive
+                      ? "bg-uparsistem-500 shadow-sm shadow-uparsistem-500/30"
+                      : ""
                   }`}>
-                    <Icon className="size-5" />
+                    <Icon className={`size-4 transition-colors duration-200 ${
+                      isActive ? "text-white" : tab.iconColor || "text-gray-400"
+                    }`} />
                   </div>
-                  <span className={`text-[10px] font-medium leading-tight transition-colors duration-150 ${
-                    isActive ? "text-foreground" : "text-muted-foreground/50"
+                  <span className={`text-[10px] font-medium leading-tight transition-colors duration-200 ${
+                    isActive ? "text-uparsistem-700" : "text-gray-400"
                   }`}>
                     {tab.label}
                   </span>
@@ -110,27 +110,33 @@ export function MobileBottomNav() {
             {overflowTabs.length > 0 && (
               <button
                 onClick={() => setExpanded(!expanded)}
-                className="relative flex flex-col items-center gap-0.5 py-1.5 px-3 min-w-0 flex-1"
+                className="relative flex flex-col items-center gap-0.5 py-1.5 px-2 min-w-0 flex-1 rounded-xl transition-all duration-200"
               >
-                <div className="flex items-center justify-center size-6 rounded-lg text-muted-foreground/60">
-                  <ChevronDown className={`size-5 transition-transform duration-300 ease-out will-change-transform ${expanded ? "rotate-180" : ""}`} />
+                <div className={`flex items-center justify-center size-7 rounded-lg transition-all duration-200 ${
+                  expanded ? "bg-gray-100" : ""
+                }`}>
+                  <ChevronDown className={`size-4 text-gray-400 transition-transform duration-300 ${expanded ? "rotate-180" : ""}`} />
                 </div>
-                <span className="text-[10px] font-medium leading-tight text-muted-foreground/50">Más</span>
+                <span className={`text-[10px] font-medium leading-tight transition-colors duration-200 ${
+                  expanded ? "text-uparsistem-700" : "text-gray-400"
+                }`}>
+                  Más
+                </span>
               </button>
             )}
           </div>
 
-          {/* Second row - overflow tabs */}
+          {/* Overflow tabs */}
           {overflowTabs.length > 0 && (
             <div
-              className={`overflow-hidden transition-[max-height] duration-300 ease-out will-change-[max-height] ${
+              className={`overflow-hidden transition-[max-height] duration-300 ease-out ${
                 expanded ? "max-h-40" : "max-h-0"
               }`}
             >
-              <div className={`transition-all duration-300 ease-out will-change-transform ${
+              <div className={`transition-all duration-300 ease-out ${
                 expanded ? "translate-y-0 opacity-100" : "translate-y-3 opacity-0"
               }`}>
-                <div className="border-t border-gray-100 dark:border-gray-800 px-4 py-3">
+                <div className="border-t border-gray-100 px-4 py-3">
                   <div className="flex items-center justify-around">
                     {overflowTabs.map((tab) => {
                       const isActive = pathname === tab.path
@@ -139,20 +145,21 @@ export function MobileBottomNav() {
                         <button
                           key={tab.path}
                           onClick={() => navigate(tab.path)}
-                          className="relative flex flex-col items-center gap-1 py-2 px-3 min-w-0 flex-1"
+                          className={`relative flex flex-col items-center gap-1 py-2 px-3 min-w-0 flex-1 rounded-xl transition-all duration-200 ${
+                            isActive ? "bg-uparsistem-50" : ""
+                          }`}
                         >
-                          {isActive && (
-                            <div className={`absolute -top-2 left-1/2 -translate-x-1/2 w-8 h-0.5 rounded-full ${roleIndicator[activeRole || ""] || "bg-primary"}`} />
-                          )}
-                          <div className={`flex items-center justify-center size-7 rounded-xl transition-colors duration-150 ${
+                          <div className={`flex items-center justify-center size-8 rounded-lg transition-all duration-200 ${
                             isActive
-                              ? "text-foreground bg-primary/10"
-                              : tab.iconColor || "text-muted-foreground/70"
+                              ? "bg-uparsistem-500 shadow-sm shadow-uparsistem-500/30"
+                              : "bg-gray-50"
                           }`}>
-                            <Icon className="size-5" />
+                            <Icon className={`size-4 transition-colors duration-200 ${
+                              isActive ? "text-white" : tab.iconColor || "text-gray-400"
+                            }`} />
                           </div>
-                          <span className={`text-[11px] font-medium leading-tight transition-colors duration-150 ${
-                            isActive ? "text-foreground font-semibold" : "text-muted-foreground/60"
+                          <span className={`text-[11px] font-medium leading-tight transition-colors duration-200 ${
+                            isActive ? "text-uparsistem-700 font-semibold" : "text-gray-400"
                           }`}>
                             {tab.label}
                           </span>
@@ -165,6 +172,9 @@ export function MobileBottomNav() {
             </div>
           )}
         </div>
+
+        {/* Safe area spacer for notched phones */}
+        <div className="h-[env(safe-area-inset-bottom)] bg-white" />
       </nav>
     </>
   )

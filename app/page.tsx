@@ -1,5 +1,5 @@
-import { UnifiedLogin } from "@/components/unified-login"
+import { LoginNew } from "@/components/login-new"
 
 export default function Home() {
-  return <UnifiedLogin />
+  return <LoginNew />
 }

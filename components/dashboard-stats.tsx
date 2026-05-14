@@ -150,7 +150,6 @@ export function DashboardStats({ currentUserRole = "administrador", userName = "
       })
       setAccessLogs(logsData)
       setRealTimeUpdates((prev) => prev + 1)
-      console.log("[v0] Logs actualizados en tiempo real:", logsData.length)
     })
 
     const mesasQuery = query(collection(db, "mesas_config"))
@@ -163,14 +162,12 @@ export function DashboardStats({ currentUserRole = "administrador", userName = "
         } as MesaConfig)
       })
       setMesasConfig(mesasData)
-      console.log("[v0] Configuración de mesas actualizada:", mesasData.length)
     })
 
     const inventoryRef = doc(db, "config", "meal_inventory")
     const unsubscribeInventory = onSnapshot(inventoryRef, (docSnapshot) => {
       if (docSnapshot.exists()) {
         setMealInventory(docSnapshot.data() as MealInventory)
-        console.log("[v0] Inventario de comidas actualizado:", docSnapshot.data())
       }
     })
 
@@ -225,14 +222,6 @@ export function DashboardStats({ currentUserRole = "administrador", userName = "
       mesaMasActiva,
       promedioEntregasPorMesa,
     })
-
-    console.log("[v0] Estadísticas de bufete calculadas:", {
-      mesasActivas,
-      comidasEntregadas,
-      ingresosPorComida,
-      mesaMasActiva,
-      entregasPorMesa: Array.from(entregasPorMesa.entries()),
-    })
   }
 
   const fetchUserData = async (userId: string): Promise<UserData | null> => {
@@ -249,21 +238,16 @@ export function DashboardStats({ currentUserRole = "administrador", userName = "
         } as UserData
 
         setUsersCache((prev) => new Map(prev).set(userId, userData))
-        console.log("[v0] Usuario cargado desde Firestore:", userData)
         return userData
       }
       return null
     } catch (error) {
-      console.error("[v0] Error al cargar usuario:", error)
+      console.error("Error al cargar usuario:", error)
       return null
     }
   }
 
   const getFilteredLogs = () => {
-    console.log("[v0] Mostrando todos los logs sin filtrar por rol:", {
-      totalLogs: accessLogs.length,
-    })
-
     return accessLogs
   }
 
@@ -274,25 +258,15 @@ export function DashboardStats({ currentUserRole = "administrador", userName = "
     const filteredLogs = getFilteredLogs()
 
     for (const log of filteredLogs) {
-      console.log("[v0] Procesando log en getUserStats:", {
-        grantedByUserId: log.grantedByUserId,
-        grantedByUserName: log.grantedByUserName,
-        grantedByUserRole: log.grantedByUserRole,
-        identificacion: log.identificacion,
-        status: log.status,
-      })
-
       if (log.grantedByUserId) {
         let userName = log.grantedByUserName || "Usuario desconocido"
         let userRole = log.grantedByUserRole || "Usuario"
 
         if (!log.grantedByUserName || !log.grantedByUserRole) {
-          console.log("[v0] Datos de usuario faltantes en log, consultando Firestore...")
           const userData = await fetchUserData(log.grantedByUserId)
           if (userData) {
             userName = userData.fullName || userName
             userRole = userData.role || userRole
-            console.log("[v0] Datos actualizados desde Firestore:", { userName, userRole })
           }
         }
 
@@ -335,11 +309,6 @@ export function DashboardStats({ currentUserRole = "administrador", userName = "
     const bufeteStatsArray = Array.from(bufeteMap.values())
       .filter((stat) => stat.userName !== "Usuario desconocido")
       .sort((a, b) => b.total - a.total)
-
-    console.log("[v0] Estadísticas separadas calculadas:", {
-      adminOperativo: adminOperativoStats,
-      bufete: bufeteStatsArray,
-    })
 
     return { adminOperativo: adminOperativoStats, bufete: bufeteStatsArray }
   }
@@ -425,8 +394,11 @@ export function DashboardStats({ currentUserRole = "administrador", userName = "
       <div className="flex flex-1 flex-col gap-4 md:gap-6 p-2 md:p-4 px-1">
         <div className="flex items-center justify-center min-h-[400px] text-foreground">
           <div className="text-center">
-            <Loader2 className="h-8 w-8 animate-spin mx-auto mb-2" />
-            <p className="text-muted-foreground">Cargando estadísticas del dashboard...</p>
+            <div className="relative mx-auto w-10 h-10">
+              <div className="absolute inset-0 rounded-full border-2 border-gray-200" />
+              <div className="absolute inset-0 rounded-full border-2 border-t-uparsistem-500 animate-spin" />
+            </div>
+            <p className="mt-3 text-sm text-gray-400 font-medium">Cargando estadísticas...</p>
           </div>
         </div>
       </div>
@@ -434,236 +406,263 @@ export function DashboardStats({ currentUserRole = "administrador", userName = "
   }
 
   return (
-    <div className="flex flex-1 flex-col gap-1 md:gap-6 p-1 md:p-4 bg-gray-50/80 dark:bg-gray-950/50">
-      <div className="relative overflow-hidden rounded-xl border border-uparsistem-200 dark:border-uparsistem-800/30 bg-gradient-to-br from-uparsistem-50/80 via-white to-uparsistem-50/50 dark:from-uparsistem-950/20 dark:via-gray-900 dark:to-uparsistem-950/10 p-3 md:p-5 shadow-sm">
-        <div className="absolute top-0 right-0 w-32 h-32 bg-uparsistem-200/20 dark:bg-uparsistem-800/10 rounded-full -translate-y-1/2 translate-x-1/2 blur-2xl" />
+    <div className="flex flex-1 flex-col gap-4 md:gap-6 p-3 md:p-6 bg-gradient-to-br from-gray-50/80 via-white to-emerald-50/20 min-h-screen">
+      {/* Greeting header */}
+      <div className="relative overflow-hidden rounded-2xl border border-uparsistem-200/60 bg-gradient-to-br from-uparsistem-50/80 via-white to-uparsistem-50/40 p-4 md:p-6 shadow-sm">
+        <div className="absolute top-0 right-0 w-40 h-40 bg-uparsistem-200/15 rounded-full -translate-y-1/2 translate-x-1/3 blur-2xl" />
+        <div className="absolute bottom-0 left-0 w-24 h-24 bg-emerald-200/10 rounded-full translate-y-1/2 -translate-x-1/4 blur-xl" />
         <div className="relative flex items-center gap-3 md:gap-4">
-          <div className="flex size-9 md:size-12 shrink-0 items-center justify-center rounded-xl bg-uparsistem-600 dark:bg-uparsistem-700 shadow-sm shadow-uparsistem-600/20">
-            <span className="text-base md:text-xl font-bold text-white">
+          <div className="flex size-10 md:size-12 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-uparsistem-500 to-uparsistem-600 shadow-md shadow-uparsistem-500/20">
+            <span className="text-base md:text-lg font-bold text-white">
               {(userName || "D")[0].toUpperCase()}
             </span>
           </div>
           <div className="flex-1 min-w-0">
             {userName ? (
               <>
-                <h1 className="text-sm md:text-xl font-bold text-uparsistem-800 dark:text-uparsistem-200 leading-tight">
-                  Hola, <span className="text-uparsistem-700 dark:text-uparsistem-400">{userName}</span>
+                <h1 className="text-sm md:text-xl font-bold text-gray-900 leading-tight">
+                  Hola, <span className="bg-gradient-to-r from-uparsistem-600 to-uparsistem-700 bg-clip-text text-transparent">{userName}</span>
                 </h1>
-                <p className="text-[10px] md:text-sm text-uparsistem-600/70 dark:text-uparsistem-400/70 leading-tight mt-0.5">
+                <p className="text-[10px] md:text-sm text-gray-400 leading-tight mt-0.5">
                   Este es el resumen general del sistema
                 </p>
               </>
             ) : (
               <>
-                <h1 className="text-sm md:text-xl font-bold text-uparsistem-800 dark:text-uparsistem-200">Dashboard Principal</h1>
-                <p className="text-[10px] md:text-sm text-uparsistem-600/70 dark:text-uparsistem-400/70">Resumen general del sistema de control de acceso</p>
+                <h1 className="text-sm md:text-xl font-bold text-gray-900">Dashboard Principal</h1>
+                <p className="text-[10px] md:text-sm text-gray-400">Resumen general del sistema de control de acceso</p>
               </>
             )}
           </div>
-          <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-uparsistem-100 dark:bg-uparsistem-900/30 ring-1 ring-uparsistem-300 dark:ring-uparsistem-700">
-            <span className="flex size-1.5 rounded-full bg-uparsistem-500 animate-pulse" />
-            <span className="text-[10px] md:text-xs text-uparsistem-700 dark:text-uparsistem-300 font-medium">Tiempo real</span>
+          <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-uparsistem-50 ring-1 ring-uparsistem-200/60">
+            <span className="flex size-2 rounded-full bg-uparsistem-500 animate-pulse" />
+            <span className="text-[10px] md:text-xs text-uparsistem-700 font-semibold">Tiempo real</span>
           </div>
         </div>
       </div>
 
       {error && (
-        <Alert variant="destructive">
+        <Alert variant="destructive" className="rounded-xl">
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       )}
 
       {isLowInventory && mealInventory && (
-        <Alert variant="destructive">
-          <AlertTriangle className="h-4 w-4" />
-          <AlertDescription>
-            ¡Advertencia! El inventario de comidas está bajo ({inventoryPercentage.toFixed(1)}% disponible). Solo quedan{" "}
-            {mealInventory.comidasDisponibles} de {mealInventory.totalComidas} comidas.
-          </AlertDescription>
-        </Alert>
+        <div className="flex items-center gap-3 bg-red-50 border border-red-200/60 rounded-xl py-3 px-4">
+          <div className="flex-shrink-0 w-8 h-8 rounded-lg bg-red-100 flex items-center justify-center">
+            <AlertTriangle className="h-4 w-4 text-red-600" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold text-red-800">Inventario bajo</p>
+            <p className="text-xs text-red-600/80">
+              Solo quedan {mealInventory.comidasDisponibles} de {mealInventory.totalComidas} comidas ({inventoryPercentage.toFixed(1)}% disponible)
+            </p>
+          </div>
+        </div>
       )}
 
+      {/* Meal inventory card */}
       {mealInventory && (
-        <Card className="bg-gradient-to-br from-orange-50 to-amber-50 border-orange-200 !p-0 md:!p-0">
-          <CardHeader className="pb-1 md:pb-2 p-2 md:p-6">
-            <CardTitle className="text-[11px] md:text-base flex items-center gap-1 md:gap-2 text-uparsistem-700">
-              <Package className="h-3 w-3 md:h-5 md:w-5 text-uparsistem-600" />
+        <Card className="bg-gradient-to-br from-orange-50/80 to-amber-50/50 border-orange-200/50 rounded-2xl shadow-sm overflow-hidden">
+          <CardHeader className="pb-2 p-4 md:p-6">
+            <CardTitle className="text-sm md:text-base flex items-center gap-2 text-gray-800">
+              <div className="flex items-center justify-center size-8 rounded-lg bg-orange-100">
+                <Package className="h-4 w-4 text-orange-600" />
+              </div>
               Inventario Global de Comidas
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-1 md:space-y-3 p-2 md:p-6 pt-0 md:pt-0">
-            <div className="grid grid-cols-3 gap-1 md:gap-4">
-              <div className="text-center">
-                <div className="text-sm md:text-2xl font-bold text-uparsistem-800">{mealInventory.totalComidas}</div>
-                <p className="text-[8px] md:text-xs text-uparsistem-600">Total</p>
+          <CardContent className="space-y-3 p-4 md:p-6 pt-0">
+            <div className="grid grid-cols-3 gap-3">
+              <div className="text-center bg-white/60 rounded-xl py-3 px-2">
+                <div className="text-base md:text-2xl font-bold text-gray-900">{mealInventory.totalComidas}</div>
+                <p className="text-[10px] md:text-xs text-gray-500 font-medium">Total</p>
               </div>
-              <div className="text-center">
-                <div className="text-sm md:text-2xl font-bold text-red-700">{mealInventory.comidasConsumidas}</div>
-                <p className="text-[8px] md:text-xs text-red-600">Entregadas</p>
+              <div className="text-center bg-white/60 rounded-xl py-3 px-2">
+                <div className="text-base md:text-2xl font-bold text-red-600">{mealInventory.comidasConsumidas}</div>
+                <p className="text-[10px] md:text-xs text-gray-500 font-medium">Entregadas</p>
               </div>
-              <div className="text-center">
-                <div className={`text-sm md:text-2xl font-bold ${isLowInventory ? "text-red-700" : "text-uparsistem-700"}`}>
+              <div className="text-center bg-white/60 rounded-xl py-3 px-2">
+                <div className={`text-base md:text-2xl font-bold ${isLowInventory ? "text-red-600" : "text-uparsistem-600"}`}>
                   {mealInventory.comidasDisponibles}
                 </div>
-                <p className={`text-[8px] md:text-xs ${isLowInventory ? "text-red-600" : "text-uparsistem-600"}`}>
+                <p className={`text-[10px] md:text-xs font-medium ${isLowInventory ? "text-red-500" : "text-gray-500"}`}>
                   Disponibles
                 </p>
               </div>
             </div>
-            <div className="space-y-0.5 md:space-y-1">
-              <div className="flex items-center justify-between text-[10px] md:text-xs">
-                <span className="text-orange-700">Progreso</span>
-                <span className="font-medium text-orange-800">
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-gray-500 font-medium">Progreso</span>
+                <span className="font-semibold text-orange-700">
                   {((mealInventory.comidasConsumidas / mealInventory.totalComidas) * 100).toFixed(1)}%
                 </span>
               </div>
-              <Progress value={(mealInventory.comidasConsumidas / mealInventory.totalComidas) * 100} className="h-1.5 md:h-2 [&>div]:bg-gradient-to-r [&>div]:from-orange-400 [&>div]:to-amber-600" />
+              <Progress value={(mealInventory.comidasConsumidas / mealInventory.totalComidas) * 100} className="h-2 rounded-full [&>div]:bg-gradient-to-r [&>div]:from-orange-400 [&>div]:to-amber-500" />
             </div>
           </CardContent>
         </Card>
       )}
 
-      <div className="grid gap-1 md:gap-3 grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-        <div className="relative overflow-hidden rounded-xl bg-gradient-to-b from-blue-100 to-blue-200 dark:from-blue-950/30 dark:to-blue-900/20 border border-blue-200 dark:border-blue-800/30 p-2 md:p-4">
-          <div className="flex items-center justify-between mb-1">
-            <span className="text-[9px] md:text-xs font-semibold text-blue-700 dark:text-blue-300 uppercase tracking-wider">Graduandos</span>
-            <GraduationCap className="size-3 md:size-4 text-blue-500" />
+      {/* Stats grid */}
+      <div className="grid gap-3 md:gap-4 grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-blue-50 to-blue-100/80 border border-blue-200/50 p-3 md:p-4 shadow-sm">
+          <div className="absolute top-0 right-0 w-16 h-16 bg-blue-200/20 rounded-full -translate-y-1/3 translate-x-1/3 blur-lg" />
+          <div className="relative flex items-center justify-between mb-2">
+            <span className="text-[10px] md:text-xs font-semibold text-blue-700 uppercase tracking-wider">Graduandos</span>
+            <div className="flex items-center justify-center size-7 md:size-8 rounded-lg bg-blue-100/80">
+              <GraduationCap className="size-3.5 md:size-4 text-blue-600" />
+            </div>
           </div>
-          <div className="text-base md:text-2xl font-bold text-blue-800 dark:text-blue-200">{graduandosRegistrados}</div>
-          <p className="text-[7px] md:text-[10px] text-blue-600/70 dark:text-blue-400/70 mt-0.5">Registrados</p>
+          <div className="text-xl md:text-2xl font-bold text-blue-900">{graduandosRegistrados}</div>
+          <p className="text-[9px] md:text-[10px] text-blue-600/60 font-medium mt-0.5">Registrados</p>
         </div>
 
-        <div className="relative overflow-hidden rounded-xl bg-gradient-to-b from-uparsistem-100 to-uparsistem-200 dark:from-uparsistem-950/30 dark:to-uparsistem-900/20 border border-uparsistem-200 dark:border-uparsistem-800/30 p-2 md:p-4">
-          <div className="flex items-center justify-between mb-1">
-            <span className="text-[9px] md:text-xs font-semibold text-uparsistem-700 dark:text-uparsistem-300 uppercase tracking-wider">Accesos</span>
-            <CheckCircle className="size-3 md:size-4 text-uparsistem-500" />
+        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-uparsistem-50 to-uparsistem-100/80 border border-uparsistem-200/50 p-3 md:p-4 shadow-sm">
+          <div className="absolute top-0 right-0 w-16 h-16 bg-uparsistem-200/20 rounded-full -translate-y-1/3 translate-x-1/3 blur-lg" />
+          <div className="relative flex items-center justify-between mb-2">
+            <span className="text-[10px] md:text-xs font-semibold text-uparsistem-700 uppercase tracking-wider">Accesos</span>
+            <div className="flex items-center justify-center size-7 md:size-8 rounded-lg bg-uparsistem-100/80">
+              <CheckCircle className="size-3.5 md:size-4 text-uparsistem-600" />
+            </div>
           </div>
-          <div className="text-base md:text-2xl font-bold text-uparsistem-800 dark:text-uparsistem-200">{grantedAccessCount}</div>
-          <p className="text-[7px] md:text-[10px] text-uparsistem-600/70 dark:text-uparsistem-400/70 mt-0.5">Permitidos</p>
+          <div className="text-xl md:text-2xl font-bold text-uparsistem-800">{grantedAccessCount}</div>
+          <p className="text-[9px] md:text-[10px] text-uparsistem-600/60 font-medium mt-0.5">Permitidos</p>
         </div>
 
-        <div className="relative overflow-hidden rounded-xl bg-gradient-to-b from-red-100 to-red-200 dark:from-red-950/30 dark:to-red-900/20 border border-red-200 dark:border-red-800/30 p-2 md:p-4">
-          <div className="flex items-center justify-between mb-1">
-            <span className="text-[9px] md:text-xs font-semibold text-red-700 dark:text-red-300 uppercase tracking-wider">Denegados</span>
-            <XCircle className="size-3 md:size-4 text-red-500" />
+        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-red-50 to-red-100/80 border border-red-200/50 p-3 md:p-4 shadow-sm">
+          <div className="absolute top-0 right-0 w-16 h-16 bg-red-200/20 rounded-full -translate-y-1/3 translate-x-1/3 blur-lg" />
+          <div className="relative flex items-center justify-between mb-2">
+            <span className="text-[10px] md:text-xs font-semibold text-red-700 uppercase tracking-wider">Denegados</span>
+            <div className="flex items-center justify-center size-7 md:size-8 rounded-lg bg-red-100/80">
+              <XCircle className="size-3.5 md:size-4 text-red-600" />
+            </div>
           </div>
-          <div className="text-base md:text-2xl font-bold text-red-800 dark:text-red-200">{deniedAccessCount}</div>
-          <p className="text-[7px] md:text-[10px] text-red-600/70 dark:text-red-400/70 mt-0.5">Rechazados</p>
+          <div className="text-xl md:text-2xl font-bold text-red-900">{deniedAccessCount}</div>
+          <p className="text-[9px] md:text-[10px] text-red-600/60 font-medium mt-0.5">Rechazados</p>
         </div>
 
-        <div className="relative overflow-hidden rounded-xl bg-gradient-to-b from-amber-100 to-amber-200 dark:from-amber-950/30 dark:to-amber-900/20 border border-amber-200 dark:border-amber-800/30 p-2 md:p-4">
-          <div className="flex items-center justify-between mb-1">
-            <span className="text-[9px] md:text-xs font-semibold text-amber-700 dark:text-amber-300 uppercase tracking-wider">Espera</span>
-            <Clock className="size-3 md:size-4 text-amber-500" />
+        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-amber-50 to-amber-100/80 border border-amber-200/50 p-3 md:p-4 shadow-sm">
+          <div className="absolute top-0 right-0 w-16 h-16 bg-amber-200/20 rounded-full -translate-y-1/3 translate-x-1/3 blur-lg" />
+          <div className="relative flex items-center justify-between mb-2">
+            <span className="text-[10px] md:text-xs font-semibold text-amber-700 uppercase tracking-wider">Espera</span>
+            <div className="flex items-center justify-center size-7 md:size-8 rounded-lg bg-amber-100/80">
+              <Clock className="size-3.5 md:size-4 text-amber-600" />
+            </div>
           </div>
-          <div className="text-base md:text-2xl font-bold text-amber-800 dark:text-amber-200">{waitingPersonsCount}</div>
-          <p className="text-[7px] md:text-[10px] text-amber-600/70 dark:text-amber-400/70 mt-0.5">Sin procesar</p>
+          <div className="text-xl md:text-2xl font-bold text-amber-900">{waitingPersonsCount}</div>
+          <p className="text-[9px] md:text-[10px] text-amber-600/60 font-medium mt-0.5">Sin procesar</p>
         </div>
 
-        <div className="relative overflow-hidden rounded-xl bg-gradient-to-b from-cyan-100 to-cyan-200 dark:from-cyan-950/30 dark:to-cyan-900/20 border border-cyan-200 dark:border-cyan-800/30 p-2 md:p-4">
-          <div className="flex items-center justify-between mb-1">
-            <span className="text-[9px] md:text-xs font-semibold text-cyan-700 dark:text-cyan-300 uppercase tracking-wider">Mesas</span>
-            <Utensils className="size-3 md:size-4 text-cyan-500" />
+        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-cyan-50 to-cyan-100/80 border border-cyan-200/50 p-3 md:p-4 shadow-sm">
+          <div className="absolute top-0 right-0 w-16 h-16 bg-cyan-200/20 rounded-full -translate-y-1/3 translate-x-1/3 blur-lg" />
+          <div className="relative flex items-center justify-between mb-2">
+            <span className="text-[10px] md:text-xs font-semibold text-cyan-700 uppercase tracking-wider">Mesas</span>
+            <div className="flex items-center justify-center size-7 md:size-8 rounded-lg bg-cyan-100/80">
+              <Utensils className="size-3.5 md:size-4 text-cyan-600" />
+            </div>
           </div>
-          <div className="text-base md:text-2xl font-bold text-cyan-800 dark:text-cyan-200">
+          <div className="text-xl md:text-2xl font-bold text-cyan-900">
             {buffetStats.mesasActivas}/{buffetStats.totalMesas}
           </div>
-          <p className="text-[7px] md:text-[10px] text-cyan-600/70 dark:text-cyan-400/70 mt-0.5">Operativas</p>
+          <p className="text-[9px] md:text-[10px] text-cyan-600/60 font-medium mt-0.5">Operativas</p>
         </div>
 
-        <div className="relative overflow-hidden rounded-xl bg-gradient-to-b from-violet-100 to-violet-200 dark:from-violet-950/30 dark:to-violet-900/20 border border-violet-200 dark:border-violet-800/30 p-2 md:p-4">
-          <div className="flex items-center justify-between mb-1">
-            <span className="text-[9px] md:text-xs font-semibold text-violet-700 dark:text-violet-300 uppercase tracking-wider">Comidas</span>
-            <ChefHat className="size-3 md:size-4 text-violet-500" />
+        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-violet-50 to-violet-100/80 border border-violet-200/50 p-3 md:p-4 shadow-sm">
+          <div className="absolute top-0 right-0 w-16 h-16 bg-violet-200/20 rounded-full -translate-y-1/3 translate-x-1/3 blur-lg" />
+          <div className="relative flex items-center justify-between mb-2">
+            <span className="text-[10px] md:text-xs font-semibold text-violet-700 uppercase tracking-wider">Comidas</span>
+            <div className="flex items-center justify-center size-7 md:size-8 rounded-lg bg-violet-100/80">
+              <ChefHat className="size-3.5 md:size-4 text-violet-600" />
+            </div>
           </div>
-          <div className="text-base md:text-2xl font-bold text-violet-800 dark:text-violet-200">
+          <div className="text-xl md:text-2xl font-bold text-violet-900">
             {buffetStats.comidasEntregadas}
           </div>
-          <p className="text-[7px] md:text-[10px] text-violet-600/70 dark:text-violet-400/70 mt-0.5">Entregadas</p>
+          <p className="text-[9px] md:text-[10px] text-violet-600/60 font-medium mt-0.5">Entregadas</p>
         </div>
       </div>
 
-      <div className="grid gap-1 md:gap-4 grid-cols-1 lg:grid-cols-2">
-        <Card className="shadow-sm md:shadow-sm border-uparsistem-200/50 dark:border-uparsistem-800/30">
-          <CardHeader className="p-2 md:p-6 pb-1 md:pb-4">
-            <CardTitle className="flex items-center gap-1 md:gap-2 text-[11px] md:text-lg">
-              <TrendingUp className="w-3 h-3 md:w-5 md:h-5 text-uparsistem-600" />
+      {/* Two-column: Top User + User History */}
+      <div className="grid gap-4 md:gap-6 grid-cols-1 lg:grid-cols-2">
+        <Card className="shadow-sm border-gray-200/60 rounded-2xl overflow-hidden">
+          <CardHeader className="p-4 md:p-6 pb-3">
+            <CardTitle className="flex items-center gap-2 text-sm md:text-lg font-bold text-gray-900">
+              <div className="flex items-center justify-center size-8 rounded-lg bg-uparsistem-100">
+                <TrendingUp className="w-4 h-4 text-uparsistem-600" />
+              </div>
               Usuario Más Activo
             </CardTitle>
           </CardHeader>
-          <CardContent className="p-2 md:p-6 pt-0 md:pt-0">
+          <CardContent className="p-4 md:p-6 pt-0">
             {topUser ? (
-              <div className="flex items-center gap-1 md:gap-3 p-1 md:p-3 rounded border bg-uparsistem-50 border-uparsistem-200">
-                <div className="flex size-5 md:size-9 shrink-0 items-center justify-center rounded bg-uparsistem-600 text-white text-[9px] md:text-base font-bold">
+              <div className="flex items-center gap-3 p-3 md:p-4 rounded-xl bg-gradient-to-br from-uparsistem-50/80 to-white border border-uparsistem-200/50">
+                <div className="flex size-10 md:size-12 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-uparsistem-500 to-uparsistem-600 text-white text-sm md:text-base font-bold shadow-sm shadow-uparsistem-500/20">
                   1
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-[10px] md:text-sm font-semibold truncate leading-tight">{topUser.userName}</p>
-                  <p className="text-[8px] md:text-xs text-muted-foreground truncate capitalize leading-tight">
+                  <p className="text-sm md:text-base font-semibold text-gray-900 truncate">{topUser.userName}</p>
+                  <p className="text-xs text-gray-400 truncate capitalize">
                     {topUser.userRole} · {topUser.total} registros
                   </p>
                 </div>
-                <div className="flex items-center gap-0.5 md:gap-3 shrink-0">
-                  <div className="text-center px-0.5">
-                    <p className="text-[13px] md:text-sm font-bold text-uparsistem-600 tabular-nums leading-tight">{topUser.accedidos}</p>
-                    <p className="text-[6px] md:text-[10px] text-muted-foreground leading-tight">A</p>
+                <div className="flex items-center gap-3 shrink-0">
+                  <div className="text-center px-2">
+                    <p className="text-sm md:text-base font-bold text-uparsistem-600 tabular-nums">{topUser.accedidos}</p>
+                    <p className="text-[9px] md:text-[10px] text-gray-400 font-medium">Accesos</p>
                   </div>
-                  <div className="w-px h-4 md:h-7 bg-gray-200 dark:bg-gray-700" />
-                  <div className="text-center px-0.5">
-                    <p className="text-[13px] md:text-sm font-bold text-red-600 tabular-nums leading-tight">{topUser.denegados}</p>
-                    <p className="text-[6px] md:text-[10px] text-muted-foreground leading-tight">D</p>
+                  <div className="w-px h-8 bg-gray-200" />
+                  <div className="text-center px-2">
+                    <p className="text-sm md:text-base font-bold text-red-500 tabular-nums">{topUser.denegados}</p>
+                    <p className="text-[9px] md:text-[10px] text-gray-400 font-medium">Denegados</p>
                   </div>
                 </div>
               </div>
             ) : (
-              <p className="text-muted-foreground text-xs md:text-sm">No hay datos de usuarios disponibles</p>
+              <p className="text-gray-400 text-sm text-center py-6">No hay datos de usuarios disponibles</p>
             )}
           </CardContent>
         </Card>
 
-        <Card className="shadow-sm md:shadow-sm border-uparsistem-200/50 dark:border-uparsistem-800/30">
-          <CardHeader className="p-2 md:p-6 pb-1 md:pb-4">
-            <CardTitle className="text-[11px] md:text-lg">Historial por Usuario</CardTitle>
+        <Card className="shadow-sm border-gray-200/60 rounded-2xl overflow-hidden">
+          <CardHeader className="p-4 md:p-6 pb-3">
+            <CardTitle className="flex items-center gap-2 text-sm md:text-lg font-bold text-gray-900">
+              <div className="flex items-center justify-center size-8 rounded-lg bg-blue-100">
+                <Activity className="w-4 h-4 text-blue-600" />
+              </div>
+              Historial por Usuario
+            </CardTitle>
           </CardHeader>
-          <CardContent className="p-2 md:p-6 pt-0 md:pt-0">
-            <div className="space-y-2 md:space-y-4">
+          <CardContent className="p-4 md:p-6 pt-0">
+            <div className="space-y-3 md:space-y-4">
               {adminOperativoStats.length > 0 && (
                 <div>
-                  <div className="flex items-center gap-1 mb-1 md:mb-3">
-                    <UserCheck className="w-2.5 h-2.5 md:w-4 md:h-4 text-blue-600 flex-shrink-0" />
-                    <h3 className="text-[9px] md:text-sm font-semibold text-blue-700">Admin / Operativo</h3>
+                  <div className="flex items-center gap-2 mb-2 md:mb-3">
+                    <div className="flex items-center justify-center size-6 rounded-md bg-blue-100">
+                      <UserCheck className="w-3 h-3 md:w-4 md:h-4 text-blue-600" />
+                    </div>
+                    <h3 className="text-xs md:text-sm font-semibold text-blue-700">Admin / Operativo</h3>
                   </div>
-                  <div className="space-y-px md:space-y-2">
+                  <div className="space-y-2">
                     {adminOperativoStats.slice(0, 5).map((user, index) => (
-                      <div
-                        key={user.userId}
-                        className="flex items-center justify-between p-1 md:p-3 border rounded gap-0.5 md:gap-2 bg-blue-50/50 border-blue-100"
-                      >
-                        <div className="flex items-center gap-1 md:gap-3 flex-1 min-w-0">
-                          <div className="flex items-center justify-center w-3.5 h-3.5 md:w-8 md:h-8 rounded-full text-[7px] md:text-sm flex-shrink-0 bg-blue-100 text-blue-700">
+                      <div key={user.userId} className="flex items-center justify-between p-2.5 md:p-3 border rounded-xl bg-blue-50/50 border-blue-100/80 gap-2">
+                        <div className="flex items-center gap-2 md:gap-3 flex-1 min-w-0">
+                          <div className="flex items-center justify-center size-7 md:size-8 rounded-lg text-[10px] md:text-sm font-bold shrink-0 bg-blue-100 text-blue-700">
                             {index + 1}
                           </div>
                           <div className="flex-1 min-w-0">
-                            <p className="font-medium text-[9px] sm:text-xs md:text-base truncate leading-tight">{user.userName}</p>
-                            <p className="hidden md:block text-[8px] sm:text-[10px] md:text-sm text-muted-foreground truncate">
-                              Rol: <span className="capitalize">{user.userRole}</span>
-                            </p>
+                            <p className="font-medium text-xs md:text-sm text-gray-900 truncate">{user.userName}</p>
+                            <p className="text-[10px] md:text-xs text-gray-400 truncate capitalize">{user.userRole}</p>
                           </div>
                         </div>
-                        <div className="flex items-center gap-0.5 md:gap-4 flex-shrink-0">
-                          <div className="text-center px-0.5">
-                            <p className="font-bold text-[12px] sm:text-xs md:text-sm text-uparsistem-600 leading-tight">
-                              {user.accedidos}
-                            </p>
-                            <p className="text-[6px] sm:text-[9px] md:text-xs text-muted-foreground whitespace-nowrap leading-tight">
-                              Acc
-                            </p>
+                        <div className="flex items-center gap-2 md:gap-3 flex-shrink-0">
+                          <div className="text-center px-1.5">
+                            <p className="font-bold text-xs md:text-sm text-uparsistem-600 tabular-nums">{user.accedidos}</p>
+                            <p className="text-[8px] md:text-[10px] text-gray-400">Acc</p>
                           </div>
-                          <div className="text-center px-0.5">
-                            <p className="font-bold text-[12px] sm:text-xs md:text-sm text-red-600 leading-tight">{user.denegados}</p>
-                            <p className="text-[6px] sm:text-[9px] md:text-xs text-muted-foreground whitespace-nowrap leading-tight">
-                              Den
-                            </p>
+                          <div className="text-center px-1.5">
+                            <p className="font-bold text-xs md:text-sm text-red-500 tabular-nums">{user.denegados}</p>
+                            <p className="text-[8px] md:text-[10px] text-gray-400">Den</p>
                           </div>
                         </div>
                       </div>
@@ -674,41 +673,32 @@ export function DashboardStats({ currentUserRole = "administrador", userName = "
 
               {bufeteStats.length > 0 && (
                 <div>
-                  <div className="flex items-center gap-1 mb-1 md:mb-3">
-                    <ChefHat className="w-2.5 h-2.5 md:w-4 md:h-4 text-violet-600 flex-shrink-0" />
-                    <h3 className="text-[9px] md:text-sm font-semibold text-violet-600">Bufete</h3>
+                  <div className="flex items-center gap-2 mb-2 md:mb-3">
+                    <div className="flex items-center justify-center size-6 rounded-md bg-violet-100">
+                      <ChefHat className="w-3 h-3 md:w-4 md:h-4 text-violet-600" />
+                    </div>
+                    <h3 className="text-xs md:text-sm font-semibold text-violet-600">Bufete</h3>
                   </div>
-                  <div className="space-y-px md:space-y-2">
+                  <div className="space-y-2">
                     {bufeteStats.slice(0, 5).map((user, index) => (
-                      <div
-                        key={user.userId}
-                        className="flex items-center justify-between p-1 md:p-3 border rounded gap-0.5 md:gap-2 bg-violet-50/50 border-violet-100"
-                      >
-                        <div className="flex items-center gap-1 md:gap-3 flex-1 min-w-0">
-                          <div className="flex items-center justify-center w-3.5 h-3.5 md:w-8 md:h-8 rounded-full text-[7px] md:text-sm flex-shrink-0 bg-violet-100 text-violet-700">
+                      <div key={user.userId} className="flex items-center justify-between p-2.5 md:p-3 border rounded-xl bg-violet-50/50 border-violet-100/80 gap-2">
+                        <div className="flex items-center gap-2 md:gap-3 flex-1 min-w-0">
+                          <div className="flex items-center justify-center size-7 md:size-8 rounded-lg text-[10px] md:text-sm font-bold shrink-0 bg-violet-100 text-violet-700">
                             {index + 1}
                           </div>
                           <div className="flex-1 min-w-0">
-                            <p className="font-medium text-[9px] sm:text-xs md:text-base truncate leading-tight">{user.userName}</p>
-                            <p className="hidden md:block text-[8px] sm:text-[10px] md:text-sm text-muted-foreground truncate">
-                              Rol: <span className="capitalize">{user.userRole}</span>
-                            </p>
+                            <p className="font-medium text-xs md:text-sm text-gray-900 truncate">{user.userName}</p>
+                            <p className="text-[10px] md:text-xs text-gray-400 truncate capitalize">{user.userRole}</p>
                           </div>
                         </div>
-                        <div className="flex items-center gap-0.5 md:gap-4 flex-shrink-0">
-                          <div className="text-center px-0.5">
-                            <p className="font-bold text-[12px] sm:text-xs md:text-sm text-uparsistem-600 leading-tight">
-                              {user.accedidos}
-                            </p>
-                            <p className="text-[6px] sm:text-[9px] md:text-xs text-muted-foreground whitespace-nowrap leading-tight">
-                              Acc
-                            </p>
+                        <div className="flex items-center gap-2 md:gap-3 flex-shrink-0">
+                          <div className="text-center px-1.5">
+                            <p className="font-bold text-xs md:text-sm text-uparsistem-600 tabular-nums">{user.accedidos}</p>
+                            <p className="text-[8px] md:text-[10px] text-gray-400">Acc</p>
                           </div>
-                          <div className="text-center px-0.5">
-                            <p className="font-bold text-[12px] sm:text-xs md:text-sm text-red-600 leading-tight">{user.denegados}</p>
-                            <p className="text-[6px] sm:text-[9px] md:text-xs text-muted-foreground whitespace-nowrap leading-tight">
-                              Den
-                            </p>
+                          <div className="text-center px-1.5">
+                            <p className="font-bold text-xs md:text-sm text-red-500 tabular-nums">{user.denegados}</p>
+                            <p className="text-[8px] md:text-[10px] text-gray-400">Den</p>
                           </div>
                         </div>
                       </div>
@@ -718,7 +708,7 @@ export function DashboardStats({ currentUserRole = "administrador", userName = "
               )}
 
               {adminOperativoStats.length === 0 && bufeteStats.length === 0 && (
-                <p className="text-muted-foreground text-xs md:text-sm text-center py-4">
+                <p className="text-gray-400 text-sm text-center py-6">
                   No hay datos de usuarios disponibles
                 </p>
               )}

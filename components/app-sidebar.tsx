@@ -1,6 +1,6 @@
 "use client"
 
-import { Home, Scan, Shield, Database, Users, LogOut, User, Table, Utensils, ChevronLeft, DoorOpen, Package, Eye } from "lucide-react"
+import { Home, Scan, Shield, Database, Users, LogOut, User, Table, Utensils, ChevronLeft, DoorOpen, Package, Eye, LayoutDashboard } from "lucide-react"
 import { useState, useCallback } from "react"
 import {
   Sidebar,
@@ -45,7 +45,7 @@ const items: NavItem[] = [
   {
     title: "Inicio",
     path: "/dashboard",
-    icon: Home,
+    icon: LayoutDashboard,
     adminOnly: true,
     bufeteOnly: false,
     operativoOnly: false,
@@ -132,21 +132,27 @@ const items: NavItem[] = [
   },
 ]
 
-const roleStyles: Record<string, { label: string; gradient: string; badge: string }> = {
+const roleStyles: Record<string, { label: string; bg: string; text: string; border: string; gradient: string }> = {
   administrador: {
     label: "Admin",
-    gradient: "from-green-600 to-green-700",
-    badge: "bg-green-100 text-green-700 border-green-200",
+    bg: "bg-uparsistem-50",
+    text: "text-uparsistem-700",
+    border: "border-uparsistem-200",
+    gradient: "from-uparsistem-500 to-uparsistem-600",
   },
   operativo: {
     label: "Operativo",
+    bg: "bg-blue-50",
+    text: "text-blue-700",
+    border: "border-blue-200",
     gradient: "from-blue-500 to-indigo-600",
-    badge: "bg-blue-100 text-blue-700 border-blue-200",
   },
   bufete: {
     label: "Bufete",
+    bg: "bg-emerald-50",
+    text: "text-emerald-700",
+    border: "border-emerald-200",
     gradient: "from-emerald-500 to-green-600",
-    badge: "bg-emerald-100 text-emerald-700 border-emerald-200",
   },
 }
 
@@ -191,25 +197,25 @@ export function AppSidebar() {
       <Sidebar collapsible="icon" variant="inset">
         <SidebarHeader className="relative p-3 group-data-[collapsible=icon]:p-2">
           <div className="flex items-center gap-3 px-1 group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:justify-center">
-            <img src="/logo.webp" alt="Uparsistem" className="h-10 w-auto shrink-0 group-data-[collapsible=icon]:h-8" />
-            <div className="flex-1 min-w-0 group-data-[collapsible=icon]:hidden">
-              <p className="text-sm font-semibold truncate text-sidebar-foreground">Uparsistem</p>
-              <p className="text-[11px] truncate text-sidebar-foreground/60">Control de Acceso</p>
+            <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-br from-uparsistem-500 to-uparsistem-600 shadow-sm shadow-uparsistem-500/20 group-data-[collapsible=icon]:w-8 group-data-[collapsible=icon]:h-8 group-data-[collapsible=icon]:rounded-lg">
+              <img src="/logo.webp" alt="Uparsistem" className="h-7 w-auto group-data-[collapsible=icon]:h-5 brightness-0 invert" />
             </div>
-            <span className={`text-[10px] px-2 py-0.5 rounded-full border font-medium ${roleInfo.badge} shrink-0 group-data-[collapsible=icon]:hidden`}>
-              {roleInfo.label}
-            </span>
+            <div className="flex-1 min-w-0 group-data-[collapsible=icon]:hidden">
+              <p className="text-sm font-bold text-sidebar-foreground tracking-tight">Uparsistem</p>
+              <p className="text-[10px] text-sidebar-foreground/50 font-medium">Control de Acceso</p>
+            </div>
           </div>
-          <div className="mt-2 px-1 group-data-[collapsible=icon]:hidden">
+          <div className="mt-2.5 px-1 group-data-[collapsible=icon]:hidden">
             <RoleSwitcher />
           </div>
+
           <button
             onClick={toggleSidebar}
             className="
               absolute -right-3 top-5 z-20
               flex size-6 items-center justify-center
-              rounded-full border border-sidebar-border bg-sidebar
-              text-sidebar-foreground/50 hover:text-sidebar-foreground hover:border-sidebar-foreground/30
+              rounded-full border border-sidebar-border/80 bg-sidebar text-sidebar-foreground/40
+              hover:text-sidebar-foreground hover:border-sidebar-foreground/20 hover:bg-sidebar-accent
               shadow-sm hover:shadow-md
               transition-all duration-200
               group-data-[collapsible=icon]:rotate-180
@@ -221,37 +227,47 @@ export function AppSidebar() {
           </button>
         </SidebarHeader>
 
-        <SidebarContent>
+        <SidebarContent className="px-1">
           <SidebarGroup>
             <SidebarGroupContent>
-              <SidebarMenu className="px-1.5 space-y-0.5 group-data-[collapsible=icon]:px-1">
-                {visibleItems.map((item) => {
-                  const isActive = pathname === item.path
+              <SidebarMenu className="space-y-0.5">
+                {visibleItems.map((item, index) => {
+                  const isActive = pathname === item.path && (item.path !== "/dashboard/bufetes" || !item.description)
                   return (
                     <SidebarMenuItem key={item.title}>
                       <SidebarMenuButton
                         size="lg"
                         isActive={isActive}
                         onClick={() => navigate(item.path)}
-                        className="relative h-11 px-3 rounded-lg cursor-pointer group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:size-11"
+                        tooltip={item.title}
+                        className="relative h-11 px-3 rounded-xl cursor-pointer transition-all duration-200 group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:size-11 group-data-[collapsible=icon]:rounded-lg"
                       >
                         {isActive && (
-                          <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 rounded-r-full bg-sidebar-primary group-data-[collapsible=icon]:hidden" />
+                          <>
+                            <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 rounded-r-full bg-uparsistem-500 group-data-[collapsible=icon]:hidden" />
+                            <div className="absolute inset-0 rounded-xl bg-uparsistem-500/[0.06] group-data-[collapsible=icon]:rounded-lg" />
+                          </>
                         )}
-                        <div className={`flex items-center justify-center size-7 rounded-md shrink-0 ${
-                          isActive ? "bg-sidebar-primary/15" : "bg-sidebar-primary/5"
+                        <div className={`relative flex items-center justify-center size-8 rounded-lg shrink-0 transition-all duration-200 ${
+                          isActive
+                            ? `bg-gradient-to-br ${roleInfo.gradient} shadow-sm ${item.iconColor ? '' : ''}`
+                            : "bg-sidebar-accent/50 group-hover/bg-sidebar-accent"
                         }`}>
-                          <item.icon className={`size-4 ${isActive ? "text-sidebar-primary" : item.iconColor || "text-sidebar-foreground/60"}`} />
+                          <item.icon className={`size-4 ${
+                            isActive ? "text-white" : item.iconColor || "text-sidebar-foreground/50"
+                          } transition-colors duration-200`} />
                         </div>
-                        <div className="flex flex-col flex-1 min-w-0 group-data-[collapsible=icon]:hidden">
-                          <span className="text-sm leading-tight">{item.title}</span>
+                        <div className="relative flex flex-col flex-1 min-w-0 group-data-[collapsible=icon]:hidden">
+                          <span className={`text-sm leading-tight font-medium ${isActive ? "text-sidebar-foreground" : "text-sidebar-foreground/70"}`}>
+                            {item.title}
+                          </span>
                           {item.path === "/dashboard/escanear" && item.getDescription && (
-                            <span className="text-[10px] text-sidebar-foreground/50 leading-tight mt-px">
+                            <span className="text-[10px] text-sidebar-foreground/40 leading-tight mt-px">
                               {item.getDescription(activeRole || "")}
                             </span>
                           )}
                           {item.description && (
-                            <span className="text-[10px] text-sidebar-foreground/50 leading-tight mt-px">
+                            <span className="text-[10px] text-sidebar-foreground/40 leading-tight mt-px">
                               {item.description}
                             </span>
                           )}
@@ -265,27 +281,26 @@ export function AppSidebar() {
           </SidebarGroup>
         </SidebarContent>
 
-        <SidebarFooter className="p-3 border-t border-sidebar-border/50 group-data-[collapsible=icon]:p-2">
+        <SidebarFooter className="p-3 border-t border-sidebar-border/40 group-data-[collapsible=icon]:p-2">
           <button
             onClick={handleLogout}
-            className="flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-sidebar-foreground/60 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 transition-all duration-150 group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:justify-center"
+            className="flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-sidebar-foreground/50 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 transition-all duration-200 group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:rounded-lg"
           >
-            <div className="flex size-7 shrink-0 items-center justify-center rounded-md bg-sidebar-primary/5 group-hover:bg-red-100 dark:group-hover:bg-red-950/50 transition-colors">
+            <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-sidebar-accent/50 group-hover:bg-red-100 dark:group-hover:bg-red-950/50 transition-all duration-200">
               <LogOut className="size-4" />
             </div>
             <div className="flex-1 text-left min-w-0 group-data-[collapsible=icon]:hidden">
               <p className="text-sm font-medium truncate">{fullName || user?.idNumber || "Usuario"}</p>
-              <p className="text-[10px] truncate text-sidebar-foreground/40">
+              <p className="text-[10px] truncate text-sidebar-foreground/35">
                 {user?.idNumber || ""} · {roleInfo.label}
               </p>
             </div>
           </button>
         </SidebarFooter>
-
       </Sidebar>
 
       <AlertDialog open={showLogoutConfirm} onOpenChange={setShowLogoutConfirm}>
-        <AlertDialogContent>
+        <AlertDialogContent className="rounded-2xl">
           <AlertDialogHeader>
             <AlertDialogTitle>Cerrar sesión</AlertDialogTitle>
             <AlertDialogDescription>
@@ -294,7 +309,7 @@ export function AppSidebar() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmLogout} className="bg-red-600 hover:bg-red-700 text-white">
+            <AlertDialogAction onClick={confirmLogout} className="bg-red-600 hover:bg-red-700 text-white rounded-xl">
               Cerrar sesión
             </AlertDialogAction>
           </AlertDialogFooter>
