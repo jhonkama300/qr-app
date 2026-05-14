@@ -417,7 +417,8 @@ export function LoginNew() {
                   >
                     <img src={qrCodeUrl} alt="QR Code" className="w-24 h-24 sm:w-28 sm:h-28" />
                   </button>
-                  <p className="mt-1 text-[10px] sm:text-[11px] font-semibold text-slate-400 uppercase tracking-wider text-center">Toca para ampliar</p>
+                  <p className="mt-1 text-[10px] sm:text-[11px] font-semibold text-slate-400 uppercase tracking-wider text-center">Toca para ampliar el QR</p>
+                <p className="text-[10px] text-slate-400 text-center mt-0.5">Presenta en la entrada o el bufete</p>
                 </div>
               )}
 
@@ -556,10 +557,10 @@ export function LoginNew() {
           <div className="flex flex-col items-center py-2">
             {qrCodeUrl && (
               <div className="p-3 bg-white rounded-2xl border-2 border-slate-200 shadow-sm">
-                <img src={qrCodeUrl} alt="QR Code" className="w-56 h-56 sm:w-64 sm:h-64" />
+                <img src={qrCodeUrl} alt="QR Code" className="w-56 h-56 sm:w-64 sm:h-64 cursor-pointer" onClick={() => setShowQrPreview(false)} />
               </div>
             )}
-            <p className="mt-3 text-xs font-semibold text-slate-400 uppercase tracking-wider text-center">Presenta este QR en el bufete</p>
+            <p className="mt-3 text-xs font-semibold text-slate-400 uppercase tracking-wider text-center">Presenta este QR en la entrada o el bufete</p>
           </div>
         </DialogContent>
       </Dialog>
