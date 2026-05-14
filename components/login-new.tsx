@@ -206,23 +206,27 @@ export function LoginNew() {
                 <Image src="/images/logo1.png" alt="Logo Uparsistem" width={56} height={56} className="object-contain" />
               </div>
               <div className="text-center">
-                <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">Iniciar Sesión</h1>
-                <p className="text-sm text-slate-400 mt-1">Sistema de control de acceso</p>
+                <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">Grados Uparsistem</h1>
+                <p className="text-sm text-slate-400 mt-1">Información de grados</p>
               </div>
             </div>
 
             {/* Step Indicator */}
-            <div className="flex items-center justify-center gap-4 pt-8 lg:pt-6 pb-6 px-8">
-              <div className={`flex items-center gap-2 text-sm font-semibold transition-colors duration-300 ${step === "id" ? "text-slate-900" : "text-slate-300"}`}>
-                <div className={`flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold transition-all duration-300 ${step === "id" ? "bg-uparsistem-600 text-white" : "bg-slate-100 text-slate-400"}`}>1</div>
-                <span>Identificación</span>
+            {step === "password" && (
+              <div className="flex items-center justify-center gap-4 pt-6 pb-4 px-8 animate-step-in">
+                <div className="flex items-center gap-2 text-sm font-semibold text-slate-300">
+                  <div className="flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold bg-uparsistem-600 text-white">
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                  </div>
+                  <span>Identificación</span>
+                </div>
+                <div className="h-px w-8 bg-uparsistem-500" />
+                <div className="flex items-center gap-2 text-sm font-semibold text-slate-900">
+                  <div className="flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold bg-uparsistem-600 text-white">2</div>
+                  <span>Contraseña</span>
+                </div>
               </div>
-              <div className={`h-px w-8 transition-colors duration-300 ${step === "password" ? "bg-uparsistem-500" : "bg-slate-200"}`} />
-              <div className={`flex items-center gap-2 text-sm font-semibold transition-colors duration-300 ${step === "password" ? "text-slate-900" : "text-slate-300"}`}>
-                <div className={`flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold transition-all duration-300 ${step === "password" ? "bg-uparsistem-600 text-white" : "bg-slate-100 text-slate-400"}`}>2</div>
-                <span>Contraseña</span>
-              </div>
-            </div>
+            )}
 
             {/* Form Container */}
             <div className="px-8 pb-10 space-y-6">
