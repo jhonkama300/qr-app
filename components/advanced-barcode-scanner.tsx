@@ -1,8 +1,7 @@
 "use client"
 
 import { useState, useRef, useEffect, useCallback } from "react"
-import Webcam from "react-webcam"
-import { BrowserMultiFormatReader, BarcodeFormat, DecodeHintType } from "@zxing/library"
+import { useFastQRScanner } from "@/hooks/use-fast-qr-scanner"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -47,10 +46,7 @@ export function AdvancedBarcodeScanner() {
   const { user, fullName } = useAuth()
 
   const [isClient, setIsClient] = useState(false)
-  const [hasPermission, setHasPermission] = useState<boolean | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [devices, setDevices] = useState<MediaDeviceInfo[]>([])
-  const [selectedDeviceId, setSelectedDeviceId] = useState<string>("")
   const [scanResultDisplay, setScanResultDisplay] = useState<ScanResultDisplay | null>(null)
   const [manualIdInput, setManualIdInput] = useState<string>("")
   const [isManualProcessing, setIsManualProcessing] = useState(false)
@@ -62,10 +58,12 @@ export function AdvancedBarcodeScanner() {
   const unsubscribeRef = useRef<(() => void) | null>(null)
 
   const router = useRouter()
-  const webcamRef = useRef<Webcam>(null)
-  const codeReader = useRef<BrowserMultiFormatReader | null>(null)
   const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null)
-  const activeStreamRef = useRef<MediaStream | null>(null)
+
+  const scanner = useFastQRScanner({
+    onQRDetected: (data) => processScanResult(data, "direct"),
+    cooldown: 1500,
+  })
 
   useEffect(() => {
     setIsClient(true)
@@ -73,72 +71,13 @@ export function AdvancedBarcodeScanner() {
 
   useEffect(() => {
     if (!isClient) return
-
-    const hints = new Map<DecodeHintType, any>()
-    hints.set(DecodeHintType.POSSIBLE_FORMATS, [
-      BarcodeFormat.CODE_39,
-      BarcodeFormat.CODE_128,
-      BarcodeFormat.EAN_13,
-      BarcodeFormat.QR_CODE,
-      BarcodeFormat.DATA_MATRIX,
-      BarcodeFormat.AZTEC,
-      BarcodeFormat.PDF_417,
-    ])
-    codeReader.current = new BrowserMultiFormatReader(hints)
-
-    return () => {
-      if (codeReader.current) {
-        codeReader.current.reset()
-      }
-    }
+    const timer = setTimeout(() => scanner.startCamera(), 500)
+    return () => clearTimeout(timer)
   }, [isClient])
-
-  const handleDevices = useCallback((mediaDevices: MediaDeviceInfo[]) => {
-    const videoDevices = mediaDevices.filter(({ kind }) => kind === "videoinput")
-    console.log("[v0] Available video devices:", videoDevices.length)
-    setDevices(videoDevices)
-
-    // Buscar cámara trasera con múltiples criterios
-    const backCamera = videoDevices.find(
-      (device) =>
-        device.label.toLowerCase().includes("back") ||
-        device.label.toLowerCase().includes("trasera") ||
-        device.label.toLowerCase().includes("rear") ||
-        device.label.toLowerCase().includes("environment") ||
-        device.label.toLowerCase().includes("posterior"),
-    )
-
-    if (backCamera) {
-      console.log("[v0] Back camera found:", backCamera.label)
-      setSelectedDeviceId(backCamera.deviceId)
-    } else if (videoDevices.length > 0) {
-      console.log("[v0] Using first available camera:", videoDevices[0].label)
-      setSelectedDeviceId(videoDevices[0].deviceId)
-    }
-  }, [])
-
-  useEffect(() => {
-    if (!isClient) return
-
-    navigator.mediaDevices
-      .getUserMedia({ video: true })
-      .then((stream) => {
-        setHasPermission(true)
-        setError(null)
-        activeStreamRef.current = stream
-        navigator.mediaDevices.enumerateDevices().then(handleDevices)
-      })
-      .catch((err) => {
-        console.error("Error al acceder a la cámara:", err)
-        setError("No se pudo acceder a la cámara. Por favor, conceda permisos e inténtelo de nuevo.")
-        setHasPermission(false)
-      })
-  }, [handleDevices, isClient])
 
   const processScanResult = useCallback(
     async (scannedContent: string, source: "direct" | "q10" | "manual") => {
       if (isScanning) {
-        console.log("[v0] Scan already in progress, ignoring")
         return
       }
 
@@ -197,6 +136,7 @@ export function AdvancedBarcodeScanner() {
           setShowResult(false)
           setScanResultDisplay(null)
           setIsScanning(false)
+          scanner.resetDetection()
         }, 5000)
         return
       } else {
@@ -217,6 +157,7 @@ export function AdvancedBarcodeScanner() {
             setScanResultDisplay(null)
             setShowResult(false)
             setIsScanning(false)
+            scanner.resetDetection()
           }, 4000)
           return
         }
@@ -251,75 +192,11 @@ export function AdvancedBarcodeScanner() {
         setShowResult(false)
         setScanResultDisplay(null)
         setIsScanning(false)
+        scanner.resetDetection()
       }, 5000)
     },
     [getStudentById, markStudentAccess, processQ10Url, user, checkIfAlreadyScanned, isScanning, fullName],
   )
-
-  useEffect(() => {
-    if (!isClient || !hasPermission || !selectedDeviceId || isProcessingQ10 || isScanning || !codeReader.current) {
-      return
-    }
-
-    const video = webcamRef.current?.video
-    if (!video) {
-      console.warn("[v0] Elemento de video no listo para escanear.")
-      return
-    }
-
-    setError(null)
-
-    console.log("[v0] Iniciando escaneo continuo con dispositivo:", selectedDeviceId)
-    codeReader.current
-      .decodeFromVideoDevice(selectedDeviceId, video, (result, err) => {
-        if (result) {
-          if (!isScanning && !isProcessingQ10 && !isManualProcessing) {
-            console.log("[v0] QR detectado:", result.getText())
-            processScanResult(result.getText(), "direct")
-          }
-        }
-        if (err && err.name !== "NotFoundException" && err.name !== "AbortException") {
-          console.error("[v0] Error al escanear:", err)
-          setError("Error en el escáner: " + err.message)
-        }
-      })
-      .catch((err) => {
-        console.error("[v0] Error al iniciar el escaneo continuo:", err)
-        setError("Error al iniciar el escáner: " + err.message)
-        codeReader.current?.reset()
-      })
-
-    return () => {
-      if (codeReader.current) {
-        console.log("[v0] Reseteando lector en cleanup...")
-        codeReader.current.reset()
-      }
-      if (activeStreamRef.current) {
-        const stream = activeStreamRef.current
-        stream.getTracks().forEach((track) => {
-          track.stop()
-          console.log("[v0] Track stopped on unmount:", track.kind)
-        })
-      }
-    }
-  }, [isClient, hasPermission, selectedDeviceId, isProcessingQ10, isScanning, processScanResult])
-
-  const requestCameraPermission = () => {
-    if (!isClient) return
-    navigator.mediaDevices
-      .getUserMedia({ video: true })
-      .then((stream) => {
-        setHasPermission(true)
-        setError(null)
-        activeStreamRef.current = stream
-        navigator.mediaDevices.enumerateDevices().then(handleDevices)
-      })
-      .catch((err) => {
-        console.error("Error al acceder a la cámara:", err)
-        setError("No se pudo acceder a la cámara. Por favor, conceda permisos e inténtelo de nuevo.")
-        setHasPermission(false)
-      })
-  }
 
   const handleManualSubmit = async () => {
     if (!manualIdInput.trim()) {
@@ -341,7 +218,6 @@ export function AdvancedBarcodeScanner() {
     try {
       await processScanResult(manualIdInput.trim(), "manual")
     } catch (err) {
-      console.error("Error al procesar identificación manual:", err)
       setScanResultDisplay({
         type: "error",
         identificacion: manualIdInput,
@@ -356,23 +232,20 @@ export function AdvancedBarcodeScanner() {
   }
 
   const resetScanner = () => {
-    console.log("[v0] Resetting scanner...")
     setScanResultDisplay(null)
     setShowResult(false)
     setError(null)
     setManualIdInput("")
     setManualInputError(null)
     setIsScanning(false)
+    scanner.resetDetection()
 
-    // Limpiar cualquier timeout pendiente
     if (retryTimeoutRef.current) {
       clearTimeout(retryTimeoutRef.current)
       retryTimeoutRef.current = null
     }
 
-    // Limpiar cualquier listener de Firestore en cleanup
     if (unsubscribeRef.current) {
-      console.log("[v0] Cleaning up Firestore listener")
       unsubscribeRef.current()
       unsubscribeRef.current = null
     }
@@ -380,8 +253,6 @@ export function AdvancedBarcodeScanner() {
 
   useEffect(() => {
     if (scanResultDisplay?.identificacion && showResult && scanResultDisplay.type === "success") {
-      console.log("[v0] Setting up realtime listener for:", scanResultDisplay.identificacion)
-
       const studentDocRef = doc(db, "estudiantes", scanResultDisplay.identificacion)
 
       unsubscribeRef.current = onSnapshot(
@@ -389,7 +260,6 @@ export function AdvancedBarcodeScanner() {
         (docSnapshot) => {
           if (docSnapshot.exists()) {
             const updatedData = docSnapshot.data()
-            console.log("[v0] Realtime update received:", updatedData)
             setRealtimeStudentData(updatedData)
           }
         },
@@ -400,7 +270,6 @@ export function AdvancedBarcodeScanner() {
 
       return () => {
         if (unsubscribeRef.current) {
-          console.log("[v0] Cleaning up realtime listener")
           unsubscribeRef.current()
           unsubscribeRef.current = null
         }
@@ -422,16 +291,16 @@ export function AdvancedBarcodeScanner() {
     )
   }
 
-  if (hasPermission === false) {
+  if (scanner.permissionDenied) {
     return (
       <div className="flex flex-col items-center justify-center p-8 text-center bg-card rounded-lg border border-border shadow-sm">
         <CameraOffIcon className="text-destructive mb-6 size-20" />
         <h3 className="text-2xl font-bold mb-3 text-foreground">Acceso a la cámara denegado</h3>
         <p className="text-muted-foreground mb-8 text-base">
-          {error || "Se requiere acceso a la cámara para escanear códigos de barras."}
+          {scanner.error || "Se requiere acceso a la cámara para escanear códigos de barras."}
         </p>
         <Button
-          onClick={requestCameraPermission}
+          onClick={() => scanner.startCamera()}
           className="bg-primary text-primary-foreground h-12 px-6 text-base rounded-md"
         >
           <CameraIcon className="mr-2 size-5" />
@@ -480,25 +349,33 @@ export function AdvancedBarcodeScanner() {
               </TabsList>
 
               <TabsContent value="qr" className="space-y-4 mt-0">
-                {error && activeTab === "qr" && (
+                {(error || scanner.error) && activeTab === "qr" && (
                   <Alert variant="destructive">
                     <AlertTriangle className="h-4 w-4" />
-                    <AlertDescription>{error}</AlertDescription>
+                    <AlertDescription>{error || scanner.error}</AlertDescription>
                   </Alert>
                 )}
 
                 <div className="relative w-full pt-[100%] overflow-hidden rounded-lg bg-card shadow-lg border border-blue-200">
-                  {selectedDeviceId && (
-                    <Webcam
-                      ref={webcamRef}
-                      audio={false}
-                      videoConstraints={{
-                        deviceId: selectedDeviceId,
-                        facingMode: "environment",
-                      }}
-                      className="absolute inset-0 w-full h-full object-cover"
-                    />
-                  )}
+                  {scanner.isScanning ? (
+                    <>
+                      <video
+                        ref={scanner.videoRef}
+                        autoPlay
+                        playsInline
+                        muted
+                        className="absolute inset-0 w-full h-full object-cover"
+                      />
+                      <canvas ref={scanner.canvasRef} className="hidden" />
+                    </>
+                  ) : scanner.cameraLoading ? (
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/80">
+                      <div className="flex flex-col items-center gap-3">
+                        <div className="w-8 h-8 border-3 border-blue-400 border-t-transparent rounded-full animate-spin" />
+                        <p className="text-blue-400 text-sm font-medium">Iniciando cámara...</p>
+                      </div>
+                    </div>
+                  ) : null}
                   <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[90%] h-[50%] border-4 border-blue-500 rounded-lg shadow-[0_0_0_9999px_rgba(0,0,0,0.5)]">
                     <div className="absolute top-1/2 left-[5%] right-[5%] h-[2px] bg-blue-500 animate-scan"></div>
                   </div>
@@ -506,7 +383,12 @@ export function AdvancedBarcodeScanner() {
 
                 <div className="text-center p-3 bg-blue-50 rounded-lg border border-blue-200">
                   <p className="text-sm text-blue-700">
-                    {isScanning ? (
+                    {scanner.isDetecting ? (
+                      <span className="flex items-center justify-center gap-2">
+                        <CheckCircle className="w-4 h-4 text-green-600" />
+                        QR Detectado
+                      </span>
+                    ) : isScanning ? (
                       <span className="flex items-center justify-center gap-2">
                         <Loader2Icon className="w-4 h-4 animate-spin" />
                         Procesando...

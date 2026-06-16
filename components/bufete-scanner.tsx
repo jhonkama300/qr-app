@@ -1,8 +1,7 @@
 "use client"
 
 import { useState, useRef, useEffect, useCallback } from "react"
-import Webcam from "react-webcam"
-import { BrowserMultiFormatReader, BarcodeFormat, DecodeHintType } from "@zxing/library"
+import { useFastQRScanner } from "@/hooks/use-fast-qr-scanner"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
@@ -48,9 +47,6 @@ export function BuffeteScanner() {
   const { processQ10Url, isProcessingQ10, q10Message } = useQ10Validation()
 
   const [isClient, setIsClient] = useState(false)
-  const [hasPermission, setHasPermission] = useState<boolean | null>(null)
-  const [devices, setDevices] = useState<MediaDeviceInfo[]>([])
-  const [selectedDeviceId, setSelectedDeviceId] = useState<string>("")
   const [processing, setProcessing] = useState(false)
   const [error, setError] = useState("")
   const [scanResult, setScanResult] = useState<ScanResult | null>(null)
@@ -60,79 +56,11 @@ export function BuffeteScanner() {
   const [realtimeStudentData, setRealtimeStudentData] = useState<any>(null)
   const unsubscribeRef = useRef<(() => void) | null>(null)
 
-  const webcamRef = useRef<Webcam>(null)
-  const codeReader = useRef<BrowserMultiFormatReader | null>(null)
   const manualInputRef = useRef<HTMLInputElement>(null)
-  const activeStreamRef = useRef<MediaStream | null>(null)
 
-  const stopCamera = useCallback(() => {
-    console.log("[v0] Stopping camera completely...")
-
-    if (codeReader.current) {
-      try {
-        codeReader.current.reset()
-      } catch (e) {
-        console.error("[v0] Error resetting code reader:", e)
-      }
-    }
-
-    if (activeStreamRef.current) {
-      activeStreamRef.current.getTracks().forEach((track) => {
-        track.stop()
-        console.log("[v0] Track stopped:", track.kind, track.label)
-      })
-      activeStreamRef.current = null
-    }
-
-    if (webcamRef.current?.video?.srcObject) {
-      const stream = webcamRef.current.video.srcObject as MediaStream
-      stream.getTracks().forEach((track) => {
-        track.stop()
-        console.log("[v0] Webcam track stopped:", track.kind)
-      })
-      webcamRef.current.video.srcObject = null
-    }
-  }, [])
-
-  const handleDevices = useCallback((mediaDevices: MediaDeviceInfo[]) => {
-    const videoDevices = mediaDevices.filter(({ kind }) => kind === "videoinput")
-    setDevices(videoDevices)
-    const backCamera = videoDevices.find(
-      (device) =>
-        device.label.toLowerCase().includes("back") ||
-        device.label.toLowerCase().includes("trasera") ||
-        device.label.toLowerCase().includes("rear") ||
-        device.label.toLowerCase().includes("environment"),
-    )
-    if (backCamera) {
-      setSelectedDeviceId(backCamera.deviceId)
-    } else if (videoDevices.length > 0) {
-      setSelectedDeviceId(videoDevices[0].deviceId)
-    }
-  }, [])
-
-  const requestCamera = useCallback(async () => {
-    try {
-      stopCamera()
-      await new Promise((resolve) => setTimeout(resolve, 100))
-
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "environment" },
-      })
-
-      activeStreamRef.current = stream
-      setHasPermission(true)
-      const devices = await navigator.mediaDevices.enumerateDevices()
-      handleDevices(devices)
-
-      stream.getTracks().forEach((track) => track.stop())
-      activeStreamRef.current = null
-    } catch (err) {
-      console.error("Error al acceder a la cámara:", err)
-      setError("No se pudo acceder a la cámara. Por favor, concede permisos e inténtalo de nuevo.")
-      setHasPermission(false)
-    }
-  }, [handleDevices, stopCamera])
+  const scanner = useFastQRScanner({
+    onQRDetected: (data) => processScanResult(data, "direct"),
+  })
 
   useEffect(() => {
     setIsClient(true)
@@ -140,36 +68,59 @@ export function BuffeteScanner() {
 
   useEffect(() => {
     if (!isClient) return
+    const timer = setTimeout(() => scanner.startCamera(), 500)
+    return () => clearTimeout(timer)
+  }, [isClient])
+
+  useEffect(() => {
+    if (activeTab === "manual" && manualInputRef.current) {
+      manualInputRef.current.focus()
+    }
+  }, [activeTab])
+
+  useEffect(() => {
+    if (!scanResult?.identificacion || !showResult) {
+      return
+    }
+
+    if (typeof scanResult.identificacion !== "string" || scanResult.identificacion.trim() === "") {
+      return
+    }
 
     try {
-      if (!codeReader.current) {
-        const hints = new Map<DecodeHintType, any>()
-        hints.set(DecodeHintType.POSSIBLE_FORMATS, [BarcodeFormat.QR_CODE])
-        hints.set(DecodeHintType.TRY_HARDER, true)
-        codeReader.current = new BrowserMultiFormatReader(hints)
-        console.log("[v0] ZXing reader initialized for bufete")
-      }
+      const studentDocRef = doc(db, "personas", scanResult.identificacion)
+
+      unsubscribeRef.current = onSnapshot(
+        studentDocRef,
+        (docSnapshot) => {
+          if (docSnapshot.exists()) {
+            const updatedData = docSnapshot.data()
+            setRealtimeStudentData(updatedData)
+          }
+        },
+        (error) => {
+          console.error("[v0] Error in realtime listener:", error)
+        },
+      )
     } catch (error) {
-      console.error("[v0] Error initializing ZXing reader:", error)
-      setError("Error al inicializar el lector de códigos QR")
+      console.error("[v0] Error setting up realtime listener:", error)
     }
 
     return () => {
-      console.log("[v0] Cleaning up ZXing reader")
-      stopCamera()
+      if (unsubscribeRef.current) {
+        try {
+          unsubscribeRef.current()
+        } catch (error) {
+          console.error("[v0] Error cleaning up listener:", error)
+        }
+        unsubscribeRef.current = null
+      }
     }
-  }, [isClient, stopCamera])
-
-  useEffect(() => {
-    if (!isClient) return
-
-    requestCamera()
-  }, [isClient, requestCamera])
+  }, [scanResult?.identificacion, showResult])
 
   const processScanResult = useCallback(
     async (scannedContent: string, source: "direct" | "q10" | "manual") => {
       if (processing) {
-        console.log("[v0] Scan already in progress, ignoring")
         return
       }
 
@@ -185,6 +136,7 @@ export function BuffeteScanner() {
         if (len < 3 || len > 10) {
           setError(`La identificación debe tener entre 3 y 10 caracteres. (Ingresaste ${len})`)
           setProcessing(false)
+          scanner.resetDetection()
           return
         }
       }
@@ -205,6 +157,7 @@ export function BuffeteScanner() {
           })
           setShowResult(true)
           setProcessing(false)
+          scanner.resetDetection()
           return
         }
 
@@ -216,7 +169,6 @@ export function BuffeteScanner() {
           scannedContent.startsWith("https://site2.q10.com/CertificadosAcademicos/") ||
           scannedContent.startsWith("https://uparsistemvalledupar.q10.com/CertificadosAcademicos/")
         ) {
-          console.log("[v0] Q10 URL detected, processing certificate...")
           setScanResult({
             identificacion: scannedContent,
             student: null,
@@ -262,6 +214,7 @@ export function BuffeteScanner() {
                 })
                 setShowResult(true)
                 setProcessing(false)
+                scanner.resetDetection()
                 return
               }
 
@@ -304,9 +257,9 @@ export function BuffeteScanner() {
             }
             setShowResult(true)
             setProcessing(false)
+            scanner.resetDetection()
             return
           } catch (q10Error) {
-            console.error("[v0] Error processing Q10 certificate:", q10Error)
             setScanResult({
               identificacion: scannedContent,
               student: null,
@@ -317,6 +270,7 @@ export function BuffeteScanner() {
             })
             setShowResult(true)
             setProcessing(false)
+            scanner.resetDetection()
             return
           }
         }
@@ -348,6 +302,7 @@ export function BuffeteScanner() {
           })
           setShowResult(true)
           setProcessing(false)
+          scanner.resetDetection()
           return
         }
 
@@ -364,6 +319,7 @@ export function BuffeteScanner() {
           })
           setShowResult(true)
           setProcessing(false)
+          scanner.resetDetection()
           return
         }
 
@@ -386,8 +342,6 @@ export function BuffeteScanner() {
         await new Promise((resolve) => setTimeout(resolve, 500))
         const updatedStudent = await studentStore.getStudentById(identificacion)
 
-        console.log("[v0] Datos actualizados después del descuento:", updatedStudent)
-
         setScanResult({
           identificacion,
           student: updatedStudent || student,
@@ -398,8 +352,8 @@ export function BuffeteScanner() {
         })
         setShowResult(true)
         setProcessing(false)
+        scanner.resetDetection()
       } catch (error) {
-        console.error("[v0] Error al procesar acceso:", error)
         const errorMessage = error instanceof Error ? error.message : "Error desconocido al procesar el acceso"
         setScanResult({
           identificacion: scannedContent,
@@ -417,153 +371,27 @@ export function BuffeteScanner() {
     [processing, user, studentStore, fullName, activeRole, processQ10Url],
   )
 
-  useEffect(() => {
-    if (
-      !isClient ||
-      !hasPermission ||
-      !selectedDeviceId ||
-      processing ||
-      isProcessingQ10 ||
-      !codeReader.current ||
-      activeTab !== "qr"
-    ) {
-      return
-    }
-
-    const video = webcamRef.current?.video
-    if (!video) {
-      console.warn("[v0] Video element not ready")
-      return
-    }
-
-    console.log("[v0] Starting continuous scan with device:", selectedDeviceId)
-    setError("")
-
-    const initTimeout = setTimeout(() => {
-      console.error("[v0] Scanner initialization timeout")
-      setError("Tiempo de espera agotado al iniciar la cámara. Intenta recargar la página.")
-    }, 15000)
-
-    codeReader.current!
-      .decodeFromVideoDevice(selectedDeviceId, video, (result, err) => {
-        clearTimeout(initTimeout)
-
-        if (result && !processing && !isProcessingQ10) {
-          const scannedText = result.getText()
-          console.log("[v0] QR scanned:", scannedText)
-          processScanResult(scannedText, "direct")
-        }
-        if (err && err.name !== "NotFoundException" && err.name !== "AbortError" && !err.message?.includes("No MultiFormat Readers")) {
-          console.error("[v0] Scanner error:", err)
-          if (err.name === "NotReadableError") {
-            setError("La cámara está siendo usada por otra aplicación. Cierra otras apps y recarga la página.")
-          }
-        }
-      })
-      .then((controls) => {
-        if (video.srcObject) {
-          activeStreamRef.current = video.srcObject as MediaStream
-        }
-      })
-      .catch((err: any) => {
-        clearTimeout(initTimeout)
-        console.error("[v0] Error starting continuous scan:", err)
-        if (err.name === "NotAllowedError") {
-          setError("Permiso de cámara denegado.")
-        } else if (err.name === "NotFoundError") {
-          setError("No se encontró la cámara.")
-        } else if (err.name === "NotReadableError") {
-          setError("La cámara está en uso. Cierra otras aplicaciones e intenta de nuevo.")
-        } else if (!err.message?.includes("No MultiFormat Readers")) {
-          setError("Error al iniciar el escáner. Intenta recargar la página.")
-        }
-        stopCamera()
-      })
-
-    return () => {
-      clearTimeout(initTimeout)
-      console.log("[v0] Cleaning up scanner...")
-      stopCamera()
-    }
-  }, [isClient, hasPermission, selectedDeviceId, processing, isProcessingQ10, activeTab, stopCamera, processScanResult])
-
-  useEffect(() => {
-    return () => {
-      console.log("[v0] BuffeteScanner unmounting, cleaning up camera...")
-      stopCamera()
-    }
-  }, [stopCamera])
-
-  useEffect(() => {
-    if (activeTab === "manual" && manualInputRef.current) {
-      manualInputRef.current.focus()
-    }
-  }, [activeTab])
-
-  useEffect(() => {
-    if (!scanResult?.identificacion || !showResult) {
-      return
-    }
-
-    // Validar que la identificación sea válida antes de crear el listener
-    if (typeof scanResult.identificacion !== "string" || scanResult.identificacion.trim() === "") {
-      console.error("[v0] Invalid identificacion for realtime listener:", scanResult.identificacion)
-      return
-    }
-
-    console.log("[v0] Setting up realtime listener for:", scanResult.identificacion)
-
-    try {
-      const studentDocRef = doc(db, "personas", scanResult.identificacion)
-
-      unsubscribeRef.current = onSnapshot(
-        studentDocRef,
-        (docSnapshot) => {
-          if (docSnapshot.exists()) {
-            const updatedData = docSnapshot.data()
-            console.log("[v0] Realtime update received:", updatedData)
-            setRealtimeStudentData(updatedData)
-          } else {
-            console.log("[v0] Document does not exist:", scanResult.identificacion)
-          }
-        },
-        (error) => {
-          console.error("[v0] Error in realtime listener:", error)
-          // No lanzar el error, solo registrarlo
-        },
-      )
-    } catch (error) {
-      console.error("[v0] Error setting up realtime listener:", error)
-      // No lanzar el error, solo registrarlo
-    }
-
-    return () => {
-      if (unsubscribeRef.current) {
-        console.log("[v0] Cleaning up realtime listener")
-        try {
-          unsubscribeRef.current()
-        } catch (error) {
-          console.error("[v0] Error cleaning up listener:", error)
-        }
-        unsubscribeRef.current = null
-      }
-    }
-  }, [scanResult?.identificacion, showResult])
-
   const resetScanner = () => {
-    console.log("[v0] Resetting scanner...")
+    if (unsubscribeRef.current) {
+      try {
+        unsubscribeRef.current()
+      } catch (error) {
+        console.error("[v0] Error cleaning up listener:", error)
+      }
+      unsubscribeRef.current = null
+    }
     setScanResult(null)
     setRealtimeStudentData(null)
     setShowResult(false)
     setError("")
     setManualId("")
     setProcessing(false)
+    scanner.resetDetection()
   }
 
   const handleModalClose = (open: boolean) => {
     setShowResult(open)
     if (!open) {
-      console.log("[v0] Modal closed, resetting state")
       if (unsubscribeRef.current) {
         unsubscribeRef.current()
         unsubscribeRef.current = null
@@ -571,6 +399,7 @@ export function BuffeteScanner() {
       setScanResult(null)
       setRealtimeStudentData(null)
       setProcessing(false)
+      scanner.resetDetection()
     }
   }
 
@@ -614,14 +443,14 @@ export function BuffeteScanner() {
     )
   }
 
-  if (hasPermission === false && activeTab === "qr") {
+  if (scanner.permissionDenied && activeTab === "qr") {
     return (
       <div className="flex flex-col items-center justify-center p-8 text-center">
         <CameraOff className="text-amber-600 mb-6 size-16" />
         <h3 className="text-xl font-bold text-amber-900">Entrega de Comida</h3>
         <p className="text-sm text-amber-700 mt-1">Mesa {user?.mesaAsignada || "N/A"}</p>
         <p className="text-sm text-muted-foreground mt-3">Se necesita acceso a la cámara para escanear códigos QR</p>
-        <Button onClick={requestCamera} className="mt-4 bg-amber-600 hover:bg-amber-700 text-white">
+        <Button onClick={() => scanner.startCamera()} className="mt-4 bg-amber-600 hover:bg-amber-700 text-white">
           <CameraIcon className="w-4 h-4 mr-2" />
           Permitir cámara
         </Button>
@@ -657,10 +486,10 @@ export function BuffeteScanner() {
         </div>
       </div>
 
-      {error && activeTab === "qr" && (
+      {(error || scanner.error) && activeTab === "qr" && (
         <div className="flex items-center gap-2 p-2 md:p-3 rounded-lg bg-red-50 border border-red-200">
           <AlertTriangle className="size-3 md:size-4 text-red-600 shrink-0" />
-          <p className="text-[11px] md:text-sm text-red-700">{error}</p>
+          <p className="text-[11px] md:text-sm text-red-700">{error || scanner.error}</p>
         </div>
       )}
 
@@ -696,17 +525,25 @@ export function BuffeteScanner() {
         <div className="hidden lg:grid lg:grid-cols-3 lg:gap-4 h-full">
           {/* Scanner */}
           <div className="lg:col-span-2 relative rounded-xl overflow-hidden bg-black shadow-lg border border-white/10">
-            {selectedDeviceId && (
-              <Webcam
-                ref={webcamRef}
-                audio={false}
-                videoConstraints={{
-                  deviceId: selectedDeviceId,
-                  facingMode: "environment",
-                }}
-                className="absolute inset-0 w-full h-full object-cover"
-              />
-            )}
+            {scanner.isScanning ? (
+              <>
+                <video
+                  ref={scanner.videoRef}
+                  autoPlay
+                  playsInline
+                  muted
+                  className="absolute inset-0 w-full h-full object-cover"
+                />
+                <canvas ref={scanner.canvasRef} className="hidden" />
+              </>
+            ) : scanner.cameraLoading ? (
+              <div className="absolute inset-0 flex items-center justify-center bg-black/80">
+                <div className="flex flex-col items-center gap-3">
+                  <div className="w-8 h-8 border-3 border-amber-400 border-t-transparent rounded-full animate-spin" />
+                  <p className="text-amber-400 text-sm font-medium">Iniciando cámara...</p>
+                </div>
+              </div>
+            ) : null}
             <div className="absolute inset-0 flex items-center justify-center">
               <div className="relative w-[85%] max-w-[320px] aspect-[4/3]">
                 <div className="absolute inset-0 rounded-xl border-2 border-amber-400/80 shadow-[0_0_0_9999px_rgba(0,0,0,0.55)]" />
@@ -720,9 +557,9 @@ export function BuffeteScanner() {
             <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <div className={`size-2 rounded-full ${processing || isProcessingQ10 ? "bg-yellow-400 animate-pulse" : "bg-amber-400 animate-pulse"}`} />
+                  <div className={`size-2 rounded-full ${scanner.isDetecting ? "bg-green-400 animate-ping" : processing || isProcessingQ10 ? "bg-yellow-400 animate-pulse" : "bg-amber-400 animate-pulse"}`} />
                   <span className="text-sm text-white/90">
-                    {processing ? "Procesando..." : isProcessingQ10 ? "Procesando Q10..." : "Escaneando..."}
+                    {scanner.isDetecting ? "QR Detectado" : processing ? "Procesando..." : isProcessingQ10 ? "Procesando Q10..." : "Escaneando..."}
                   </span>
                 </div>
                 <span className="text-xs text-white/50">Apunta al código QR</span>
@@ -796,8 +633,8 @@ export function BuffeteScanner() {
               </p>
             </div>
 
-            {hasPermission === false && (
-              <Button onClick={requestCamera} variant="outline" className="w-full mt-3 h-11 text-sm border-amber-300 text-amber-700 hover:bg-amber-50">
+            {scanner.permissionDenied && (
+              <Button onClick={() => scanner.startCamera()} variant="outline" className="w-full mt-3 h-11 text-sm border-amber-300 text-amber-700 hover:bg-amber-50">
                 <CameraIcon className="mr-2 size-4" />
                 Reintentar cámara
               </Button>
@@ -808,17 +645,25 @@ export function BuffeteScanner() {
         {/* Mobile: show active tab */}
         {activeTab === "qr" && (
           <div className="lg:hidden relative rounded-xl overflow-hidden bg-black shadow-lg border border-white/10" style={{ height: "calc(100vh - 220px)" }}>
-            {selectedDeviceId && (
-              <Webcam
-                ref={webcamRef}
-                audio={false}
-                videoConstraints={{
-                  deviceId: selectedDeviceId,
-                  facingMode: "environment",
-                }}
-                className="absolute inset-0 w-full h-full object-cover"
-              />
-            )}
+            {scanner.isScanning ? (
+              <>
+                <video
+                  ref={scanner.videoRef}
+                  autoPlay
+                  playsInline
+                  muted
+                  className="absolute inset-0 w-full h-full object-cover"
+                />
+                <canvas ref={scanner.canvasRef} className="hidden" />
+              </>
+            ) : scanner.cameraLoading ? (
+              <div className="absolute inset-0 flex items-center justify-center bg-black/80">
+                <div className="flex flex-col items-center gap-3">
+                  <div className="w-8 h-8 border-3 border-amber-400 border-t-transparent rounded-full animate-spin" />
+                  <p className="text-amber-400 text-sm font-medium">Iniciando cámara...</p>
+                </div>
+              </div>
+            ) : null}
             <div className="absolute inset-0 flex items-center justify-center">
               <div className="relative w-[85%] max-w-[320px] aspect-[4/3]">
                 <div className="absolute inset-0 rounded-xl border-2 border-amber-400/80 shadow-[0_0_0_9999px_rgba(0,0,0,0.55)]" />
@@ -832,9 +677,9 @@ export function BuffeteScanner() {
             <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-3">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <div className={`size-2 rounded-full ${processing || isProcessingQ10 ? "bg-yellow-400 animate-pulse" : "bg-amber-400 animate-pulse"}`} />
+                  <div className={`size-2 rounded-full ${scanner.isDetecting ? "bg-green-400 animate-ping" : processing || isProcessingQ10 ? "bg-yellow-400 animate-pulse" : "bg-amber-400 animate-pulse"}`} />
                   <span className="text-[11px] text-white/90">
-                    {processing ? "Procesando..." : isProcessingQ10 ? "Procesando Q10..." : "Escaneando..."}
+                    {scanner.isDetecting ? "QR Detectado" : processing ? "Procesando..." : isProcessingQ10 ? "Procesando Q10..." : "Escaneando..."}
                   </span>
                 </div>
                 <span className="text-[10px] text-white/50">Apunta al código QR</span>
@@ -909,8 +754,8 @@ export function BuffeteScanner() {
               </p>
             </div>
 
-            {hasPermission === false && (
-              <Button onClick={requestCamera} variant="outline" className="w-full mt-2 h-10 text-xs border-amber-300 text-amber-700 hover:bg-amber-50">
+            {scanner.permissionDenied && (
+              <Button onClick={() => scanner.startCamera()} variant="outline" className="w-full mt-2 h-10 text-xs border-amber-300 text-amber-700 hover:bg-amber-50">
                 <CameraIcon className="mr-1.5 size-3.5" />
                 Reintentar cámara
               </Button>
