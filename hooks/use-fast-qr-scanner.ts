@@ -22,6 +22,13 @@ interface UseFastQRScannerReturn {
   setError: (err: string | null) => void
 }
 
+const CAMERA_TIMEOUT = 15000
+const RESOLUTIONS = [
+  { width: 1920, height: 1080 },
+  { width: 1280, height: 720 },
+  { width: 640, height: 480 },
+]
+
 export function useFastQRScanner({
   onQRDetected,
   cooldown = 1500,
@@ -41,67 +48,15 @@ export function useFastQRScanner({
   const scanningRef = useRef<boolean>(false)
   const detectionPausedRef = useRef<boolean>(false)
   const onQRDetectedRef = useRef(onQRDetected)
+  const cameraTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   onQRDetectedRef.current = onQRDetected
 
-  const startCamera = useCallback(async () => {
-    try {
-      setCameraLoading(true)
-      setError(null)
-      setPermissionDenied(false)
-      detectedQRRef.current = null
-      lastScanTimeRef.current = 0
-      detectionPausedRef.current = false
-
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          facingMode: { ideal: "environment" },
-          width: { ideal: 1920 },
-          height: { ideal: 1080 },
-          frameRate: { ideal: 30 },
-        },
-        audio: false,
-      })
-
-      streamRef.current = stream
-
-      if (!videoRef.current) return
-
-      videoRef.current.srcObject = stream
-
-      videoRef.current.onloadedmetadata = () => {
-        videoRef.current?.play().catch(() => {
-          setError("No se pudo iniciar la reproducción de video")
-        })
-      }
-
-      videoRef.current.onplaying = () => {
-        setCameraLoading(false)
-        setIsScanning(true)
-        scanningRef.current = true
-        startScanLoop()
-      }
-
-      videoRef.current.onerror = () => {
-        setCameraLoading(false)
-        setError("Error al acceder a la cámara")
-      }
-    } catch (err: any) {
-      setCameraLoading(false)
-      setPermissionDenied(err.name === "NotAllowedError")
-      if (err.name === "NotAllowedError") {
-        setError("Permiso de cámara denegado. Por favor, permite el acceso a la cámara.")
-      } else if (err.name === "NotFoundError") {
-        setError("No se encontró cámara en el dispositivo.")
-      } else if (err.name === "NotReadableError") {
-        setError("La cámara ya está siendo utilizada por otra aplicación.")
-      } else {
-        setError(`Error de cámara: ${err.message}`)
-      }
+  const clearCameraTimeout = () => {
+    if (cameraTimeoutRef.current) {
+      clearTimeout(cameraTimeoutRef.current)
+      cameraTimeoutRef.current = null
     }
-  }, [])
-
-  const startCameraRef = useRef(startCamera)
-  startCameraRef.current = startCamera
+  }
 
   const startScanLoop = useCallback(() => {
     if (!videoRef.current || !canvasRef.current) return
@@ -166,10 +121,95 @@ export function useFastQRScanner({
     scanLoopRef.current = requestAnimationFrame(scanFrame)
   }, [cooldown])
 
+  const startCamera = useCallback(async () => {
+    try {
+      setCameraLoading(true)
+      setError(null)
+      setPermissionDenied(false)
+      detectedQRRef.current = null
+      lastScanTimeRef.current = 0
+      detectionPausedRef.current = false
+      clearCameraTimeout()
+
+      let mediaStream: MediaStream | null = null
+      let lastError: any = null
+
+      for (const res of RESOLUTIONS) {
+        try {
+          mediaStream = await navigator.mediaDevices.getUserMedia({
+            video: {
+              facingMode: { ideal: "environment" },
+              width: { ideal: res.width },
+              height: { ideal: res.height },
+              frameRate: { ideal: 30 },
+            },
+            audio: false,
+          })
+          break
+        } catch (err: any) {
+          lastError = err
+          await new Promise((resolve) => setTimeout(resolve, 200))
+        }
+      }
+
+      if (!mediaStream) {
+        throw lastError || new Error("No se pudo iniciar la cámara")
+      }
+
+      streamRef.current = mediaStream
+
+      if (!videoRef.current) return
+
+      videoRef.current.srcObject = mediaStream
+
+      videoRef.current.onloadedmetadata = () => {
+        videoRef.current?.play().catch(() => {
+          setCameraLoading(false)
+          clearCameraTimeout()
+          setError("No se pudo iniciar la reproducción de video")
+        })
+      }
+
+      videoRef.current.onplaying = () => {
+        clearCameraTimeout()
+        setCameraLoading(false)
+        setIsScanning(true)
+        scanningRef.current = true
+        startScanLoop()
+      }
+
+      videoRef.current.onerror = () => {
+        clearCameraTimeout()
+        setCameraLoading(false)
+        setError("Error al acceder a la cámara")
+      }
+
+      cameraTimeoutRef.current = setTimeout(() => {
+        setCameraLoading(false)
+        setError("La cámara no pudo iniciarse. Verifica que ningún otro programa la esté usando.")
+        stopCamera()
+      }, CAMERA_TIMEOUT)
+    } catch (err: any) {
+      setCameraLoading(false)
+      clearCameraTimeout()
+      setPermissionDenied(err.name === "NotAllowedError")
+      if (err.name === "NotAllowedError") {
+        setError("Permiso de cámara denegado. Por favor, permite el acceso a la cámara.")
+      } else if (err.name === "NotFoundError") {
+        setError("No se encontró cámara en el dispositivo.")
+      } else if (err.name === "NotReadableError") {
+        setError("La cámara ya está siendo utilizada por otra aplicación.")
+      } else {
+        setError(`Error de cámara: ${err.message}`)
+      }
+    }
+  }, [startScanLoop])
+
   const stopCamera = useCallback(() => {
     scanningRef.current = false
     setIsScanning(false)
     setIsDetecting(false)
+    clearCameraTimeout()
 
     if (scanLoopRef.current !== null) {
       cancelAnimationFrame(scanLoopRef.current)
@@ -197,6 +237,7 @@ export function useFastQRScanner({
 
   useEffect(() => {
     return () => {
+      clearCameraTimeout()
       stopCamera()
     }
   }, [stopCamera])

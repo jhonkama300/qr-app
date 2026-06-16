@@ -85,10 +85,33 @@ export function BarcodeScanner() {
         const len = trimmed.length
         const isNumeric = /^\d+$/.test(trimmed)
 
-        if (source === "direct" && (!isNumeric || len < 7 || len > 10)) {
-          setIsScanning(false)
-          scanner.resetDetection()
-          return
+        if (source === "direct") {
+          if (!isNumeric) {
+            setScanResultDisplay({
+              type: "error",
+              identificacion: scannedContent,
+              message: `El código QR no contiene un número de identificación válido. Asegúrate de escanear el QR correcto.`,
+              source: source,
+              timestamp: new Date().toISOString(),
+            })
+            setShowResult(true)
+            setIsScanning(false)
+            scanner.resetDetection()
+            return
+          }
+          if (len < 7 || len > 10) {
+            setScanResultDisplay({
+              type: "error",
+              identificacion: scannedContent,
+              message: `La identificación debe tener entre 7 y 10 caracteres. (Escaneaste ${len})`,
+              source: source,
+              timestamp: new Date().toISOString(),
+            })
+            setShowResult(true)
+            setIsScanning(false)
+            scanner.resetDetection()
+            return
+          }
         }
 
         if (len < 3 || len > 10) {
