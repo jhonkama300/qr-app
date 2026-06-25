@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { createContext, useContext, useEffect, useState } from "react"
+import { createContext, useContext, useEffect, useMemo, useState } from "react"
 import type { User } from "@/lib/auth-service"
 
 interface AuthContextType {
@@ -108,24 +108,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const isAdmin = activeRole === "administrador"
   const isBufete = activeRole === "bufete"
 
-  return (
-    <AuthContext.Provider
-      value={{
-        user,
-        activeRole,
-        availableRoles,
-        userRole: activeRole, // For backward compatibility
-        mesaAsignada,
-        fullName,
-        isAdmin,
-        isBufete,
-        loading,
-        login,
-        logout,
-        switchRole,
-      }}
-    >
-      {children}
-    </AuthContext.Provider>
+  const value = useMemo(
+    () => ({
+      user,
+      activeRole,
+      availableRoles,
+      userRole: activeRole,
+      mesaAsignada,
+      fullName,
+      isAdmin,
+      isBufete,
+      loading,
+      login,
+      logout,
+      switchRole,
+    }),
+    [user, activeRole, availableRoles, mesaAsignada, fullName, isAdmin, isBufete, loading, login, logout, switchRole],
   )
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }

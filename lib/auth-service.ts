@@ -2,8 +2,6 @@
 
 import { collection, query, where, getDocs, addDoc, updateDoc, doc } from "firebase/firestore"
 import { db } from "@/lib/firebase"
-import CryptoJS from "crypto-js"
-
 export interface User {
   id: string
   idNumber: string
@@ -14,18 +12,28 @@ export interface User {
   hasDefaultPassword?: boolean
 }
 
-// Función para hashear contraseñas
-const hashPassword = (password: string): string => {
-  return CryptoJS.SHA256(password).toString()
+const DEFAULT_PASSWORD = "Uparsistem123"
+
+const hashPassword = async (password: string): Promise<string> => {
+  const encoder = new TextEncoder()
+  const data = encoder.encode(password)
+  const hashBuffer = await crypto.subtle.digest("SHA-256", data)
+  const hashArray = Array.from(new Uint8Array(hashBuffer))
+  return hashArray.map((b) => b.toString(16).padStart(2, "0")).join("")
 }
 
-const DEFAULT_PASSWORD = "Uparsistem123"
-const DEFAULT_PASSWORD_HASH = hashPassword(DEFAULT_PASSWORD)
+let defaultPasswordHash: string | null = null
+const getDefaultPasswordHash = async (): Promise<string> => {
+  if (!defaultPasswordHash) {
+    defaultPasswordHash = await hashPassword(DEFAULT_PASSWORD)
+  }
+  return defaultPasswordHash
+}
 
 // Función para validar login
 export const validateLogin = async (idNumber: string, password: string): Promise<User | null> => {
   try {
-    const hashedPassword = hashPassword(password)
+    const hashedPassword = await hashPassword(password)
 
     // Buscar usuario por número de identificación y contraseña
     const q = query(collection(db, "users"), where("idNumber", "==", idNumber), where("password", "==", hashedPassword))
@@ -39,7 +47,8 @@ export const validateLogin = async (idNumber: string, password: string): Promise
     const userDoc = querySnapshot.docs[0]
     const userData = userDoc.data()
 
-    const hasDefaultPassword = hashedPassword === DEFAULT_PASSWORD_HASH
+    const defaultHash = await getDefaultPasswordHash()
+    const hasDefaultPassword = hashedPassword === defaultHash
 
     let roles: ("administrador" | "operativo" | "bufete")[]
     if (Array.isArray(userData.roles)) {
@@ -75,7 +84,7 @@ export const createUser = async (
   mesaAsignada?: number,
 ): Promise<boolean> => {
   try {
-    const hashedPassword = hashPassword(password)
+    const hashedPassword = await hashPassword(password)
 
     // Verificar si el usuario ya existe
     const q = query(collection(db, "users"), where("idNumber", "==", idNumber))
@@ -108,8 +117,9 @@ export const createUser = async (
 
 export const resetUserPassword = async (userId: string): Promise<boolean> => {
   try {
+    const defaultHash = await getDefaultPasswordHash()
     await updateDoc(doc(db, "users", userId), {
-      password: DEFAULT_PASSWORD_HASH,
+      password: defaultHash,
     })
     return true
   } catch (error) {
@@ -120,7 +130,7 @@ export const resetUserPassword = async (userId: string): Promise<boolean> => {
 
 export const changePassword = async (userId: string, newPassword: string): Promise<boolean> => {
   try {
-    const hashedPassword = hashPassword(newPassword)
+    const hashedPassword = await hashPassword(newPassword)
     await updateDoc(doc(db, "users", userId), {
       password: hashedPassword,
     })

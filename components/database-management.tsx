@@ -35,7 +35,13 @@ import {
   UserPlus,
   Gift,
 } from "lucide-react"
-import * as XLSX from "xlsx"
+let xlsxModule: any = null
+const getXLSX = async () => {
+  if (!xlsxModule) {
+    xlsxModule = await import("xlsx")
+  }
+  return xlsxModule
+}
 
 interface PersonData {
   id?: string
@@ -234,6 +240,7 @@ export function DatabaseManagement() {
 
     try {
       const data = await file.arrayBuffer()
+      const XLSX = await getXLSX()
       const workbook = XLSX.read(data)
       const sheetName = workbook.SheetNames[0]
       const worksheet = workbook.Sheets[sheetName]
@@ -252,8 +259,6 @@ export function DatabaseManagement() {
         const identificacion = String(row["identificacion"] || row["Identificacion"] || row["ID"] || "")
         const nombre = String(row["nombre"] || row["Nombre"] || "")
         const programa = String(row["programa"] || row["Programa"] || "")
-        // Removed cuposExtras from normal import - always 0 now
-        // const cuposExtras = Number(row["cuposExtras"] || row["CuposExtras"] || row["cupos_extras"] || 0)
 
         if (identificacion && nombre) {
           const docRef = doc(collection(db, "personas"))
@@ -262,7 +267,7 @@ export function DatabaseManagement() {
             identificacion,
             nombre,
             programa,
-            cuposExtras: 0, // Always 0 in normal import
+            cuposExtras: 0,
             cuposConsumidos: 0,
             fechaImportacion: new Date().toISOString(),
           })
@@ -298,6 +303,7 @@ export function DatabaseManagement() {
 
     try {
       const data = await file.arrayBuffer()
+      const XLSX = await getXLSX()
       const workbook = XLSX.read(data)
       const sheetName = workbook.SheetNames[0]
       const worksheet = workbook.Sheets[sheetName]
@@ -318,7 +324,6 @@ export function DatabaseManagement() {
 
         if (!identificacion) continue
 
-        // Buscar el estudiante por identificación
         const q = query(collection(db, "personas"), where("identificacion", "==", identificacion))
         const querySnapshot = await getDocs(q)
 
@@ -327,7 +332,6 @@ export function DatabaseManagement() {
           continue
         }
 
-        // Actualizar el estudiante con los cupos extras
         const studentDoc = querySnapshot.docs[0]
         await updateDoc(doc(db, "personas", studentDoc.id), {
           cuposExtras: cuposExtras,
@@ -368,6 +372,7 @@ export function DatabaseManagement() {
 
     try {
       const data = await file.arrayBuffer()
+      const XLSX = await getXLSX()
       const workbook = XLSX.read(data)
       const sheetName = workbook.SheetNames[0]
       const worksheet = workbook.Sheets[sheetName]

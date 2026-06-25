@@ -67,9 +67,19 @@ export function BuffeteScanner() {
     setIsClient(true)
   }, [])
 
+  const mountedRef = useRef(true)
+  useEffect(() => {
+    mountedRef.current = true
+    return () => {
+      mountedRef.current = false
+    }
+  }, [])
+
   useEffect(() => {
     if (!isClient) return
-    const timer = setTimeout(() => scanner.startCamera(), 500)
+    const timer = setTimeout(() => {
+      if (mountedRef.current) scanner.startCamera()
+    }, 500)
     return () => clearTimeout(timer)
   }, [isClient])
 

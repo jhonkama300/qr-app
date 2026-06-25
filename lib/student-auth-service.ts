@@ -2,8 +2,6 @@
 
 import { collection, query, where, getDocs } from "firebase/firestore"
 import { db } from "@/lib/firebase"
-import CryptoJS from "crypto-js"
-
 export interface StudentUser {
   id: string
   identificacion: string
@@ -15,15 +13,18 @@ export interface StudentUser {
   mesaAsignada?: number
 }
 
-// Función para hashear contraseñas
-const hashPassword = (password: string): string => {
-  return CryptoJS.SHA256(password).toString()
+const hashPassword = async (password: string): Promise<string> => {
+  const encoder = new TextEncoder()
+  const data = encoder.encode(password)
+  const hashBuffer = await crypto.subtle.digest("SHA-256", data)
+  const hashArray = Array.from(new Uint8Array(hashBuffer))
+  return hashArray.map((b) => b.toString(16).padStart(2, "0")).join("")
 }
 
 // Función para validar login de estudiante
 export const validateStudentLogin = async (identificacion: string, password: string): Promise<StudentUser | null> => {
   try {
-    const hashedPassword = hashPassword(password)
+    const hashedPassword = await hashPassword(password)
 
     // Buscar estudiante por identificación y contraseña
     const q = query(
