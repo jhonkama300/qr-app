@@ -377,29 +377,29 @@ export function BarcodeScanner() {
 
       {/* Main Content */}
       <div className="flex-1 min-h-0">
-        {/* Desktop: two columns */}
-        <div className="hidden lg:grid lg:grid-cols-3 lg:gap-4 h-full">
-          {/* Scanner */}
-          <div className="lg:col-span-2 relative rounded-xl overflow-hidden bg-black shadow-lg border border-white/10">
-            {scanner.isScanning ? (
-              <>
-                <video
-                  ref={scanner.videoRef}
-                  autoPlay
-                  playsInline
-                  muted
-                  className="absolute inset-0 w-full h-full object-cover"
-                />
-                <canvas ref={scanner.canvasRef} className="hidden" />
-              </>
-            ) : scanner.cameraLoading ? (
+          <div className="h-full lg:grid lg:grid-cols-3 lg:gap-4">
+          {/* Scanner column - full width on mobile when active, col-span-2 on desktop */}
+          <div className={`relative rounded-xl overflow-hidden bg-black shadow-lg border border-white/10
+            lg:col-span-2
+            max-lg:h-[calc(100vh-220px)]
+            ${scanMode !== "qr" ? "max-lg:hidden" : ""}
+          `}>
+            <video
+              ref={scanner.videoRef}
+              autoPlay
+              playsInline
+              muted
+              className="absolute inset-0 w-full h-full object-cover"
+            />
+            <canvas ref={scanner.canvasRef} className="hidden" />
+            {scanner.cameraLoading && !scanner.isScanning && (
               <div className="absolute inset-0 flex items-center justify-center bg-black/80">
                 <div className="flex flex-col items-center gap-3">
                   <div className="w-8 h-8 border-3 border-uparsistem-400 border-t-transparent rounded-full animate-spin" />
                   <p className="text-uparsistem-400 text-sm font-medium">Iniciando cámara...</p>
                 </div>
               </div>
-            ) : null}
+            )}
             <div className="absolute inset-0 flex items-center justify-center">
               <div className="relative w-[85%] max-w-[320px] aspect-[4/3]">
                 <div className="absolute inset-0 rounded-xl border-2 border-uparsistem-400/80 shadow-[0_0_0_9999px_rgba(0,0,0,0.55)]" />
@@ -410,21 +410,21 @@ export function BarcodeScanner() {
                 <div className="absolute top-1/2 left-[8%] right-[8%] h-[1.5px] bg-uparsistem-300/80 animate-scan shadow-[0_0_8px_rgba(168,207,69,0.5)]" />
               </div>
             </div>
-            <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-4">
+            <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-4 max-lg:p-3">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <div className={`size-2 rounded-full ${scanner.isDetecting ? "bg-green-400 animate-ping" : isScanning ? "bg-yellow-400 animate-pulse" : scanner.cameraLoading ? "bg-uparsistem-400 animate-pulse" : "bg-uparsistem-400 animate-pulse"}`} />
-                  <span className="text-sm text-white/90">
+                  <span className="text-sm max-lg:text-[11px] text-white/90">
                     {scanner.isDetecting ? "QR Detectado" : isScanning ? "Procesando..." : scanner.cameraLoading ? "Iniciando..." : "Escaneando..."}
                   </span>
                 </div>
-                <span className="text-xs text-white/50">Apunta al código QR</span>
+                <span className="text-xs max-lg:text-[10px] text-white/50">Apunta al código QR</span>
               </div>
             </div>
           </div>
 
-          {/* Manual */}
-          <div className="rounded-xl border border-uparsistem-200 dark:border-uparsistem-800/30 bg-white/80 dark:bg-gray-900/80 backdrop-blur-xl shadow-sm p-5">
+          {/* Manual - desktop only */}
+          <div className="hidden lg:block rounded-xl border border-uparsistem-200 dark:border-uparsistem-800/30 bg-white/80 dark:bg-gray-900/80 backdrop-blur-xl shadow-sm p-5">
             <div className="flex items-center gap-2 mb-4">
               <div className="flex size-8 items-center justify-center rounded-lg bg-uparsistem-100 dark:bg-uparsistem-900/30 text-uparsistem-700 dark:text-uparsistem-300">
                 <Search className="size-4" />
@@ -487,115 +487,70 @@ export function BarcodeScanner() {
               </Button>
             )}
           </div>
-        </div>
 
-        {/* Mobile: show active tab */}
-        {scanMode === "qr" && (
-          <div className="lg:hidden relative rounded-xl overflow-hidden bg-black shadow-lg border border-white/10" style={{ height: "calc(100vh - 220px)" }}>
-            {scanner.isScanning ? (
-              <>
-                <video
-                  ref={scanner.videoRef}
-                  autoPlay
-                  playsInline
-                  muted
-                  className="absolute inset-0 w-full h-full object-cover"
+          {/* Manual - mobile only */}
+          {scanMode === "manual" && (
+            <div className="lg:hidden rounded-xl border border-uparsistem-200 dark:border-uparsistem-800/30 bg-white/80 dark:bg-gray-900/80 backdrop-blur-xl shadow-sm p-3">
+              <div className="flex items-center gap-2 mb-3">
+                <div className="flex size-7 items-center justify-center rounded-lg bg-uparsistem-100 dark:bg-uparsistem-900/30 text-uparsistem-700 dark:text-uparsistem-300">
+                  <Search className="size-3.5" />
+                </div>
+                <div>
+                  <h3 className="text-[11px] font-semibold leading-tight">Ingreso Manual</h3>
+                  <p className="text-[9px] text-muted-foreground leading-tight">Escribe la identificación</p>
+                </div>
+              </div>
+
+              {manualInputError && (
+                <div className="flex items-center gap-1.5 p-1.5 mb-2 rounded-lg bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800">
+                  <AlertTriangle className="size-3 text-red-600 shrink-0" />
+                  <p className="text-[10px] text-red-700 dark:text-red-400">{manualInputError}</p>
+                </div>
+              )}
+
+              <div className="space-y-2">
+                <Input
+                  id="manual-id-mobile"
+                  type="text"
+                  placeholder="Número de identificación"
+                  value={manualIdInput}
+                  onChange={(e) => setManualIdInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && manualIdInput.trim() && !isManualProcessing && !isProcessingQ10) {
+                      handleManualSubmit()
+                    }
+                  }}
+                  disabled={isManualProcessing || isProcessingQ10}
+                  className="h-10 text-sm border-uparsistem-200 dark:border-uparsistem-800 focus-visible:ring-uparsistem-500"
                 />
-                <canvas ref={scanner.canvasRef} className="hidden" />
-              </>
-            ) : scanner.cameraLoading ? (
-              <div className="absolute inset-0 flex items-center justify-center bg-black/80">
-                <div className="flex flex-col items-center gap-3">
-                  <div className="w-8 h-8 border-3 border-uparsistem-400 border-t-transparent rounded-full animate-spin" />
-                  <p className="text-uparsistem-400 text-sm font-medium">Iniciando cámara...</p>
-                </div>
+                <Button
+                  onClick={handleManualSubmit}
+                  disabled={isManualProcessing || isProcessingQ10 || !manualIdInput.trim()}
+                  className="w-full h-10 text-xs bg-uparsistem-600 hover:bg-uparsistem-700 text-white"
+                >
+                  {isManualProcessing ? (
+                    <><Loader2Icon className="mr-1.5 size-3.5 animate-spin" /> Validando...</>
+                  ) : (
+                    <><Search className="mr-1.5 size-3.5" /> Validar</>
+                  )}
+                </Button>
               </div>
-            ) : null}
-            <div className="absolute inset-0 flex items-center justify-center">
-              <div className="relative w-[85%] max-w-[320px] aspect-[4/3]">
-                <div className="absolute inset-0 rounded-xl border-2 border-uparsistem-400/80 shadow-[0_0_0_9999px_rgba(0,0,0,0.55)]" />
-                <div className="absolute top-0 left-0 w-4 h-4 border-t-2 border-l-2 border-uparsistem-300 rounded-tl" />
-                <div className="absolute top-0 right-0 w-4 h-4 border-t-2 border-r-2 border-uparsistem-300 rounded-tr" />
-                <div className="absolute bottom-0 left-0 w-4 h-4 border-b-2 border-l-2 border-uparsistem-300 rounded-bl" />
-                <div className="absolute bottom-0 right-0 w-4 h-4 border-b-2 border-r-2 border-uparsistem-300 rounded-br" />
-                <div className="absolute top-1/2 left-[8%] right-[8%] h-[1.5px] bg-uparsistem-300/80 animate-scan shadow-[0_0_8px_rgba(168,207,69,0.5)]" />
-              </div>
-            </div>
-            <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <div className={`size-2 rounded-full ${scanner.isDetecting ? "bg-green-400 animate-ping" : isScanning ? "bg-yellow-400 animate-pulse" : "bg-uparsistem-400 animate-pulse"}`} />
-                  <span className="text-[11px] text-white/90">
-                    {scanner.isDetecting ? "QR Detectado" : isScanning ? "Procesando..." : "Escaneando..."}
-                  </span>
-                </div>
-                <span className="text-[10px] text-white/50">Apunta al código QR</span>
-              </div>
-            </div>
-          </div>
-        )}
 
-        {scanMode === "manual" && (
-          <div className="lg:hidden rounded-xl border border-uparsistem-200 dark:border-uparsistem-800/30 bg-white/80 dark:bg-gray-900/80 backdrop-blur-xl shadow-sm p-3">
-            <div className="flex items-center gap-2 mb-3">
-              <div className="flex size-7 items-center justify-center rounded-lg bg-uparsistem-100 dark:bg-uparsistem-900/30 text-uparsistem-700 dark:text-uparsistem-300">
-                <Search className="size-3.5" />
+              <div className="mt-3 p-2 rounded-lg bg-uparsistem-50/50 dark:bg-uparsistem-950/10 border border-uparsistem-100 dark:border-uparsistem-900/20">
+                <p className="text-[9px] text-uparsistem-700 dark:text-uparsistem-300 leading-tight">
+                  <span className="font-semibold">Tip:</span> Verifica el documento de identidad del estudiante.
+                </p>
               </div>
-              <div>
-                <h3 className="text-[11px] font-semibold leading-tight">Ingreso Manual</h3>
-                <p className="text-[9px] text-muted-foreground leading-tight">Escribe la identificación</p>
-              </div>
+
+              {scanner.permissionDenied && (
+                <Button onClick={() => scanner.startCamera()} variant="outline" className="w-full mt-2 h-10 text-xs border-uparsistem-300 text-uparsistem-700 hover:bg-uparsistem-50">
+                  <CameraIcon className="mr-1.5 size-3.5" />
+                  Reintentar cámara
+                </Button>
+              )}
             </div>
-
-            {manualInputError && (
-              <div className="flex items-center gap-1.5 p-1.5 mb-2 rounded-lg bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800">
-                <AlertTriangle className="size-3 text-red-600 shrink-0" />
-                <p className="text-[10px] text-red-700 dark:text-red-400">{manualInputError}</p>
-              </div>
-            )}
-
-            <div className="space-y-2">
-              <Input
-                id="manual-id-mobile"
-                type="text"
-                placeholder="Número de identificación"
-                value={manualIdInput}
-                onChange={(e) => setManualIdInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && manualIdInput.trim() && !isManualProcessing && !isProcessingQ10) {
-                    handleManualSubmit()
-                  }
-                }}
-                disabled={isManualProcessing || isProcessingQ10}
-                className="h-10 text-sm border-uparsistem-200 dark:border-uparsistem-800 focus-visible:ring-uparsistem-500"
-              />
-              <Button
-                onClick={handleManualSubmit}
-                disabled={isManualProcessing || isProcessingQ10 || !manualIdInput.trim()}
-                className="w-full h-10 text-xs bg-uparsistem-600 hover:bg-uparsistem-700 text-white"
-              >
-                {isManualProcessing ? (
-                  <><Loader2Icon className="mr-1.5 size-3.5 animate-spin" /> Validando...</>
-                ) : (
-                  <><Search className="mr-1.5 size-3.5" /> Validar</>
-                )}
-              </Button>
-            </div>
-
-            <div className="mt-3 p-2 rounded-lg bg-uparsistem-50/50 dark:bg-uparsistem-950/10 border border-uparsistem-100 dark:border-uparsistem-900/20">
-              <p className="text-[9px] text-uparsistem-700 dark:text-uparsistem-300 leading-tight">
-                <span className="font-semibold">Tip:</span> Verifica el documento de identidad del estudiante.
-              </p>
-            </div>
-
-            {scanner.permissionDenied && (
-              <Button onClick={() => scanner.startCamera()} variant="outline" className="w-full mt-2 h-10 text-xs border-uparsistem-300 text-uparsistem-700 hover:bg-uparsistem-50">
-                <CameraIcon className="mr-1.5 size-3.5" />
-                Reintentar cámara
-              </Button>
-            )}
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
       {/* Result Dialog */}
