@@ -24,9 +24,9 @@ interface UseFastQRScannerReturn {
 
 const CAMERA_TIMEOUT = 15000
 const RESOLUTIONS = [
-  { width: 1920, height: 1080 },
-  { width: 1280, height: 720 },
   { width: 640, height: 480 },
+  { width: 1280, height: 720 },
+  { width: 1920, height: 1080 },
 ]
 
 export function useFastQRScanner({
@@ -230,7 +230,7 @@ export function useFastQRScanner({
   }, [])
 
   const resetDetection = useCallback(() => {
-    detectedQRRef.current = null
+    lastScanTimeRef.current = Date.now()
     detectionPausedRef.current = false
     setIsDetecting(false)
   }, [])

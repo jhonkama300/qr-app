@@ -53,7 +53,7 @@ export function BarcodeScanner() {
 
   const scanner = useFastQRScanner({
     onQRDetected: (data) => processScanResult(data, "direct"),
-    cooldown: 2000,
+    cooldown: 800,
   })
 
   useEffect(() => {

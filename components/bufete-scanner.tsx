@@ -60,6 +60,7 @@ export function BuffeteScanner() {
 
   const scanner = useFastQRScanner({
     onQRDetected: (data) => processScanResult(data, "direct"),
+    cooldown: 800,
   })
 
   useEffect(() => {
