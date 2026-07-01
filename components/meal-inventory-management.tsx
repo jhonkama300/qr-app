@@ -214,8 +214,8 @@ export function MealInventoryManagement() {
     const numero = Number.parseInt(tableNumber)
     const meals = Number.parseInt(tableMeals)
 
-    if (isNaN(numero) || numero < 1 || numero > 10) {
-      setError("El número de mesa debe estar entre 1 y 10")
+    if (isNaN(numero) || numero < 1) {
+      setError("El número de mesa debe ser mayor o igual a 1")
       return
     }
 
@@ -656,8 +656,8 @@ export function MealInventoryManagement() {
           </DialogHeader>
           <div className="space-y-3 py-2">
             <div className="space-y-1.5">
-              <Label htmlFor="tableNumber" className="text-sm font-medium">Número de Mesa (1-10)</Label>
-              <Input id="tableNumber" type="number" placeholder="1" value={tableNumber} onChange={(e) => setTableNumber(e.target.value)} min={1} max={10} className="border-uparsistem-200 focus-visible:ring-uparsistem-500" />
+              <Label htmlFor="tableNumber" className="text-sm font-medium">Número de Mesa</Label>
+              <Input id="tableNumber" type="number" placeholder="1" value={tableNumber} onChange={(e) => setTableNumber(e.target.value)} min={1} className="border-uparsistem-200 focus-visible:ring-uparsistem-500" />
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="tableName" className="text-sm font-medium">Nombre de la Mesa</Label>
