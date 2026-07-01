@@ -35,7 +35,7 @@ import { doc, onSnapshot } from "firebase/firestore"
 interface ScanResult {
   identificacion: string
   student: any
-  status: "success" | "error" | "no_cupos"
+  status: "success" | "error" | "no_cupos" | "denied"
   message: string
   timestamp: string
   source?: "direct" | "q10" | "manual"
@@ -55,6 +55,16 @@ export function BuffeteScanner() {
   const [activeTab, setActiveTab] = useState<"qr" | "manual">("qr")
   const [realtimeStudentData, setRealtimeStudentData] = useState<any>(null)
   const unsubscribeRef = useRef<(() => void) | null>(null)
+
+  const [showQuantitySelector, setShowQuantitySelector] = useState(false)
+  const [pendingCupos, setPendingCupos] = useState({
+    identificacion: "",
+    student: null as any,
+    cuposDisponibles: 0,
+    cuposTotales: 0,
+    source: "direct" as "direct" | "q10" | "manual",
+  })
+  const [selectedQuantity, setSelectedQuantity] = useState(1)
 
   const manualInputRef = useRef<HTMLInputElement>(null)
 
@@ -131,7 +141,7 @@ export function BuffeteScanner() {
 
   const processScanResult = useCallback(
     async (scannedContent: string, source: "direct" | "q10" | "manual") => {
-      if (processing) {
+      if (processing || showQuantitySelector) {
         return
       }
 
@@ -229,33 +239,18 @@ export function BuffeteScanner() {
                 return
               }
 
-              const userInfo = {
-                userId: user.id,
-                userName: fullName || user.fullName || "Usuario Bufete",
-                userEmail: user.idNumber + "@sistema.com",
-                userRole: activeRole || "bufete",
-                mesaAsignada: user.mesaAsignada,
-              }
-
-              await studentStore.markStudentAccess(
-                q10Result.identificacion!,
-                true,
-                `Comida entregada en Mesa ${user.mesaAsignada}`,
-                "q10",
-                userInfo,
-              )
-
-              await new Promise((resolve) => setTimeout(resolve, 500))
-              const updatedStudent = await studentStore.getStudentById(q10Result.identificacion!)
-
-              setScanResult({
+              setPendingCupos({
                 identificacion: q10Result.identificacion!,
-                student: updatedStudent || q10Result.student,
-                status: "success",
-                message: validation.message,
-                timestamp: new Date().toISOString(),
+                student: validation.student || q10Result.student,
+                cuposDisponibles: validation.cuposDisponibles || 0,
+                cuposTotales: validation.cuposTotales || 0,
                 source: "q10",
               })
+              setSelectedQuantity(1)
+              setShowQuantitySelector(true)
+              setProcessing(false)
+              scanner.resetDetection()
+              return
             } else {
               setScanResult({
                 identificacion: q10Result.identificacion || scannedContent,
@@ -317,53 +312,18 @@ export function BuffeteScanner() {
           return
         }
 
-        const student = await studentStore.getStudentById(identificacion)
-
-        if (!student) {
-          setScanResult({
-            identificacion,
-            student: null,
-            status: "error",
-            message: "Estudiante no encontrado en la base de datos",
-            timestamp: new Date().toISOString(),
-            source,
-          })
-          setShowResult(true)
-          setProcessing(false)
-          scanner.resetDetection()
-          return
-        }
-
-        const userInfo = {
-          userId: user.id,
-          userName: fullName || user.fullName || "Usuario Bufete",
-          userEmail: user.idNumber + "@sistema.com",
-          userRole: activeRole || "bufete",
-          mesaAsignada: user.mesaAsignada,
-        }
-
-        await studentStore.markStudentAccess(
+        setPendingCupos({
           identificacion,
-          true,
-          `Comida entregada en Mesa ${user.mesaAsignada}`,
-          source === "q10" ? "q10" : "manual",
-          userInfo,
-        )
-
-        await new Promise((resolve) => setTimeout(resolve, 500))
-        const updatedStudent = await studentStore.getStudentById(identificacion)
-
-        setScanResult({
-          identificacion,
-          student: updatedStudent || student,
-          status: "success",
-          message: validation.message,
-          timestamp: new Date().toISOString(),
+          student: validation.student,
+          cuposDisponibles: validation.cuposDisponibles || 0,
+          cuposTotales: validation.cuposTotales || 0,
           source,
         })
-        setShowResult(true)
+        setSelectedQuantity(1)
+        setShowQuantitySelector(true)
         setProcessing(false)
         scanner.resetDetection()
+        return
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : "Error desconocido al procesar el acceso"
         setScanResult({
@@ -379,8 +339,78 @@ export function BuffeteScanner() {
         setProcessing(false)
       }
     },
-    [processing, user, studentStore, fullName, activeRole, processQ10Url],
+    [processing, showQuantitySelector, user, studentStore, fullName, activeRole, processQ10Url],
   )
+
+  const handleQuantityConfirm = useCallback(async () => {
+    const { identificacion, student, cuposDisponibles, cuposTotales, source } = pendingCupos
+    const qty = selectedQuantity
+
+    if (qty < 1 || qty > cuposDisponibles) return
+
+    setShowQuantitySelector(false)
+    setProcessing(true)
+
+    try {
+      if (!user) throw new Error("Usuario no autenticado")
+
+      const userInfo = {
+        userId: user.id,
+        userName: fullName || user.fullName || "Usuario Bufete",
+        userEmail: user.idNumber + "@sistema.com",
+        userRole: activeRole || "bufete",
+        mesaAsignada: user.mesaAsignada,
+      }
+
+      await studentStore.markStudentAccess(
+        identificacion,
+        true,
+        `${qty} plato(s) entregado(s) en Mesa ${user.mesaAsignada}`,
+        source,
+        userInfo,
+        qty,
+      )
+
+      await new Promise((resolve) => setTimeout(resolve, 500))
+      const updatedStudent = await studentStore.getStudentById(identificacion)
+
+      setScanResult({
+        identificacion,
+        student: updatedStudent || student,
+        status: "success",
+        message: `${qty} plato(s) entregado(s) exitosamente. Cupos restantes: ${cuposDisponibles - qty}/${cuposTotales}`,
+        timestamp: new Date().toISOString(),
+        source,
+      })
+      setShowResult(true)
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Error al entregar comida"
+      setScanResult({
+        identificacion,
+        student: null,
+        status: "error",
+        message: errorMessage,
+        timestamp: new Date().toISOString(),
+        source,
+      })
+      setShowResult(true)
+    } finally {
+      setProcessing(false)
+    }
+  }, [pendingCupos, selectedQuantity, user, studentStore, fullName, activeRole])
+
+  const handleQuantityCancel = () => {
+    setShowQuantitySelector(false)
+    setPendingCupos({
+      identificacion: "",
+      student: null,
+      cuposDisponibles: 0,
+      cuposTotales: 0,
+      source: "direct",
+    })
+    setSelectedQuantity(1)
+    scanner.resetDetection()
+  }
 
   const resetScanner = () => {
     if (unsubscribeRef.current) {
@@ -394,6 +424,9 @@ export function BuffeteScanner() {
     setScanResult(null)
     setRealtimeStudentData(null)
     setShowResult(false)
+    setShowQuantitySelector(false)
+    setPendingCupos({ identificacion: "", student: null, cuposDisponibles: 0, cuposTotales: 0, source: "direct" })
+    setSelectedQuantity(1)
     setError("")
     setManualId("")
     setProcessing(false)
@@ -730,6 +763,94 @@ export function BuffeteScanner() {
         </div>
       </div>
 
+      {/* Quantity Selector Dialog */}
+      <Dialog open={showQuantitySelector} onOpenChange={(open) => { if (!open) handleQuantityCancel() }}>
+        <DialogContent className="sm:max-w-md !rounded-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-sm md:text-base">
+              <Utensils className="size-5 text-amber-600" />
+              Seleccionar Cantidad
+            </DialogTitle>
+          </DialogHeader>
+
+          {pendingCupos.student && (
+            <div className="space-y-4">
+              <div className="rounded-xl border border-amber-200 bg-amber-50/80 overflow-hidden">
+                <div className="bg-gradient-to-r from-amber-600 to-orange-500 p-3 md:p-4">
+                  <p className="text-lg md:text-xl font-bold text-white truncate">{pendingCupos.student.nombre}</p>
+                  <div className="flex items-center gap-2 mt-1">
+                    <span className="text-[10px] md:text-xs text-white/80">ID: {pendingCupos.identificacion}</span>
+                    <span className="text-white/40">·</span>
+                    <span className="text-[10px] md:text-xs text-white/80 truncate">{pendingCupos.student.programa}</span>
+                  </div>
+                </div>
+                <div className="p-3 md:p-4 space-y-2">
+
+                  <div className="bg-white rounded-lg p-3 border border-amber-200">
+                    <div className="flex items-center justify-between mb-3">
+                      <span className="text-xs md:text-sm font-semibold text-gray-700">Cupos disponibles</span>
+                      <span className="text-lg md:text-xl font-bold text-amber-600">{pendingCupos.cuposDisponibles}</span>
+                    </div>
+                    <p className="text-[10px] md:text-xs text-muted-foreground mb-3">
+                      Selecciona cuántos platos entregar:
+                    </p>
+                    <div className="grid grid-cols-3 gap-2">
+                      {Array.from({ length: pendingCupos.cuposDisponibles }, (_, i) => i + 1).map((num) => (
+                        <button
+                          key={num}
+                          onClick={() => setSelectedQuantity(num)}
+                          className={`py-3 rounded-xl text-sm font-bold transition-all ${
+                            selectedQuantity === num
+                              ? "bg-amber-600 text-white shadow-md shadow-amber-600/30 scale-105"
+                              : "bg-gray-100 text-gray-700 hover:bg-amber-100 hover:text-amber-700"
+                          }`}
+                        >
+                          {num}
+                          <span className="block text-[9px] font-normal opacity-70">
+                            {num === 1 ? "plato" : "platos"}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                    <div className="mt-3 w-full bg-gray-200 rounded-full h-2">
+                      <div
+                        className="bg-gradient-to-r from-amber-500 to-orange-500 h-2 rounded-full transition-all duration-300"
+                        style={{ width: `${(selectedQuantity / pendingCupos.cuposDisponibles) * 100}%` }}
+                      />
+                    </div>
+                    <p className="text-center text-xs text-amber-700 mt-2 font-medium">
+                      Entregando: {selectedQuantity} de {pendingCupos.cuposDisponibles} plato(s)
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex gap-2">
+                <Button
+                  onClick={handleQuantityConfirm}
+                  disabled={processing}
+                  className="flex-1 h-11 text-xs md:text-sm bg-amber-600 hover:bg-amber-700 text-white"
+                >
+                  {processing ? (
+                    <><Loader2 className="size-4 mr-1.5 animate-spin" /> Entregando...</>
+                  ) : (
+                    <><CheckCircle className="size-4 mr-1.5" /> Confirmar Entrega</>
+                  )}
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={handleQuantityCancel}
+                  disabled={processing}
+                  className="h-11 text-xs md:text-sm"
+                >
+                  Cancelar
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
       {/* Result Dialog */}
       <Dialog open={showResult} onOpenChange={handleModalClose}>
         <DialogContent className="sm:max-w-md !rounded-2xl">
@@ -751,42 +872,22 @@ export function BuffeteScanner() {
           <div className="space-y-3">
             {scanResult && (
               <>
-                <div className="flex items-center gap-2 p-2 rounded-lg bg-gray-50">
-                  <User className="size-3.5 md:size-4 text-muted-foreground shrink-0" />
-                  <span className="text-[11px] md:text-sm font-medium">ID:</span>
-                  <Badge variant="secondary" className="text-[10px] md:text-xs font-mono">
-                    {scanResult.identificacion}
-                  </Badge>
-                </div>
-
                 {scanResult.status === "success" && displayStudent && (
                   <div className="rounded-xl border border-amber-200 bg-amber-50/80 overflow-hidden">
-                    <div className="bg-amber-600 p-2.5 md:p-3">
-                      <div className="flex items-center gap-2">
+                    <div className="bg-gradient-to-r from-amber-600 to-orange-500 p-3 md:p-4">
+                      <div className="flex items-center gap-2 mb-1">
                         <CheckCircle className="size-4 md:size-5 text-white" />
-                        <p className="text-[11px] md:text-sm font-semibold text-white">Comida Entregada Exitosamente</p>
+                        <p className="text-xs md:text-sm font-semibold text-white">Comida Entregada</p>
                       </div>
+                      <p className="text-base md:text-lg font-bold text-white truncate">{displayStudent.nombre}</p>
                     </div>
                     <div className="p-3 md:p-4 space-y-2">
-                      <div className="grid grid-cols-2 gap-2 md:gap-3">
-                        <div>
-                          <p className="text-[9px] md:text-xs text-muted-foreground">Nombre</p>
-                          <p className="text-[11px] md:text-sm font-medium truncate">{displayStudent.nombre}</p>
-                        </div>
-                        <div>
-                          <p className="text-[9px] md:text-xs text-muted-foreground">Programa</p>
-                          <p className="text-[11px] md:text-sm font-medium truncate">{displayStudent.programa}</p>
-                        </div>
-                        {displayStudent.puesto && (
-                          <div>
-                            <p className="text-[9px] md:text-xs text-muted-foreground">Puesto</p>
-                            <p className="text-[11px] md:text-sm font-medium">{displayStudent.puesto}</p>
-                          </div>
-                        )}
-                        <div>
-                          <p className="text-[9px] md:text-xs text-muted-foreground">Mesa</p>
-                          <Badge className="bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs">Mesa {user.mesaAsignada}</Badge>
-                        </div>
+                      <div className="flex items-center gap-4 md:gap-6 flex-wrap">
+                        <Badge variant="outline" className="px-3 md:px-4 py-1.5 text-sm md:text-base font-extrabold font-mono tracking-widest bg-gradient-to-br from-amber-50 to-amber-100 text-amber-900 border-2 border-amber-400 shadow-sm shadow-amber-200/50">{scanResult.identificacion}</Badge>
+                        <span className="text-amber-300 font-bold hidden sm:inline">·</span>
+                        <span className="text-xs md:text-sm text-muted-foreground truncate">{displayStudent.programa}</span>
+                        <span className="text-amber-300 font-bold hidden sm:inline">·</span>
+                        <Badge className="px-3 md:px-4 py-1.5 text-sm md:text-base font-extrabold bg-gradient-to-br from-amber-600 to-orange-500 text-white shadow-md shadow-amber-600/30">Mesa {user.mesaAsignada}</Badge>
                       </div>
 
                       <div className="bg-white rounded-lg p-3 border border-amber-200 space-y-2">

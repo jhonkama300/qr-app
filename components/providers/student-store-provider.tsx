@@ -5,7 +5,7 @@ import { createContext, useContext, useCallback } from "react"
 import { collection, query, where, getDocs, addDoc, updateDoc, doc, getDoc, setDoc } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import type { MealInventory } from "@/lib/firestore-service"
-import { consumeTableMeal } from "@/lib/firestore-service"
+import { consumeTableMeal, getTableMealInventory } from "@/lib/firestore-service"
 
 interface Student {
   id: string
@@ -46,6 +46,7 @@ interface StudentStoreContextType {
     details?: string,
     source?: "direct" | "q10" | "manual",
     userInfo?: UserInfo,
+    quantity?: number,
   ) => Promise<void>
   markQ10Access: (
     id: string,
@@ -58,11 +59,11 @@ interface StudentStoreContextType {
   validateMesaAccess: (
     identificacion: string,
     mesaRequerida: number,
-  ) => Promise<{ valid: boolean; message: string; noAccessLog?: boolean }>
+  ) => Promise<{ valid: boolean; message: string; noAccessLog?: boolean; student?: Student; cuposDisponibles?: number; cuposTotales?: number }>
   checkMesaStatus: (mesaNumero: number) => Promise<boolean>
   checkAccessGranted: (identificacion: string) => Promise<boolean>
   getMealInventory: () => Promise<MealInventory>
-  decrementMealInventory: () => Promise<boolean>
+  decrementMealInventory: (quantity?: number) => Promise<boolean>
   isSystemUser: (identificacion: string) => Promise<boolean>
 }
 
@@ -100,20 +101,20 @@ export function StudentStoreProvider({ children }: { children: React.ReactNode }
     }
   }, [])
 
-  const decrementMealInventory = useCallback(async (): Promise<boolean> => {
+  const decrementMealInventory = useCallback(async (quantity: number = 1): Promise<boolean> => {
     try {
       const inventoryRef = doc(db, "config", "meal_inventory")
       const currentInventory = await getMealInventory()
 
-      if (currentInventory.comidasDisponibles <= 0) {
-        console.error("[v0] No hay comidas disponibles en el inventario")
+      if (currentInventory.comidasDisponibles < quantity) {
+        console.error("[v0] No hay suficientes comidas disponibles en el inventario")
         return false
       }
 
       const updatedInventory: MealInventory = {
         totalComidas: currentInventory.totalComidas,
-        comidasConsumidas: currentInventory.comidasConsumidas + 1,
-        comidasDisponibles: currentInventory.comidasDisponibles - 1,
+        comidasConsumidas: currentInventory.comidasConsumidas + quantity,
+        comidasDisponibles: currentInventory.comidasDisponibles - quantity,
         fechaActualizacion: new Date().toISOString(),
       }
 
@@ -214,30 +215,14 @@ export function StudentStoreProvider({ children }: { children: React.ReactNode }
     async (
       identificacion: string,
       mesaRequerida: number,
-    ): Promise<{ valid: boolean; message: string; noAccessLog?: boolean }> => {
+    ): Promise<{ valid: boolean; message: string; noAccessLog?: boolean; student?: Student; cuposDisponibles?: number; cuposTotales?: number }> => {
       try {
         const hasEventAccess = await checkAccessGranted(identificacion)
         if (!hasEventAccess) {
           return {
             valid: false,
             message: `❌ Estudiante sin acceso al evento. Debe registrarse primero con el rol Operativo.`,
-            noAccessLog: true, // Indica que no debe registrar log, queda en espera
-          }
-        }
-
-        const tableMealSuccess = await consumeTableMeal(mesaRequerida)
-        if (!tableMealSuccess) {
-          return {
-            valid: false,
-            message: `⚠️ La Mesa ${mesaRequerida} no tiene comidas disponibles o está inactiva`,
-          }
-        }
-
-        const inventory = await getMealInventory()
-        if (inventory.comidasDisponibles <= 0) {
-          return {
-            valid: false,
-            message: `⚠️ No hay comidas disponibles en el inventario global`,
+            noAccessLog: true,
           }
         }
 
@@ -246,6 +231,22 @@ export function StudentStoreProvider({ children }: { children: React.ReactNode }
           return {
             valid: false,
             message: `La Mesa ${mesaRequerida} está inactiva`,
+          }
+        }
+
+        const tableInventory = await getTableMealInventory(mesaRequerida)
+        if (tableInventory && tableInventory.comidasDisponibles <= 0) {
+          return {
+            valid: false,
+            message: `⚠️ La Mesa ${mesaRequerida} no tiene comidas disponibles`,
+          }
+        }
+
+        const inventory = await getMealInventory()
+        if (inventory.comidasDisponibles <= 0) {
+          return {
+            valid: false,
+            message: `⚠️ No hay comidas disponibles en el inventario global`,
           }
         }
 
@@ -267,7 +268,10 @@ export function StudentStoreProvider({ children }: { children: React.ReactNode }
 
         return {
           valid: true,
-          message: `Comida entregada exitosamente en Mesa ${mesaRequerida}. Cupos: ${cuposDisponibles - 1}/${cuposTotales}`,
+          message: `Cupos disponibles: ${cuposDisponibles} de ${cuposTotales}`,
+          student,
+          cuposDisponibles,
+          cuposTotales,
         }
       } catch (error) {
         console.error("Error al validar acceso:", error)
@@ -284,6 +288,7 @@ export function StudentStoreProvider({ children }: { children: React.ReactNode }
       details?: string,
       source?: "direct" | "q10" | "manual",
       userInfo?: UserInfo,
+      quantity: number = 1,
     ) => {
       try {
         console.log("[v0] UserInfo recibido en markStudentAccess:", userInfo)
@@ -292,18 +297,23 @@ export function StudentStoreProvider({ children }: { children: React.ReactNode }
           userInfo?.userRole === "bufete" && userInfo?.mesaAsignada !== undefined && userInfo?.mesaAsignada !== null
 
         if (granted && shouldConsumeCupo) {
-          const inventorySuccess = await decrementMealInventory()
+          const tableSuccess = await consumeTableMeal(userInfo.mesaAsignada!, quantity)
+          if (!tableSuccess) {
+            throw new Error(`No hay suficientes comidas en la Mesa ${userInfo.mesaAsignada}`)
+          }
+
+          const inventorySuccess = await decrementMealInventory(quantity)
           if (!inventorySuccess) {
-            throw new Error("No se pudo actualizar el inventario de comidas")
+            throw new Error("No se pudo actualizar el inventario global de comidas")
           }
 
           const student = await getStudentById(identificacion)
           if (student) {
-            const cuposConsumidos = (student.cuposConsumidos || 0) + 1
+            const cuposConsumidos = (student.cuposConsumidos || 0) + quantity
             await updateDoc(doc(db, "personas", student.id), {
               cuposConsumidos: cuposConsumidos,
             })
-            console.log(`[v0] 1 comida consumida para ${identificacion}. Total acumulado: ${cuposConsumidos}`)
+            console.log(`[v0] ${quantity} comida(s) consumida(s) para ${identificacion}. Total acumulado: ${cuposConsumidos}`)
           }
         } else if (granted && !shouldConsumeCupo) {
           console.log(

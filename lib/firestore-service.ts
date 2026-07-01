@@ -257,7 +257,7 @@ export const deleteTableMealInventory = async (numeroMesa: number): Promise<void
   }
 }
 
-export const consumeTableMeal = async (numeroMesa: number): Promise<boolean> => {
+export const consumeTableMeal = async (numeroMesa: number, quantity: number = 1): Promise<boolean> => {
   try {
     const tableRef = doc(db, "table_meal_inventory", `mesa_${numeroMesa}`)
     const tableSnap = await getDoc(tableRef)
@@ -268,14 +268,14 @@ export const consumeTableMeal = async (numeroMesa: number): Promise<boolean> => 
 
     const table = tableSnap.data() as TableMealInventory
 
-    if (!table.activa || table.comidasDisponibles <= 0) {
+    if (!table.activa || table.comidasDisponibles < quantity) {
       return false
     }
 
     const updatedTable: TableMealInventory = {
       ...table,
-      comidasConsumidas: table.comidasConsumidas + 1,
-      comidasDisponibles: table.comidasDisponibles - 1,
+      comidasConsumidas: table.comidasConsumidas + quantity,
+      comidasDisponibles: table.comidasDisponibles - quantity,
       fechaActualizacion: new Date().toISOString(),
     }
 

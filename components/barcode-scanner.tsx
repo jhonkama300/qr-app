@@ -580,44 +580,36 @@ export function BarcodeScanner() {
           <div className="space-y-3">
             {scanResultDisplay && (
               <>
-                <div className="flex items-center gap-2 p-2 rounded-lg bg-gray-50 dark:bg-gray-800/50">
-                  <User className="size-3.5 md:size-4 text-muted-foreground shrink-0" />
-                  <span className="text-[11px] md:text-sm font-medium">ID:</span>
-                  <Badge variant="secondary" className="text-[10px] md:text-xs font-mono">
-                    {scanResultDisplay.identificacion}
-                  </Badge>
-                </div>
-
                 {scanResultDisplay.type === "success" && scanResultDisplay.person && (
                   <div className="rounded-xl border border-uparsistem-200 bg-uparsistem-50/80 dark:bg-uparsistem-950/20 overflow-hidden">
-                    <div className="bg-uparsistem-600 p-2.5 md:p-3">
-                      <div className="flex items-center gap-2">
+                    <div className="bg-gradient-to-r from-uparsistem-600 to-uparsistem-500 p-3 md:p-4">
+                      <div className="flex items-center gap-2 mb-1">
                         <CheckCircle className="size-4 md:size-5 text-white" />
-                        <p className="text-[11px] md:text-sm font-semibold text-white">Acceso Concedido</p>
+                        <p className="text-xs md:text-sm font-semibold text-white">Acceso Concedido</p>
                       </div>
+                      <p className="text-base md:text-lg font-bold text-white truncate">{scanResultDisplay.person.nombre}</p>
                     </div>
-                    <div className="p-3 md:p-4 space-y-2">
-                      <div className="grid grid-cols-2 gap-2 md:gap-3">
-                        <div>
-                          <p className="text-[9px] md:text-xs text-muted-foreground">Nombre</p>
-                          <p className="text-[11px] md:text-sm font-medium truncate">{scanResultDisplay.person.nombre}</p>
+                    <div className="p-3 md:p-4 space-y-3">
+                      <Badge variant="outline" className="w-full py-2 text-sm md:text-base font-extrabold font-mono tracking-widest text-center bg-gradient-to-br from-uparsistem-50 to-uparsistem-100 text-uparsistem-900 border-2 border-uparsistem-400 shadow-sm shadow-uparsistem-200/50">{scanResultDisplay.identificacion}</Badge>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="bg-white dark:bg-gray-900 rounded-lg p-2.5 border border-uparsistem-100 dark:border-uparsistem-900/30">
+                          <p className="text-[9px] md:text-xs text-muted-foreground font-medium uppercase tracking-wider">Programa</p>
+                          <p className="text-xs md:text-sm font-semibold break-words mt-0.5">{scanResultDisplay.person.programa}</p>
                         </div>
-                        <div>
-                          <p className="text-[9px] md:text-xs text-muted-foreground">Programa</p>
-                          <p className="text-[11px] md:text-sm font-medium truncate">{scanResultDisplay.person.programa}</p>
-                        </div>
-                        <div>
-                          <p className="text-[9px] md:text-xs text-muted-foreground">Puesto</p>
-                          <p className="text-[11px] md:text-sm font-medium">{scanResultDisplay.person.puesto}</p>
-                        </div>
-                        <div>
-                          <p className="text-[9px] md:text-xs text-muted-foreground">Cupos Extra</p>
-                          <p className="text-[11px] md:text-sm font-medium">{scanResultDisplay.person.cuposExtras || 0}</p>
+                        <div className="bg-white dark:bg-gray-900 rounded-lg p-2.5 border border-purple-100 dark:border-purple-900/30 flex flex-col justify-center min-h-[60px]">
+                          <p className="text-[9px] md:text-xs text-purple-600 font-medium uppercase tracking-wider">Puesto</p>
+                          <p className="text-sm md:text-base font-black text-purple-800 dark:text-purple-300 mt-0.5">{scanResultDisplay.person.puesto}</p>
                         </div>
                       </div>
-                      <div className="flex items-center gap-1.5 p-1.5 md:p-2 rounded-lg bg-uparsistem-100/70 dark:bg-uparsistem-900/30 mt-1">
-                        <CheckCircle className="size-3 md:size-3.5 text-uparsistem-600 shrink-0" />
-                        <p className="text-[9px] md:text-xs text-uparsistem-700 dark:text-uparsistem-300">Bienvenido al evento</p>
+                      <div className="bg-white dark:bg-gray-900 rounded-lg p-2.5 border border-uparsistem-100 dark:border-uparsistem-900/30">
+                        <div className="flex items-center justify-between">
+                          <p className="text-[9px] md:text-xs text-muted-foreground font-medium uppercase tracking-wider">Cupos Extra</p>
+                          <Badge className="text-xs md:text-sm font-extrabold bg-gradient-to-br from-uparsistem-600 to-uparsistem-500 text-white shadow-sm">{scanResultDisplay.person.cuposExtras || 0}</Badge>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1.5 p-2 rounded-lg bg-uparsistem-100/70 dark:bg-uparsistem-900/30">
+                        <CheckCircle className="size-3.5 text-uparsistem-600 shrink-0" />
+                        <p className="text-[10px] md:text-xs font-medium text-uparsistem-700 dark:text-uparsistem-300">Bienvenido al evento</p>
                       </div>
                     </div>
                   </div>
@@ -625,30 +617,28 @@ export function BarcodeScanner() {
 
                 {scanResultDisplay.type === "already_scanned" && scanResultDisplay.person && (
                   <div className="rounded-xl border border-amber-200 bg-amber-50/80 dark:bg-amber-950/20 overflow-hidden">
-                    <div className="bg-amber-500 p-2.5 md:p-3">
-                      <div className="flex items-center gap-2">
+                    <div className="bg-gradient-to-r from-amber-500 to-amber-400 p-3 md:p-4">
+                      <div className="flex items-center gap-2 mb-1">
                         <AlertTriangle className="size-4 md:size-5 text-white" />
-                        <p className="text-[11px] md:text-sm font-semibold text-white">Ya Registrado</p>
+                        <p className="text-xs md:text-sm font-semibold text-white">Ya Registrado</p>
                       </div>
+                      <p className="text-base md:text-lg font-bold text-white truncate">{scanResultDisplay.person.nombre}</p>
                     </div>
-                    <div className="p-3 md:p-4 space-y-2">
-                      <div className="grid grid-cols-2 gap-2 md:gap-3">
-                        <div>
-                          <p className="text-[9px] md:text-xs text-muted-foreground">Nombre</p>
-                          <p className="text-[11px] md:text-sm font-medium truncate">{scanResultDisplay.person.nombre}</p>
+                    <div className="p-3 md:p-4 space-y-3">
+                      <Badge variant="outline" className="w-full py-2 text-sm md:text-base font-extrabold font-mono tracking-widest text-center bg-gradient-to-br from-amber-50 to-amber-100 text-amber-900 border-2 border-amber-400 shadow-sm shadow-amber-200/50">{scanResultDisplay.identificacion}</Badge>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="bg-white dark:bg-gray-900 rounded-lg p-2.5 border border-amber-100 dark:border-amber-900/30">
+                          <p className="text-[9px] md:text-xs text-muted-foreground font-medium uppercase tracking-wider">Programa</p>
+                          <p className="text-xs md:text-sm font-semibold break-words mt-0.5">{scanResultDisplay.person.programa}</p>
                         </div>
-                        <div>
-                          <p className="text-[9px] md:text-xs text-muted-foreground">Programa</p>
-                          <p className="text-[11px] md:text-sm font-medium truncate">{scanResultDisplay.person.programa}</p>
-                        </div>
-                        <div>
-                          <p className="text-[9px] md:text-xs text-muted-foreground">Puesto</p>
-                          <p className="text-[11px] md:text-sm font-medium">{scanResultDisplay.person.puesto}</p>
+                        <div className="bg-white dark:bg-gray-900 rounded-lg p-2.5 border border-purple-100 dark:border-purple-900/30 flex flex-col justify-center min-h-[60px]">
+                          <p className="text-[9px] md:text-xs text-purple-600 font-medium uppercase tracking-wider">Puesto</p>
+                          <p className="text-sm md:text-base font-black text-purple-800 dark:text-purple-300 mt-0.5">{scanResultDisplay.person.puesto}</p>
                         </div>
                       </div>
-                      <div className="flex items-center gap-1.5 p-1.5 md:p-2 rounded-lg bg-amber-100/70 dark:bg-amber-900/30 mt-1">
-                        <AlertTriangle className="size-3 md:size-3.5 text-amber-600 shrink-0" />
-                        <p className="text-[9px] md:text-xs text-amber-700 dark:text-amber-300">Este estudiante ya ingresó previamente</p>
+                      <div className="flex items-center gap-1.5 p-2 rounded-lg bg-amber-100/70 dark:bg-amber-900/30">
+                        <AlertTriangle className="size-3.5 text-amber-600 shrink-0" />
+                        <p className="text-[10px] md:text-xs font-medium text-amber-700 dark:text-amber-300">Este estudiante ya ingresó previamente</p>
                       </div>
                     </div>
                   </div>
