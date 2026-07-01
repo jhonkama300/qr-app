@@ -7,7 +7,6 @@ import { Badge } from "@/components/ui/badge"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { collection, query, where, onSnapshot, doc } from "firebase/firestore"
 import { db } from "@/lib/firebase"
-import { useAuth } from "@/components/auth-provider"
 import { Utensils, Users, Activity, Scale, Package, AlertTriangle, TrendingDown, UserPlus } from "lucide-react"
 import { Progress } from "@/components/ui/progress"
 import type { MealInventory, TableMealInventory } from "@/lib/firestore-service"
@@ -20,7 +19,6 @@ interface MesaStats {
 }
 
 export default function BufetesPage() {
-  const { user, activeRole } = useAuth()
   const [mesas, setMesas] = useState<MesaStats[]>([])
   const [tableMealInventories, setTableMealInventories] = useState<TableMealInventory[]>([])
   const [loading, setLoading] = useState(true)
@@ -154,16 +152,6 @@ export default function BufetesPage() {
 
   return (
     <div className="flex-1 space-y-3 md:space-y-6 p-2 md:p-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-lg md:text-3xl font-bold tracking-tight">Gestión de Mesas</h1>
-          <p className="text-xs md:text-base text-muted-foreground">Monitorea el estado y estadísticas de las mesas en tiempo real</p>
-        </div>
-        <Badge variant="outline" className="text-sm">
-          Rol: {activeRole}
-        </Badge>
-      </div>
-
       {isLowInventory && mealInventory && (
         <Alert variant="destructive">
           <AlertTriangle className="h-4 w-4" />
