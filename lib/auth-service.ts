@@ -6,7 +6,7 @@ export interface User {
   id: string
   idNumber: string
   fullName: string
-  roles: ("administrador" | "operativo" | "bufete")[] // Changed from single role to array of roles
+  roles: ("administrador" | "operativo" | "bufete" | "consultor")[] // Changed from single role to array of roles
   mesaAsignada?: number
   createdAt: string
   hasDefaultPassword?: boolean
@@ -50,7 +50,7 @@ export const validateLogin = async (idNumber: string, password: string): Promise
     const defaultHash = await getDefaultPasswordHash()
     const hasDefaultPassword = hashedPassword === defaultHash
 
-    let roles: ("administrador" | "operativo" | "bufete")[]
+    let roles: ("administrador" | "operativo" | "bufete" | "consultor")[]
     if (Array.isArray(userData.roles)) {
       roles = userData.roles
     } else if (userData.role) {
@@ -80,7 +80,7 @@ export const createUser = async (
   idNumber: string,
   fullName: string,
   password: string,
-  roles: ("administrador" | "operativo" | "bufete")[],
+  roles: ("administrador" | "operativo" | "bufete" | "consultor")[],
   mesaAsignada?: number,
 ): Promise<boolean> => {
   try {
@@ -168,7 +168,7 @@ export const checkIdType = async (
       const userData = usersSnapshot.docs[0].data()
       console.log("[v0] Usuario admin encontrado:", userData)
 
-      let roles: ("administrador" | "operativo" | "bufete")[]
+      let roles: ("administrador" | "operativo" | "bufete" | "consultor")[]
       if (Array.isArray(userData.roles)) {
         roles = userData.roles
       } else if (userData.role) {

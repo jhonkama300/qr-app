@@ -12,6 +12,7 @@ interface NavTab {
   adminOnly?: boolean
   bufeteOnly?: boolean
   operativoOnly?: boolean
+  consultorOnly?: boolean
   adminOrOperativo?: boolean
   iconColor?: string
 }
@@ -26,12 +27,13 @@ const tabs: NavTab[] = [
   { path: "/dashboard/bufetes", icon: Utensils, label: "Bufetes", bufeteOnly: true, iconColor: "text-emerald-500" },
   { path: "/dashboard/control-bufetes", icon: Table, label: "Bufetes", adminOnly: true, iconColor: "text-violet-500" },
   { path: "/dashboard/bufetes", icon: Eye, label: "Mesas", operativoOnly: true, iconColor: "text-cyan-500" },
+  { path: "/dashboard/consultas", icon: Eye, label: "Consultas", consultorOnly: true, iconColor: "text-purple-500" },
 ]
 
 const PRIMARY_COUNT = 4
 
 export function MobileBottomNav() {
-  const { activeRole, isAdmin, isBufete } = useAuth()
+  const { activeRole, isAdmin, isBufete, isConsultor } = useAuth()
   const router = useRouter()
   const pathname = usePathname()
   const [expanded, setExpanded] = useState(false)
@@ -44,6 +46,7 @@ export function MobileBottomNav() {
   }, [router])
 
   const visibleTabs = tabs.filter((t) => {
+    if (isConsultor) return !!t.consultorOnly
     if (t.adminOnly && !isAdmin) return false
     if (t.bufeteOnly && !isBufete) return false
     if (t.operativoOnly && !isOperativo) return false

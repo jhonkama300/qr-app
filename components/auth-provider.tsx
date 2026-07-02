@@ -7,17 +7,18 @@ import type { User } from "@/lib/auth-service"
 
 interface AuthContextType {
   user: User | null
-  activeRole: "administrador" | "operativo" | "bufete" | null
-  availableRoles: ("administrador" | "operativo" | "bufete")[]
-  userRole: "administrador" | "operativo" | "bufete" | null // Deprecated: use activeRole instead
+  activeRole: "administrador" | "operativo" | "bufete" | "consultor" | null
+  availableRoles: ("administrador" | "operativo" | "bufete" | "consultor")[]
+  userRole: "administrador" | "operativo" | "bufete" | "consultor" | null // Deprecated: use activeRole instead
   mesaAsignada: number | null
   fullName: string | null
   isAdmin: boolean
   isBufete: boolean
+  isConsultor: boolean
   loading: boolean
   login: (user: User) => void
   logout: () => void
-  switchRole: (role: "administrador" | "operativo" | "bufete") => void
+  switchRole: (role: "administrador" | "operativo" | "bufete" | "consultor") => void
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -29,6 +30,7 @@ const AuthContext = createContext<AuthContextType>({
   fullName: null,
   isAdmin: false,
   isBufete: false,
+  isConsultor: false,
   loading: true,
   login: () => {},
   logout: () => {},
@@ -45,7 +47,7 @@ export const useAuth = () => {
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
-  const [activeRole, setActiveRole] = useState<"administrador" | "operativo" | "bufete" | null>(null)
+  const [activeRole, setActiveRole] = useState<"administrador" | "operativo" | "bufete" | "consultor" | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -58,8 +60,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUser(userData)
 
         // Set active role from localStorage or default to first available role
-        if (savedActiveRole && userData.roles?.includes(savedActiveRole)) {
-          setActiveRole(savedActiveRole)
+        if (savedActiveRole && userData.roles?.includes(savedActiveRole as "administrador" | "operativo" | "bufete" | "consultor")) {
+          setActiveRole(savedActiveRole as "administrador" | "operativo" | "bufete" | "consultor")
         } else if (userData.roles && userData.roles.length > 0) {
           setActiveRole(userData.roles[0])
           localStorage.setItem("activeRole", userData.roles[0])
@@ -92,7 +94,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     localStorage.removeItem("activeRole")
   }
 
-  const switchRole = (role: "administrador" | "operativo" | "bufete") => {
+  const switchRole = (role: "administrador" | "operativo" | "bufete" | "consultor") => {
     if (user?.roles?.includes(role)) {
       setActiveRole(role)
       localStorage.setItem("activeRole", role)
@@ -107,6 +109,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const fullName = user?.fullName || null
   const isAdmin = activeRole === "administrador"
   const isBufete = activeRole === "bufete"
+  const isConsultor = activeRole === "consultor"
 
   const value = useMemo(
     () => ({
@@ -118,12 +121,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       fullName,
       isAdmin,
       isBufete,
+      isConsultor,
       loading,
       login,
       logout,
       switchRole,
     }),
-    [user, activeRole, availableRoles, mesaAsignada, fullName, isAdmin, isBufete, loading, login, logout, switchRole],
+    [user, activeRole, availableRoles, mesaAsignada, fullName, isAdmin, isBufete, isConsultor, loading, login, logout, switchRole],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

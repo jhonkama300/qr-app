@@ -167,10 +167,12 @@ export function UnifiedLogin() {
             ? "Acceso Operativo"
             : primaryRole === "bufete"
               ? "Acceso Bufete"
-              : "Acceso concedido"
+              : primaryRole === "consultor"
+                ? "Acceso Consultor"
+                : "Acceso concedido"
       setSuccessMessage(accessMessage)
       setLoading(false)
-      setTimeout(() => router.push("/dashboard"), 1500)
+      setTimeout(() => router.push(primaryRole === "consultor" ? "/dashboard/consultas" : "/dashboard"), 1500)
     } catch {
       setError("Error al iniciar sesión")
       setLoading(false)
@@ -211,11 +213,13 @@ export function UnifiedLogin() {
               ? "Acceso Operativo"
               : primaryRole === "bufete"
                 ? "Acceso Bufete"
-                : "Acceso concedido"
+                : primaryRole === "consultor"
+                  ? "Acceso Consultor"
+                  : "Acceso concedido"
         setSuccessMessage(accessMessage)
         setShowChangePasswordModal(false)
         setChangingPassword(false)
-        setTimeout(() => router.push("/dashboard"), 1500)
+        setTimeout(() => router.push(primaryRole === "consultor" ? "/dashboard/consultas" : "/dashboard"), 1500)
       }
     } catch (error: any) {
       console.error("[v0] Error al cambiar contraseña:", error)

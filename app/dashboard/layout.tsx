@@ -21,7 +21,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { LogOut, Home, Scan, DoorOpen, Table, Utensils, Users, Database, Package, Shield, Check, Scale } from "lucide-react"
+import { LogOut, Home, Scan, DoorOpen, Table, Utensils, Users, Database, Package, Shield, Check, Scale, Eye } from "lucide-react"
 import { usePathname } from "next/navigation"
 import { useRouter } from "next/navigation"
 import { useState, useEffect } from "react"
@@ -36,6 +36,7 @@ const viewConfig: Record<string, { icon: React.ElementType; title: string }> = {
   "/dashboard/control-bufetes": { icon: Table, title: "Control de Mesas" },
   "/dashboard/usuarios": { icon: Users, title: "Usuarios" },
   "/dashboard/base-datos": { icon: Database, title: "Base de Datos" },
+  "/dashboard/consultas": { icon: Eye, title: "Consultas" },
   "/dashboard/mesas-bufete": { icon: Utensils, title: "Mesas Bufete" },
 }
 
@@ -53,6 +54,12 @@ export default function DashboardLayout({
   useEffect(() => {
     if (!loading && !user) router.push("/")
   }, [user, loading, router])
+
+  useEffect(() => {
+    if (!loading && activeRole === "consultor" && pathname !== "/dashboard/consultas") {
+      router.push("/dashboard/consultas")
+    }
+  }, [loading, activeRole, pathname, router])
 
   if (loading) {
     return (
@@ -94,9 +101,11 @@ export default function DashboardLayout({
                     ? "bg-uparsistem-50 text-uparsistem-700 border-uparsistem-200"
                     : activeRole === "bufete"
                       ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                      : "bg-blue-50 text-blue-700 border-blue-200"
+                      : activeRole === "consultor"
+                        ? "bg-purple-50 text-purple-700 border-purple-200"
+                        : "bg-blue-50 text-blue-700 border-blue-200"
                 }`}>
-                  {activeRole === "administrador" ? "Admin" : activeRole === "bufete" ? "Bufete" : "Operativo"}
+                  {activeRole === "administrador" ? "Admin" : activeRole === "bufete" ? "Bufete" : activeRole === "consultor" ? "Consultor" : "Operativo"}
                 </span>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
@@ -114,8 +123,8 @@ export default function DashboardLayout({
                         <div className="px-3 pt-2.5 pb-1 text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Cambiar Rol</div>
                         {availableRoles.map((role) => {
                           const isActive = role === activeRole
-                          const RoleIcon = role === "administrador" ? Shield : role === "bufete" ? Scale : Users
-                          const roleGrad = role === "administrador" ? "from-uparsistem-500 to-uparsistem-600" : role === "bufete" ? "from-emerald-500 to-green-600" : "from-blue-500 to-indigo-600"
+                          const RoleIcon = role === "administrador" ? Shield : role === "bufete" ? Scale : role === "consultor" ? Eye : Users
+                          const roleGrad = role === "administrador" ? "from-uparsistem-500 to-uparsistem-600" : role === "bufete" ? "from-emerald-500 to-green-600" : role === "consultor" ? "from-purple-500 to-purple-600" : "from-blue-500 to-indigo-600"
                           return (
                             <DropdownMenuItem
                               key={role}

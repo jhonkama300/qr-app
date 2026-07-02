@@ -31,7 +31,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { Loader2, Plus, Trash2, Shield, User, Award as IdCard, Scale, KeyRound, Edit, Search } from "lucide-react"
+import { Loader2, Plus, Trash2, Shield, User, Award as IdCard, Scale, KeyRound, Edit, Search, Eye } from "lucide-react"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
@@ -40,7 +40,7 @@ interface UserData {
   id: string
   idNumber: string
   fullName: string
-  roles: ("administrador" | "operativo" | "bufete")[]
+  roles: ("administrador" | "operativo" | "bufete" | "consultor")[]
   mesaAsignada?: number
   createdAt: string
 }
@@ -64,14 +64,15 @@ export function UserManagement() {
     administrador: false,
     operativo: false,
     bufete: false,
+    consultor: false,
   })
   const [editMesaAsignada, setEditMesaAsignada] = useState(1)
 
   const [searchQuery, setSearchQuery] = useState("")
-  const [selectedRoleFilter, setSelectedRoleFilter] = useState<"todos" | "administrador" | "operativo" | "bufete">(
+  const [selectedRoleFilter, setSelectedRoleFilter] = useState<"todos" | "administrador" | "operativo" | "bufete" | "consultor">(
     "todos",
   )
-  const [activeTab, setActiveTab] = useState<"todos" | "administrador" | "operativo" | "bufete">("todos")
+  const [activeTab, setActiveTab] = useState<"todos" | "administrador" | "operativo" | "bufete" | "consultor">("todos")
 
   const [confirmDialog, setConfirmDialog] = useState<{
     open: boolean
@@ -95,6 +96,7 @@ export function UserManagement() {
       administrador: false,
       operativo: true,
       bufete: false,
+      consultor: false,
     },
     mesaAsignada: 1,
   })
@@ -133,7 +135,7 @@ export function UserManagement() {
       querySnapshot.forEach((doc) => {
         const data = doc.data()
 
-        let roles: ("administrador" | "operativo" | "bufete")[]
+        let roles: ("administrador" | "operativo" | "bufete" | "consultor")[]
         if (Array.isArray(data.roles)) {
           roles = data.roles
         } else if (data.role) {
@@ -185,6 +187,7 @@ export function UserManagement() {
       administradores: users.filter((u) => u.roles.includes("administrador")).length,
       operativos: users.filter((u) => u.roles.includes("operativo")).length,
       bufetes: users.filter((u) => u.roles.includes("bufete")).length,
+      consultores: users.filter((u) => u.roles.includes("consultor")).length,
     }
   }, [users])
 
@@ -195,10 +198,11 @@ export function UserManagement() {
     setSuccess("")
 
     try {
-      const selectedRoles: ("administrador" | "operativo" | "bufete")[] = []
+      const selectedRoles: ("administrador" | "operativo" | "bufete" | "consultor")[] = []
       if (newUser.roles.administrador) selectedRoles.push("administrador")
       if (newUser.roles.operativo) selectedRoles.push("operativo")
       if (newUser.roles.bufete) selectedRoles.push("bufete")
+      if (newUser.roles.consultor) selectedRoles.push("consultor")
 
       if (selectedRoles.length === 0) {
         setError("Debes seleccionar al menos un rol")
@@ -226,7 +230,7 @@ export function UserManagement() {
         idNumber: "",
         fullName: "",
         password: "",
-        roles: { administrador: false, operativo: true, bufete: false },
+        roles: { administrador: false, operativo: true, bufete: false, consultor: false },
         mesaAsignada: 1,
       })
       setIsDialogOpen(false)
@@ -260,10 +264,10 @@ export function UserManagement() {
   const handleRoleToggle = async (
     userId: string,
     role: "administrador" | "operativo" | "bufete",
-    currentRoles: ("administrador" | "operativo" | "bufete")[],
+    currentRoles: ("administrador" | "operativo" | "bufete" | "consultor")[],
   ) => {
     try {
-      let newRoles: ("administrador" | "operativo" | "bufete")[]
+      let newRoles: ("administrador" | "operativo" | "bufete" | "consultor")[]
 
       if (currentRoles.includes(role)) {
         // Remove role
@@ -347,6 +351,7 @@ export function UserManagement() {
       administrador: user.roles.includes("administrador"),
       operativo: user.roles.includes("operativo"),
       bufete: user.roles.includes("bufete"),
+      consultor: user.roles.includes("consultor"),
     })
     setEditMesaAsignada(user.mesaAsignada || 1)
     setIsEditDialogOpen(true)
@@ -361,10 +366,11 @@ export function UserManagement() {
     setSuccess("")
 
     try {
-      const selectedRoles: ("administrador" | "operativo" | "bufete")[] = []
+      const selectedRoles: ("administrador" | "operativo" | "bufete" | "consultor")[] = []
       if (editRoles.administrador) selectedRoles.push("administrador")
       if (editRoles.operativo) selectedRoles.push("operativo")
       if (editRoles.bufete) selectedRoles.push("bufete")
+      if (editRoles.consultor) selectedRoles.push("consultor")
 
       if (selectedRoles.length === 0) {
         setError("El usuario debe tener al menos un rol")
@@ -414,6 +420,8 @@ export function UserManagement() {
         return <Shield className="w-3.5 h-3.5 text-red-600" />
       case "bufete":
         return <Scale className="w-3.5 h-3.5 text-green-600" />
+      case "consultor":
+        return <Eye className="w-3.5 h-3.5 text-purple-600" />
       default:
         return <User className="w-3.5 h-3.5 text-blue-600" />
     }
@@ -424,6 +432,7 @@ export function UserManagement() {
       administrador: "bg-red-100 text-red-800",
       bufete: "bg-green-100 text-green-800",
       operativo: "bg-blue-100 text-blue-800",
+      consultor: "bg-purple-100 text-purple-800",
     }
     return colors[role as keyof typeof colors] || colors.operativo
   }
@@ -570,6 +579,20 @@ export function UserManagement() {
                         Bufete
                       </label>
                     </div>
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        id="role-consultor"
+                        checked={newUser.roles.consultor}
+                        onCheckedChange={(checked) =>
+                          setNewUser({ ...newUser, roles: { ...newUser.roles, consultor: checked as boolean } })
+                        }
+                        disabled={creating}
+                      />
+                      <label htmlFor="role-consultor" className="flex items-center gap-2 text-sm cursor-pointer">
+                        <Eye className="w-4 h-4" />
+                        Consultor
+                      </label>
+                    </div>
                   </div>
                 </div>
 
@@ -636,7 +659,7 @@ export function UserManagement() {
           />
         </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+        <div className="grid grid-cols-3 md:grid-cols-5 gap-2">
           <Card>
             <CardContent className="p-3">
               <div className="text-center">
@@ -669,11 +692,19 @@ export function UserManagement() {
               </div>
             </CardContent>
           </Card>
+          <Card>
+            <CardContent className="p-3">
+              <div className="text-center">
+                <p className="text-2xl font-bold text-purple-600">{userStats.consultores}</p>
+                <p className="text-xs text-muted-foreground">Consultores</p>
+              </div>
+            </CardContent>
+          </Card>
         </div>
       </div>
 
       <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as typeof activeTab)} className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="todos" className="text-xs">
             Todos
             <Badge variant="secondary" className="ml-1.5 px-1.5 py-0 text-xs">
@@ -699,6 +730,13 @@ export function UserManagement() {
             Bufete
             <Badge variant="secondary" className="ml-1.5 px-1.5 py-0 text-xs">
               {userStats.bufetes}
+            </Badge>
+          </TabsTrigger>
+          <TabsTrigger value="consultor" className="text-xs">
+            <Eye className="w-3 h-3 mr-1" />
+            Consult.
+            <Badge variant="secondary" className="ml-1.5 px-1.5 py-0 text-xs">
+              {userStats.consultores}
             </Badge>
           </TabsTrigger>
         </TabsList>
@@ -737,7 +775,7 @@ export function UserManagement() {
                         <div className="flex items-center gap-0.5 mt-0.5 flex-wrap">
                           {user.roles.map((role) => (
                             <span key={role} className={`text-[8px] md:text-[10px] px-1.5 py-0.5 rounded-full font-medium ${getRoleBadge(role)}`}>
-                              {role === "administrador" ? "Admin" : role === "bufete" ? "Bufete" : "Operativo"}
+                              {role === "administrador" ? "Admin" : role === "bufete" ? "Bufete" : role === "consultor" ? "Consultor" : "Operativo"}
                             </span>
                           ))}
                         </div>
@@ -861,6 +899,20 @@ export function UserManagement() {
                     <label htmlFor="edit-role-bufete" className="flex items-center gap-2 text-sm cursor-pointer">
                       <Scale className="w-4 h-4" />
                       Bufete
+                    </label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="edit-role-consultor"
+                      checked={editRoles.consultor}
+                      onCheckedChange={(checked) =>
+                        setEditRoles({ ...editRoles, consultor: checked as boolean })
+                      }
+                      disabled={creating}
+                    />
+                    <label htmlFor="edit-role-consultor" className="flex items-center gap-2 text-sm cursor-pointer">
+                      <Eye className="w-4 h-4" />
+                      Consultor
                     </label>
                   </div>
                 </div>

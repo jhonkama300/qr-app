@@ -35,6 +35,7 @@ interface NavItem {
   adminOnly: boolean
   bufeteOnly: boolean
   operativoOnly: boolean
+  consultorOnly?: boolean
   adminOrOperativo?: boolean
   getDescription?: (role: string) => string
   description?: string
@@ -130,6 +131,16 @@ const items: NavItem[] = [
     operativoOnly: false,
     iconColor: "text-indigo-500",
   },
+  {
+    title: "Consultas",
+    path: "/dashboard/consultas",
+    icon: Eye,
+    adminOnly: false,
+    bufeteOnly: false,
+    operativoOnly: false,
+    consultorOnly: true,
+    iconColor: "text-purple-500",
+  },
 ]
 
 const roleStyles: Record<string, { label: string; bg: string; text: string; border: string; gradient: string }> = {
@@ -154,10 +165,17 @@ const roleStyles: Record<string, { label: string; bg: string; text: string; bord
     border: "border-emerald-200",
     gradient: "from-emerald-500 to-green-600",
   },
+  consultor: {
+    label: "Consultor",
+    bg: "bg-purple-50",
+    text: "text-purple-700",
+    border: "border-purple-200",
+    gradient: "from-purple-500 to-purple-600",
+  },
 }
 
 export function AppSidebar() {
-  const { user, activeRole, isAdmin, isBufete, logout, fullName } = useAuth()
+  const { user, activeRole, isAdmin, isBufete, isConsultor, logout, fullName } = useAuth()
   const router = useRouter()
   const pathname = usePathname()
   const { toggleSidebar, state, setOpenMobile, isMobile } = useSidebar()
@@ -185,6 +203,7 @@ export function AppSidebar() {
   const roleInfo = roleStyles[activeRole || ""] || roleStyles.operativo
 
   const visibleItems = items.filter((item) => {
+    if (isConsultor) return !!item.consultorOnly
     if (item.adminOnly && !isAdmin) return false
     if (item.bufeteOnly && !isBufete) return false
     if (item.operativoOnly && !isOperativo) return false
