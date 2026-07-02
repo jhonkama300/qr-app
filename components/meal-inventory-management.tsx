@@ -25,7 +25,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { Package, RefreshCw, Settings, AlertTriangle, Plus, Utensils, Edit, Trash2 } from "lucide-react"
-import { doc, onSnapshot, collection } from "firebase/firestore"
+import { doc, onSnapshot, collection, setDoc } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import {
   updateMealInventory,
@@ -235,6 +235,12 @@ export function MealInventoryManagement() {
 
     try {
       await createOrUpdateTableMealInventory(numero, tableName, meals, true)
+      await setDoc(doc(db, "mesas_config", `mesa_${numero}`), {
+        numero,
+        nombre: tableName,
+        activa: true,
+        fechaActualizacion: new Date().toISOString(),
+      })
       setSuccess(`Mesa ${numero} configurada con ${meals} comidas`)
       setIsAddTableDialogOpen(false)
       setTableNumber("")
