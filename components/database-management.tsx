@@ -34,6 +34,8 @@ import {
   Utensils,
   UserPlus,
   Gift,
+  Plus,
+  Minus,
 } from "lucide-react"
 let xlsxModule: any = null
 const getXLSX = async () => {
@@ -104,6 +106,11 @@ export function DatabaseManagement() {
     actualizados: number
     noEncontrados: string[]
   } | null>(null)
+
+  const [isAddCuposDialogOpen, setIsAddCuposDialogOpen] = useState(false)
+  const [selectedPersonForCupos, setSelectedPersonForCupos] = useState<PersonData | null>(null)
+  const [cuposToAdd, setCuposToAdd] = useState(1)
+  const [addingCupos, setAddingCupos] = useState(false)
 
   const totalPages = Math.ceil(filteredPersons.length / itemsPerPage)
   const startIndex = (currentPage - 1) * itemsPerPage
@@ -692,6 +699,29 @@ export function DatabaseManagement() {
     }
   }
 
+  const handleAddCuposExtras = async () => {
+    if (!selectedPersonForCupos || !selectedPersonForCupos.id) return
+    setAddingCupos(true)
+    setError("")
+    setSuccess("")
+    try {
+      const currentCupos = selectedPersonForCupos.cuposExtras || 0
+      await updateDoc(doc(db, "personas", selectedPersonForCupos.id), {
+        cuposExtras: currentCupos + cuposToAdd,
+      })
+      setSuccess(`${cuposToAdd} cupo(s) extra(s) agregado(s) a ${selectedPersonForCupos.nombre}`)
+      setIsAddCuposDialogOpen(false)
+      setSelectedPersonForCupos(null)
+      setCuposToAdd(1)
+      loadPersons()
+    } catch (error) {
+      console.error("Error adding cupos extras:", error)
+      setError("Error al agregar cupos extras")
+    } finally {
+      setAddingCupos(false)
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -873,6 +903,13 @@ export function DatabaseManagement() {
                                   +{cupos.extras}
                                 </span>
                               )}
+                              <button
+                                onClick={() => { setSelectedPersonForCupos(person); setCuposToAdd(1); setIsAddCuposDialogOpen(true) }}
+                                className="size-4 md:size-5 flex items-center justify-center rounded-full bg-uparsistem-600 text-white hover:bg-uparsistem-700 transition-colors"
+                                title="Agregar cupos extras"
+                              >
+                                <Plus className="size-2.5 md:size-3" />
+                              </button>
                             </div>
                           </div>
                         </div>
@@ -1261,6 +1298,74 @@ export function DatabaseManagement() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsResetBufetesDialogOpen(false)}>
               Cancelar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Diálogo para agregar cupos extras */}
+      <Dialog open={isAddCuposDialogOpen} onOpenChange={setIsAddCuposDialogOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Gift className="h-5 w-5 text-amber-500" />
+              Agregar Cupos Extras
+            </DialogTitle>
+            <DialogDescription>
+              {selectedPersonForCupos ? (
+                <>Agregar cupos a <strong>{selectedPersonForCupos.nombre}</strong> ({selectedPersonForCupos.identificacion})</>
+              ) : (
+                "Selecciona un estudiante"
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="flex items-center gap-3">
+              <Button
+                variant="outline"
+                size="icon"
+                className="size-9"
+                onClick={() => setCuposToAdd(Math.max(1, cuposToAdd - 1))}
+                disabled={cuposToAdd <= 1}
+              >
+                <Minus className="size-4" />
+              </Button>
+              <div className="flex-1 text-center">
+                <span className="text-3xl font-bold text-amber-600">{cuposToAdd}</span>
+                <p className="text-xs text-muted-foreground">cupo(s) extra(s)</p>
+              </div>
+              <Button
+                variant="outline"
+                size="icon"
+                className="size-9"
+                onClick={() => setCuposToAdd(cuposToAdd + 1)}
+              >
+                <Plus className="size-4" />
+              </Button>
+            </div>
+            {selectedPersonForCupos && (
+              <div className="text-xs text-muted-foreground text-center">
+                Actualmente tiene <strong>{selectedPersonForCupos.cuposExtras || 0}</strong> cupo(s) extra(s) → <strong>{(selectedPersonForCupos.cuposExtras || 0) + cuposToAdd}</strong>
+              </div>
+            )}
+          </div>
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() => { setIsAddCuposDialogOpen(false); setSelectedPersonForCupos(null); setCuposToAdd(1) }}
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleAddCuposExtras}
+              disabled={addingCupos || !selectedPersonForCupos}
+              className="bg-amber-600 hover:bg-amber-700 text-white"
+            >
+              {addingCupos ? (
+                <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Agregando...</>
+              ) : (
+                <><Plus className="mr-2 h-4 w-4" /> Agregar {cuposToAdd} cupo(s)</>
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>
