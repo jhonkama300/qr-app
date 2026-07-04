@@ -153,6 +153,7 @@ export function BuffeteScanner() {
       if (
         source !== "q10" &&
         !scannedContent.startsWith("https://site2.q10.com/CertificadosAcademicos/") &&
+        !scannedContent.startsWith("https://site6.q10.com/CertificadosAcademicos/") &&
         !scannedContent.startsWith("https://uparsistemvalledupar.q10.com/CertificadosAcademicos/")
       ) {
         const len = scannedContent.trim().length
@@ -190,6 +191,7 @@ export function BuffeteScanner() {
 
         if (
           scannedContent.startsWith("https://site2.q10.com/CertificadosAcademicos/") ||
+          scannedContent.startsWith("https://site6.q10.com/CertificadosAcademicos/") ||
           scannedContent.startsWith("https://uparsistemvalledupar.q10.com/CertificadosAcademicos/")
         ) {
           setScanResult({
