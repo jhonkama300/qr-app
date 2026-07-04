@@ -82,6 +82,9 @@ export function AdvancedBarcodeScanner() {
       }
 
       setIsScanning(true)
+
+      scannedContent = scannedContent.trim()
+
       let currentScanResult: ScanResultDisplay
 
       const userInfo = user

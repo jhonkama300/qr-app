@@ -119,6 +119,8 @@ export function OperativoScanner() {
 
       setProcessing(true)
 
+      scannedContent = scannedContent.trim()
+
       if (
         source !== "q10" &&
         !scannedContent.startsWith("https://site2.q10.com/CertificadosAcademicos/") &&

@@ -148,6 +148,8 @@ export function BuffeteScanner() {
       setProcessing(true)
       setError("")
 
+      scannedContent = scannedContent.trim()
+
       if (
         source !== "q10" &&
         !scannedContent.startsWith("https://site2.q10.com/CertificadosAcademicos/") &&
